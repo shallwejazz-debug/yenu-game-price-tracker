@@ -73,6 +73,11 @@ const BLACKLIST_KEYWORDS = [
   '상점환율', '상점국가', '국가변경', '환율변경',
 ]
 
+// 블랙리스트 정규식 (단어 경계 필요한 것 — NA버전/AA버전/NA계정 등)
+const BLACKLIST_REGEX = [
+  /\b(na|aa)\s*버전\b/i,
+  /\b(na|aa)\s*계정\b/i,
+]
 
 // 2) 디지털 키로 분류 (is_digital = 1) — 단순 부분일치
 const DIGITAL_KEYWORDS = [
