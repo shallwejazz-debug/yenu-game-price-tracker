@@ -1,8 +1,9 @@
 // ============================================================
 // 네이버 쇼핑 API 연동 모듈
 // src/naver.ts
-//   - 게임명으로 검색 → 패키지(실물) 가격 + 구매 링크 수집
+//   - 게임명으로 검색 → 패키지(실물) / 디지털 키 가격 + 구매 링크 수집
 //   - 굿즈/액세서리 필터링 (category3 = "게임타이틀" 만 통과)
+//   - 계정/대리 등 회색지대 상품 제외 (정식 유통만 노출)
 // ============================================================
 
 // 네이버 쇼핑 API 원본 아이템
@@ -36,6 +37,7 @@ export interface CleanedPrice {
   link: string
   title: string
   image: string
+  isDigital: number // 1 = 디지털 키/코드, 0 = 실물 패키지
 }
 
 // HTML 태그 제거 (<b>엘든링</b> → 엘든링)
@@ -52,6 +54,54 @@ function mapMallToSource(mallName: string): string {
   if (n.includes('옥션') || n.includes('auction')) return 'auction'
   if (n === '네이버' || n.includes('naver') || n.includes('스마트스토어')) return 'naver'
   return 'etc'
+}
+
+// ============================================================
+// 디지털/패키지/블랙리스트 분류 정책
+//   - 정식 유통 상품만 노출 (계정/대리/지역우회 등 회색지대 제외)
+//   - 분류 키워드는 운영 중 보강 가능하도록 이 상수 블록에 집약
+//   - (백로그 #8) 추후 DB 테이블화 + 관리자 편집
+// ============================================================
+
+// 1) 수집 자체에서 제외 (블랙리스트) — 걸리면 결과 폐기
+const BLACKLIST_KEYWORDS = [
+  '계정', '기존계정', '공유계정', '대리', '대행',
+  '해외계정', '지역우회', 'vpn',
+  '미개통', '미사용계정',
+]
+
+// 2) 디지털 키로 분류 (is_digital = 1) — 단순 부분일치
+const DIGITAL_KEYWORDS = [
+  '스팀', 'steam', '스팀키',
+  'cd키', 'cd-key', 'cdkey', '시리얼키', '시리얼번호',
+  '디지털', 'digital', '다운로드', 'download',
+  '이메일발송', '온라인코드', 'pc판 키', '에디션 키',
+  '이숍', 'eshop', '다운로드 번호',
+]
+
+// 2-보강) 단어 경계가 필요한 디지털 신호 (예: "code"가 "QR코드"에 오탐되지 않도록)
+const DIGITAL_REGEX = [
+  /\bcode\b/i,                         // 영문 code (단어 경계)
+  /(^|[^가-힣])코드([^가-힣]|$)/,      // 한글 코드 (앞뒤가 한글이 아닐 때만)
+]
+
+/**
+ * 블랙리스트(계정/대리 등 회색지대) 판별 → true면 수집에서 제외
+ */
+function isBlacklisted(title: string): boolean {
+  const t = title.toLowerCase()
+  return BLACKLIST_KEYWORDS.some((w) => t.includes(w.toLowerCase()))
+}
+
+/**
+ * 디지털 키/코드 판별 → true면 is_digital = 1 로 저장
+ * (블랙리스트 통과 후 호출되는 것을 전제)
+ */
+function isDigitalKey(title: string): boolean {
+  const t = title.toLowerCase()
+  if (DIGITAL_KEYWORDS.some((w) => t.includes(w.toLowerCase()))) return true
+  if (DIGITAL_REGEX.some((re) => re.test(title))) return true
+  return false
 }
 
 // 굿즈/액세서리 필터 — 게임 본품만 남기기
@@ -121,6 +171,7 @@ export interface ClassifyResult {
   buckets: PlatformBucket[]
   skipped: {
     notGameTitle: number // 게임타이틀 카테고리 아님
+    blacklisted: number // 계정/대리 등 회색지대
     used: number // 중고/대여
     outOfRange: number // 가격 범위 밖
     noPlatform: number // 플랫폼 판별 실패
@@ -129,7 +180,7 @@ export interface ClassifyResult {
 }
 
 /**
- * 게임명만으로 검색 → 게임타이틀 필터 → 신품/가격필터 → 플랫폼 자동분류.
+ * 게임명만으로 검색 → 게임타이틀 필터 → 블랙리스트/신품/가격필터 → 플랫폼 자동분류.
  * 하나의 검색 결과가 여러 플랫폼 버킷으로 쪼개진다. (자동 임포트의 핵심)
  *
  * @param query    검색어 (보통 게임 제목 그대로, 예: "엘든링")
@@ -158,7 +209,7 @@ export async function searchAndClassify(
   }
 
   const data = (await res.json()) as NaverShopResponse
-  const skipped = { notGameTitle: 0, used: 0, outOfRange: 0, noPlatform: 0 }
+  const skipped = { notGameTitle: 0, blacklisted: 0, used: 0, outOfRange: 0, noPlatform: 0 }
 
   // 플랫폼별로 원본 모으기
   const byPlatform = new Map<string, CleanedPrice[]>()
@@ -168,6 +219,10 @@ export async function searchAndClassify(
 
     if (!isLikelyGameTitle(item, keywords)) {
       skipped.notGameTitle++
+      continue
+    }
+    if (isBlacklisted(title)) {
+      skipped.blacklisted++
       continue
     }
     if (isUsedItem(title)) {
@@ -192,19 +247,21 @@ export async function searchAndClassify(
       link: item.link,
       title,
       image: item.image,
+      isDigital: isDigitalKey(title) ? 1 : 0,
     }
     const arr = byPlatform.get(platform) ?? []
     arr.push(cleaned)
     byPlatform.set(platform, arr)
   }
 
-  // 플랫폼별: source당 최저가 1건만 + 오름차순 정렬
+  // 플랫폼별: (source + 디지털여부)당 최저가 1건만 + 오름차순 정렬
   const buckets: PlatformBucket[] = []
   for (const [platform, list] of byPlatform.entries()) {
     const bySource = new Map<string, CleanedPrice>()
     for (const c of list) {
-      const existing = bySource.get(c.mallName)
-      if (!existing || c.price < existing.price) bySource.set(c.mallName, c)
+      const key = `${c.mallName}|${c.isDigital}`
+      const existing = bySource.get(key)
+      if (!existing || c.price < existing.price) bySource.set(key, c)
     }
     const prices = Array.from(bySource.values()).sort((a, b) => a.price - b.price)
     buckets.push({
@@ -223,7 +280,7 @@ export async function searchAndClassify(
 }
 
 /**
- * 게임 패키지 가격을 네이버 쇼핑에서 검색
+ * 게임 패키지/디지털 가격을 네이버 쇼핑에서 검색
  * @param query     검색어 (예: "PS5 엘든링 한글판")
  * @param keywords  본품 판별용 핵심 키워드 (예: ["엘든", "elden"])
  */
@@ -256,6 +313,9 @@ export async function searchGamePrices(
   const cleaned: CleanedPrice[] = []
   for (const item of data.items) {
     if (!isLikelyGameTitle(item, keywords)) continue
+    const title = stripTags(item.title)
+    if (isBlacklisted(title)) continue
+    if (isUsedItem(title)) continue
     const price = parseInt(item.lprice, 10)
     if (!isReasonablePrice(price)) continue
 
@@ -264,17 +324,19 @@ export async function searchGamePrices(
       mallLabel: item.mallName,
       price,
       link: item.link,
-      title: stripTags(item.title),
+      title,
       image: item.image,
+      isDigital: isDigitalKey(title) ? 1 : 0,
     })
   }
 
-  // 같은 쇼핑몰(source)은 최저가 1건만 유지
+  // 같은 (쇼핑몰 + 디지털여부)는 최저가 1건만 유지
   const bySource = new Map<string, CleanedPrice>()
   for (const c of cleaned) {
-    const existing = bySource.get(c.mallName)
+    const key = `${c.mallName}|${c.isDigital}`
+    const existing = bySource.get(key)
     if (!existing || c.price < existing.price) {
-      bySource.set(c.mallName, c)
+      bySource.set(key, c)
     }
   }
 
