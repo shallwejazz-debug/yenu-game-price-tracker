@@ -4,7 +4,7 @@
 //   POST   /admin/games                      - 게임(작품) 등록
 //   POST   /admin/games/:id/editions         - 에디션(플랫폼판) 추가
 //   PATCH  /admin/editions/:id               - 에디션 수정 (검색어 등)
-//   POST   /admin/editions/:id/fetch-prices  - 네이버에서 패키지 가격 수집
+//   POST   /admin/editions/:id/fetch-prices  - 네이버에서 가격 수집
 //   POST   /admin/editions/:id/prices        - 가격 수동 추가 (디지털 등)
 //
 // 인증: X-Admin-Token 헤더
@@ -175,7 +175,7 @@ admin.post('/editions/:id/prices', async (c) => {
   }
 })
 
-// ---------- 네이버에서 패키지 가격 수집 (에디션 단위) ----------
+// ---------- 네이버에서 가격 수집 (에디션 단위) ----------
 admin.post('/editions/:id/fetch-prices', async (c) => {
   const id = Number(c.req.param('id'))
   if (Number.isNaN(id)) return c.json({ ok: false, error: '잘못된 에디션 ID' }, 400)
@@ -208,7 +208,7 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
         source: p.mallName,
         price: p.price,
         currency: 'KRW',
-        is_digital: 0,
+        is_digital: p.isDigital,
         product_url: p.link,
         mall_label: p.mallLabel,
       })
@@ -219,8 +219,8 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
       query: edition.search_query,
       found: prices.length,
       saved,
-      prices: prices.map((p) => ({ mall: p.mallLabel, source: p.mallName, price: p.price })),
-      message: `패키지 가격 ${saved}건 수집 완료`,
+      prices: prices.map((p) => ({ mall: p.mallLabel, source: p.mallName, price: p.price, is_digital: p.isDigital })),
+      message: `가격 ${saved}건 수집 완료`,
     })
   } catch (err: any) {
     return c.json({ ok: false, error: err.message }, 500)
@@ -232,7 +232,6 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
 // ============================================================
 
 // ---------- 토큰 검증 (잠금 화면 통과용) ----------
-// 미들웨어를 이미 통과했다는 것 = 토큰이 맞다는 것. 단순 ok 반환.
 admin.post('/api/verify', (c) => {
   return c.json({ ok: true })
 })
@@ -271,7 +270,7 @@ admin.post('/api/settings', async (c) => {
   }
 })
 
-// ---------- 게임 "제목만" 추가 (자동화 방향: 제목만 넣으면 끝) ----------
+// ---------- 게임 "제목만" 추가 ----------
 admin.post('/api/games', async (c) => {
   let body: any
   try {
@@ -300,8 +299,9 @@ admin.post('/api/games', async (c) => {
 })
 
 // ============================================================
-// 자동 임포트: 제목만 던지면 → 검색 → 게임타이틀/신품 필터 →
-//             플랫폼 자동분류 → (dryRun 아니면) 작품/에디션/가격 자동 저장
+// 자동 임포트: 제목만 던지면 → 검색 → 게임타이틀/신품/블랙리스트 필터 →
+//             디지털/패키지 분류 → 플랫폼 자동분류 →
+//             (dryRun 아니면) 작품/에디션/가격 자동 저장
 //   POST /admin/api/auto-import
 //   바디: { "titles": ["엘든링", ...], "dryRun": true }
 // ============================================================
@@ -348,7 +348,12 @@ admin.post('/api/auto-import', async (c) => {
           label: PLATFORM_LABELS[b.platform] ?? b.platform,
           count: b.count,
           lowest: b.lowest,
-          malls: b.prices.map((p) => ({ source: p.mallName, label: p.mallLabel, price: p.price })),
+          malls: b.prices.map((p) => ({
+            source: p.mallName,
+            label: p.mallLabel,
+            price: p.price,
+            is_digital: p.isDigital,
+          })),
         }
       }
 
@@ -392,7 +397,7 @@ admin.post('/api/auto-import', async (c) => {
             })
             editionId = Number(r.meta.last_row_id)
           }
-          // 3) 가격 저장 (패키지)
+          // 3) 가격 저장 (디지털/패키지 분류 반영)
           let cnt = 0
           for (const p of b.prices) {
             await insertPrice(c.env.DB, {
@@ -400,7 +405,7 @@ admin.post('/api/auto-import', async (c) => {
               source: p.mallName,
               price: p.price,
               currency: 'KRW',
-              is_digital: 0,
+              is_digital: p.isDigital,
               product_url: p.link,
               mall_label: p.mallLabel,
             })
