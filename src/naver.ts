@@ -65,10 +65,14 @@ function mapMallToSource(mallName: string): string {
 
 // 1) 수집 자체에서 제외 (블랙리스트) — 걸리면 결과 폐기
 const BLACKLIST_KEYWORDS = [
-  '계정', '기존계정', '공유계정', '대리', '대행',
+  '계정', '기존계정', '공유계정', '신규계정', '대리', '대행',
   '해외계정', '지역우회', 'vpn',
   '미개통', '미사용계정',
+  // 스팀 계정성/지역우회 코드 (NA/AA 등) 차단
+  'na버전', 'aa버전', 'na 버전', 'aa 버전',
+  '상점환율', '상점국가', '국가변경', '환율변경',
 ]
+
 
 // 2) 디지털 키로 분류 (is_digital = 1) — 단순 부분일치
 const DIGITAL_KEYWORDS = [
@@ -90,8 +94,11 @@ const DIGITAL_REGEX = [
  */
 function isBlacklisted(title: string): boolean {
   const t = title.toLowerCase()
-  return BLACKLIST_KEYWORDS.some((w) => t.includes(w.toLowerCase()))
+  if (BLACKLIST_KEYWORDS.some((w) => t.includes(w.toLowerCase()))) return true
+  if (BLACKLIST_REGEX.some((re) => re.test(title))) return true   // ← 추가
+  return false
 }
+
 
 /**
  * 디지털 키/코드 판별 → true면 is_digital = 1 로 저장
