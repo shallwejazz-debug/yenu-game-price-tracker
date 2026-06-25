@@ -2,17 +2,44 @@
 // 관리자 콘솔 프론트엔드
 // public/static/admin.js
 //   - 토큰을 localStorage에 보관, API 호출 시 X-Admin-Token 헤더로 전송
+//   - 5분 비활동 시 자동 잠금 + "사이트로" 이동 시 즉시 잠금
 // ============================================================
 
 (function () {
   'use strict'
 
   const TOKEN_KEY = 'gpt_admin_token'
+  const TS_KEY = 'gpt_admin_ts'           // 마지막 활동 시각
+  const IDLE_LIMIT = 5 * 60 * 1000        // 5분 (밀리초)
   const $ = (id) => document.getElementById(id)
+
+  let idleTimer = null
 
   function getToken() {
     return localStorage.getItem(TOKEN_KEY) || ''
   }
+
+  // 토큰 + 활동시각 기록
+  function saveToken(pw) {
+    localStorage.setItem(TOKEN_KEY, pw)
+    localStorage.setItem(TS_KEY, String(Date.now()))
+  }
+  // 활동시각만 갱신 (작업 중일 때)
+  function touch() {
+    if (getToken()) localStorage.setItem(TS_KEY, String(Date.now()))
+  }
+  // 토큰 폐기 (잠금)
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(TS_KEY)
+  }
+  // 5분 지났는지 확인
+  function isExpired() {
+    const ts = parseInt(localStorage.getItem(TS_KEY) || '0', 10)
+    if (!ts) return true
+    return Date.now() - ts > IDLE_LIMIT
+  }
+
   function setStatus(el, msg, ok) {
     el.textContent = msg
     el.className = 'admin-status ' + (ok ? 'ok' : 'err')
@@ -33,14 +60,31 @@
     return data
   }
 
+  // ---------- 자동 잠금 타이머 ----------
+  function startIdleTimer() {
+    stopIdleTimer()
+    idleTimer = setInterval(() => {
+      if (isExpired()) {
+        clearToken()
+        showLock('5분간 활동이 없어 자동 잠금되었습니다.', true)
+      }
+    }, 30 * 1000) // 30초마다 검사
+  }
+  function stopIdleTimer() {
+    if (idleTimer) { clearInterval(idleTimer); idleTimer = null }
+  }
+
   // ---------- 잠금 화면 / 인증 게이트 ----------
   function showAdmin() {
     $('lockScreen').style.display = 'none'
     $('adminContent').hidden = false
+    touch()
+    startIdleTimer()
     loadSettings()
     loadGames()
   }
   function showLock(msg, ok) {
+    stopIdleTimer()
     $('adminContent').hidden = true
     $('lockScreen').style.display = 'flex'
     if (msg) setStatus($('lockStatus'), msg, !!ok)
@@ -64,22 +108,32 @@
       setStatus($('lockStatus'), '비밀번호를 입력하세요.', false)
       return
     }
-    localStorage.setItem(TOKEN_KEY, pw)
+    saveToken(pw)
     setStatus($('lockStatus'), '확인 중…', true)
     const ok = await verifyToken()
     if (ok) {
       $('lockPassword').value = ''
       showAdmin()
     } else {
-      localStorage.removeItem(TOKEN_KEY)
+      clearToken()
       setStatus($('lockStatus'), '❌ 비밀번호가 틀렸습니다.', false)
     }
   })
 
   // 잠그기 버튼 (로그아웃)
   $('lockBtn').addEventListener('click', () => {
-    localStorage.removeItem(TOKEN_KEY)
+    clearToken()
     showLock('잠금 처리되었습니다.', true)
+  })
+
+  // "사이트로" 링크 → 떠날 때 즉시 잠금
+  document.querySelectorAll('.admin-back, .lock-back').forEach((a) => {
+    a.addEventListener('click', () => { clearToken() })
+  })
+
+  // 사용자 활동 감지 → 활동시각 갱신 (작업 중엔 안 잠김)
+  ;['click', 'keydown', 'input'].forEach((ev) => {
+    document.addEventListener(ev, touch, true)
   })
 
   // ---------- 레퍼럴 설정 ----------
@@ -215,13 +269,18 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const saved = getToken()
     if (saved) {
-      // 저장된 비밀번호가 여전히 유효한지 확인
+      // 5분 지났으면 만료 처리
+      if (isExpired()) {
+        clearToken()
+        showLock('세션이 만료되었습니다. 다시 로그인하세요.', false)
+        return
+      }
       const ok = await verifyToken()
       if (ok) {
         showAdmin()
         return
       }
-      localStorage.removeItem(TOKEN_KEY)
+      clearToken()
     }
     showLock()
   })
