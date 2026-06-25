@@ -4,6 +4,7 @@
 //   - 게임명으로 검색 → 패키지(실물) / 디지털 키 가격 + 구매 링크 수집
 //   - 굿즈/액세서리 필터링 (category3 = "게임타이틀" 만 통과)
 //   - 계정/대리 등 회색지대 상품 제외 (정식 유통만 노출)
+//   - 중고/개인거래성 판매처 제외
 // ============================================================
 
 // 네이버 쇼핑 API 원본 아이템
@@ -79,6 +80,11 @@ const BLACKLIST_REGEX = [
   /\b(na|aa)\s*계정\b/i,
 ]
 
+// 중고/개인거래성 판매처 (네이버 API title엔 '중고'가 없어도 이런 몰은 거름)
+const BLOCKED_MALLS = [
+  '마리오친구', '메루카리', '번개장터', '중고나라',
+]
+
 // 2) 디지털 키로 분류 (is_digital = 1) — 단순 부분일치
 const DIGITAL_KEYWORDS = [
   '스팀', 'steam', '스팀키',
@@ -100,10 +106,17 @@ const DIGITAL_REGEX = [
 function isBlacklisted(title: string): boolean {
   const t = title.toLowerCase()
   if (BLACKLIST_KEYWORDS.some((w) => t.includes(w.toLowerCase()))) return true
-  if (BLACKLIST_REGEX.some((re) => re.test(title))) return true   // ← 추가
+  if (BLACKLIST_REGEX.some((re) => re.test(title))) return true
   return false
 }
 
+/**
+ * 중고/개인거래성 판매처 판별 → true면 수집에서 제외
+ */
+function isBlockedMall(mallName: string): boolean {
+  const n = mallName.toLowerCase()
+  return BLOCKED_MALLS.some((w) => n.includes(w.toLowerCase()))
+}
 
 /**
  * 디지털 키/코드 판별 → true면 is_digital = 1 로 저장
@@ -184,7 +197,7 @@ export interface ClassifyResult {
   skipped: {
     notGameTitle: number // 게임타이틀 카테고리 아님
     blacklisted: number // 계정/대리 등 회색지대
-    used: number // 중고/대여
+    used: number // 중고/대여/차단몰
     outOfRange: number // 가격 범위 밖
     noPlatform: number // 플랫폼 판별 실패
   }
@@ -239,6 +252,10 @@ export async function searchAndClassify(
     }
     if (isUsedItem(title)) {
       skipped.used++
+      continue
+    }
+    if (isBlockedMall(item.mallName)) {
+      skipped.used++ // 중고/개인거래성 판매처 → 중고로 같이 카운트
       continue
     }
     const price = parseInt(item.lprice, 10)
@@ -328,6 +345,7 @@ export async function searchGamePrices(
     const title = stripTags(item.title)
     if (isBlacklisted(title)) continue
     if (isUsedItem(title)) continue
+    if (isBlockedMall(item.mallName)) continue
     const price = parseInt(item.lprice, 10)
     if (!isReasonablePrice(price)) continue
 
