@@ -1,7 +1,7 @@
 // ============================================================
 // 네이버 쇼핑 API 연동 모듈  src/naver.ts
 //   - 게임명 검색 → 패키지/디지털 가격 + 구매 링크 수집
-//   - 굿즈/계정/중고/회색지대 상품 제외
+//   - 굿즈/스틸북/계정/중고/회색지대 상품 제외
 //   - PS4+PS5 동시 언급 매물은 실물 기준 PS4로 분류
 // ============================================================
 
@@ -14,9 +14,15 @@ function mapMallToSource(mallName: string): string { const n = mallName.toLowerC
 
 // ---------- 블랙리스트 & 차단몰 ----------
 const BLACKLIST_KEYWORDS = ['계정','기존계정','공유계정','신규계정','대리','대행','해외계정','지역우회','vpn','미개통','미사용계정','na버전','aa버전','na 버전','aa 버전','상점환율','상점국가','국가변경','환율변경'];
-const BLACKLIST_REGEX = [/\b(na|aa)\s*버전\b/i, /\b(na|aa)\s*계정\b/i];
+const BLACKLIST_REGEX = [
+  /\b(na|aa)\s*버전\b/i,
+  /\b(na|aa)\s*계정\b/i,
+  /[\(\[]\s*(na|aa)\s*[\)\]]/i,   // (AA) [NA] 괄호 형태
+  /\b(na|aa)\s*ver\b/i,           // AA Ver / NA ver
+  /(na|aa)\s*$/i                  // 제목 맨 끝 NA/AA
+];
 // 중고/개인거래성 판매처 차단 (네이버 API 제목엔 "중고"가 없고 상세페이지에만 있는 케이스 대응)
-const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드'];
+const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames'];
 
 function isBlacklisted(title: string): boolean { const t = title.toLowerCase(); if (BLACKLIST_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (BLACKLIST_REGEX.some(re => re.test(title))) return true; return false; }
 function isBlockedMall(mallName: string): boolean { return BLOCKED_MALLS.some(w => mallName.toLowerCase().includes(w.toLowerCase())); }
@@ -28,7 +34,8 @@ function isDigitalKey(title: string): boolean { const t = title.toLowerCase(); i
 function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean {
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
-  const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스'];
+  // 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (가짜 초저가의 주범)
+  const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost'];
   if (banned.some(w => title.includes(w))) return false;
   if (gameKeywords.length > 0 && !gameKeywords.some(k => title.includes(k.toLowerCase()))) return false;
   return true;
