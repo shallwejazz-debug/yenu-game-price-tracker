@@ -201,6 +201,9 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     if (prices.length === 0) {
       return c.json({ ok: true, found: 0, message: '게임 본품을 찾지 못했습니다. 검색어를 조정하세요.' })
     }
+       // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
+    await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(id).run()
+
     let saved = 0
     for (const p of prices) {
       await insertPrice(c.env.DB, {
@@ -213,6 +216,8 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
         mall_label: p.mallLabel,
       })
       saved++
+    }
+
     }
     return c.json({
       ok: true,
