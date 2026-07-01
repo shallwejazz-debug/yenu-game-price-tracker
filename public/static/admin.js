@@ -142,8 +142,7 @@
       const data = await api('/settings')
       const s = data.settings || {}
       $('coupang_partners_id').value = s.coupang_partners_id || ''
-      $('gmarket_esm_id').value = s.gmarket_esm_id || ''
-      $('elevenst_affiliate_id').value = s.elevenst_affiliate_id || ''
+      $('linkprice_id').value = s.linkprice_id || ''
     } catch (e) {
       // 토큰 없거나 인증 실패는 조용히
     }
@@ -153,8 +152,7 @@
     try {
       await api('/settings', 'POST', {
         coupang_partners_id: $('coupang_partners_id').value.trim(),
-        gmarket_esm_id: $('gmarket_esm_id').value.trim(),
-        elevenst_affiliate_id: $('elevenst_affiliate_id').value.trim(),
+        linkprice_id: $('linkprice_id').value.trim(),
       })
       setStatus($('settingsStatus'), '✅ 레퍼럴 ID 저장 완료', true)
     } catch (e) {
