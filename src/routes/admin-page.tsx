@@ -55,12 +55,8 @@ export function AdminPage(): string {
         <input type="text" id="coupang_partners_id" placeholder="예: AF1234567" />
       </label>
       <label class="admin-field">
-        <span>G마켓 ESM ID</span>
-        <input type="text" id="gmarket_esm_id" placeholder="예: esm_xxxxx" />
-      </label>
-      <label class="admin-field">
-        <span>11번가 제휴 ID</span>
-        <input type="text" id="elevenst_affiliate_id" placeholder="예: 11st_xxxxx" />
+        <span>링크프라이스 퍼블리셔 ID (a값)</span>
+        <input type="text" id="linkprice_id" placeholder="예: A100705627" />
       </label>
       <button id="saveSettings" class="btn btn-primary">레퍼럴 저장</button>
       <p id="settingsStatus" class="admin-status"></p>
