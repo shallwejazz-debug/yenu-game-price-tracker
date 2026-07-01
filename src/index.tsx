@@ -54,37 +54,49 @@ app.get('/go/:priceId', async (c) => {
   return c.redirect(target, 302)
 })
 
-// 소스별 어필리에이트 ID 결합 로직
+// 소스별 어필리에이트 링크 생성 로직
+// - 쿠팡: 상품 URL에 파트너스 태그(lptag) 결합
+// - G마켓/옥션/11번가: 링크프라이스 딥링크(lpweb.kr)로 래핑
 function appendAffiliate(
   source: string,
   url: string,
   env: Record<string, string>,
   settings: Record<string, string> = {}
 ): string {
-  // env(secret)가 있으면 우선, 없으면 D1 settings 값 사용
   const pick = (envKey: string, settingKey: string) =>
     env[envKey] || settings[settingKey] || ''
+
+  // ── 링크프라이스 설정 ──
+  const LINKPRICE_DOMAIN = 'lpweb.kr'
+  // 링크프라이스 퍼블리셔 ID (a 값). env(secret) 우선, 없으면 DB settings.
+  const lpId = pick('LINKPRICE_ID', 'linkprice_id')
+  // source(내부 몰코드) → 링크프라이스 m 값
+  const LINKPRICE_M: Record<string, string> = {
+    gmarket: 'gmarket',
+    auction: 'auction',
+    // 11번가 승인 후 실제 m 값 확인해서 추가 (예: '11st': '11st')
+  }
+
   try {
-    const u = new URL(url)
-    switch (source) {
-      case 'coupang': {
-        const id = pick('COUPANG_PARTNERS_ID', 'coupang_partners_id')
-        if (id) u.searchParams.set('lptag', id)
-        break
-      }
-      case 'gmarket': {
-        const id = pick('GMARKET_ESM_ID', 'gmarket_esm_id')
-        if (id) u.searchParams.set('jaehuid', id)
-        break
-      }
-      case '11st': {
-        const id = pick('ELEVENST_AFFILIATE_ID', 'elevenst_affiliate_id')
-        if (id) u.searchParams.set('affiliate', id)
-        break
-      }
-      // 디지털(steam/psn/nintendo)은 어필리에이트 없음 → 원본 그대로
+    // 1) 링크프라이스 대상 몰이면 딥링크로 래핑
+    if (LINKPRICE_M[source] && lpId) {
+      const m = LINKPRICE_M[source]
+      const tu = encodeURIComponent(url)
+      return `https://${LINKPRICE_DOMAIN}/click.php?m=${m}&a=${lpId}&l=9999&l_cd1=3&l_cd2=0&tu=${tu}`
     }
-    return u.toString()
+
+    // 2) 쿠팡은 상품 URL에 파트너스 태그 결합
+    if (source === 'coupang') {
+      const id = pick('COUPANG_PARTNERS_ID', 'coupang_partners_id')
+      if (id) {
+        const u = new URL(url)
+        u.searchParams.set('lptag', id)
+        return u.toString()
+      }
+    }
+
+    // 3) 그 외(제휴 없는 몰, 디지털 등)는 원본 그대로
+    return url
   } catch {
     return url
   }
