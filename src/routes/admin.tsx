@@ -217,8 +217,7 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
       })
       saved++
     }
-
-    }
+    
     return c.json({
       ok: true,
       query: edition.search_query,
