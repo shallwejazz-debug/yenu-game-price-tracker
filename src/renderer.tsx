@@ -15,6 +15,9 @@ export const renderer = jsxRenderer(({ children }) => {
         <meta property="og:title" content="여누딜 - 게임가격트래커" />
         <meta property="og:description" content="PS5, 닌텐도 스위치, Xbox, PC 게임 최저가를 한눈에 비교" />
         <meta property="og:url" content="https://yeonudeal.com" />
+        <meta property="og:image" content="https://yeonudeal.com/static/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="633" />
 
         <link
           rel="icon"
