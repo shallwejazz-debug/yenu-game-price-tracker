@@ -581,3 +581,48 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   border-radius: 10px;
   padding: 16px;
 }
+
+/* ============================================================
+   모바일 대응 (그리드 1열 고정 + 펼침 패널 정리)
+   ============================================================ */
+@media (max-width: 640px) {
+  /* 그리드를 명시적으로 1열로 고정 → auto-fill 트랙 계산 흔들림 방지 */
+  .game-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* 펼침 패널: 전체 폭 차지 유지 (1열에서도 안전) */
+  .row-panel {
+    grid-column: 1 / -1;
+  }
+  .row-panel-inner {
+    padding: 14px 14px 18px;
+  }
+
+  /* 패널 헤더: 세로 스택으로 (썸네일 + 제목 + 액션 겹침 방지) */
+  .panel-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel-title {
+    gap: 12px;
+  }
+  .panel-thumb {
+    width: 96px;
+  }
+  .panel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* 가격 섹션: 1열 (디지털/패키지 세로 배치) */
+  .row-panel .price-sections {
+    grid-template-columns: 1fr;
+  }
+
+  /* 그래프 높이 축소 */
+  .trend-chart-wrap {
+    height: 200px;
+  }
+}
