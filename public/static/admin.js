@@ -2,6 +2,7 @@
 // 관리자 콘솔 프론트엔드
 // public/static/admin.js
 //   - 자동 가져오기: 엑셀식 별칭 그룹(groups) 입력 지원
+//   - 게임 목록: 체크박스 선택 삭제 지원
 // ============================================================
 
 (function () {
@@ -291,12 +292,15 @@
       const games = data.games || []
       if (games.length === 0) {
         list.innerHTML = '<li class="admin-empty">등록된 게임이 없습니다.</li>'
+        updateBulkBar()   // [추가] 선택 카운트 초기화
         return
       }
       list.innerHTML = games
         .map(
           (g) =>
             '<li class="admin-game-item">' +
+            // [추가] 행 선택용 체크박스
+            '<input type="checkbox" class="ag-check" data-id="' + g.id + '" />' +
             '<span class="ag-id">#' + g.id + '</span>' +
             '<span class="ag-title">' + escapeHtml(g.title) + '</span>' +
             '<span class="ag-editions">' + (g.edition_count || 0) + '개 플랫폼</span>' +
@@ -304,13 +308,71 @@
             '</li>'
         )
         .join('')
+      // [추가] 목록 새로 그린 뒤 전체선택 해제 + 카운트 갱신
+      const selAll = $('selectAllGames')
+      if (selAll) selAll.checked = false
+      updateBulkBar()
     } catch (e) {
       list.innerHTML = '<li class="admin-empty">목록을 불러오지 못했습니다 (' + escapeHtml(e.message) + ')</li>'
     }
   }
   $('refreshGames').addEventListener('click', loadGames)
 
-  // ---------- 게임 삭제 (이벤트 위임) ----------
+  // ---------- [추가] 선택 삭제 ----------
+  function getCheckedIds() {
+    return Array.from($('gameList').querySelectorAll('.ag-check:checked'))
+      .map(function (c) { return c.getAttribute('data-id') })
+  }
+
+  function updateBulkBar() {
+    const btn = $('bulkDeleteBtn')
+    if (!btn) return
+    const n = getCheckedIds().length
+    btn.disabled = n === 0
+    btn.textContent = n === 0 ? '선택 삭제' : '선택 삭제 (' + n + ')'
+  }
+
+  // 개별 체크박스 변경 → 카운트 갱신
+  $('gameList').addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('ag-check')) {
+      updateBulkBar()
+    }
+  })
+
+  // 전체 선택 토글 (해당 요소가 있을 때만 동작)
+  ;(function () {
+    const selAll = $('selectAllGames')
+    if (!selAll) return
+    selAll.addEventListener('change', function (e) {
+      const checked = e.target.checked
+      $('gameList').querySelectorAll('.ag-check').forEach(function (c) { c.checked = checked })
+      updateBulkBar()
+    })
+  })()
+
+  // 선택 삭제 실행 (해당 버튼이 있을 때만 동작)
+  ;(function () {
+    const btn = $('bulkDeleteBtn')
+    if (!btn) return
+    btn.addEventListener('click', async function () {
+      const ids = getCheckedIds()
+      if (ids.length === 0) return
+      if (!confirm(ids.length + '개 게임을 삭제하시겠습니까?\n연결된 플랫폼/가격/이력 데이터도 모두 삭제됩니다.')) return
+      btn.disabled = true
+      btn.textContent = '삭제 중…'
+      try {
+        await api('/games/bulk-delete', 'POST', { ids: ids.map(Number) })
+        const selAll = $('selectAllGames')
+        if (selAll) selAll.checked = false
+        loadGames()
+      } catch (err) {
+        alert('선택 삭제 실패: ' + err.message)
+        updateBulkBar()
+      }
+    })
+  })()
+
+  // ---------- 게임 삭제 (이벤트 위임, 단건) ----------
   $('gameList').addEventListener('click', async (e) => {
     const btn = e.target.closest('.ag-delete')
     if (!btn) return
