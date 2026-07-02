@@ -247,6 +247,7 @@
             '<span class="ag-id">#' + g.id + '</span>' +
             '<span class="ag-title">' + escapeHtml(g.title) + '</span>' +
             '<span class="ag-editions">' + (g.edition_count || 0) + '개 플랫폼</span>' +
+            '<button class="ag-delete" data-id="' + g.id + '" data-title="' + escapeHtml(g.title) + '" title="삭제">−</button>' +
             '</li>'
         )
         .join('')
@@ -255,6 +256,23 @@
     }
   }
   $('refreshGames').addEventListener('click', loadGames)
+
+  // ---------- 게임 삭제 (이벤트 위임) ----------
+  $('gameList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.ag-delete')
+    if (!btn) return
+    const id = btn.getAttribute('data-id')
+    const title = btn.getAttribute('data-title')
+    if (!confirm("'" + title + "' 게임을 삭제하시겠습니까?\n연결된 플랫폼/가격 데이터도 모두 삭제됩니다.")) return
+    btn.disabled = true
+    try {
+      await api('/games/' + id, 'DELETE')
+      loadGames()
+    } catch (err) {
+      alert('삭제 실패: ' + err.message)
+      btn.disabled = false
+    }
+  })
 
   function escapeHtml(s) {
     return String(s == null ? '' : s)
