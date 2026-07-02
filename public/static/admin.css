@@ -1,4 +1,4 @@
-/* ============================================================/
+/* ============================================================
    관리자 콘솔 전용 스타일
    public/static/admin.css
    ============================================================ */
@@ -201,6 +201,50 @@ textarea#importTitles {
 .lock-back:hover { color: #e6e8ec; }
 
 .admin-head-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ============================================================
+   등록된 게임: 선택 삭제 컨트롤 바
+   ============================================================ */
+.admin-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.admin-bulk-bar .btn-sm { margin-bottom: 0; }  /* 바 안에서는 하단 여백 제거 */
+.admin-selall {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .85rem;
+  color: #c3c8d2;
+  cursor: pointer;
+  user-select: none;
+}
+.admin-selall input { cursor: pointer; }
+.btn-danger {
+  background: #3a1f2e;
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #ff6b6b;
+  color: #fff;
+}
+.btn-danger:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+/* 목록 행 선택용 체크박스 */
+.admin-game-item .ag-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #4f7cff;
+}
 
 /* ============================================================
    게임 삭제 버튼 (관리자 게임 목록)
