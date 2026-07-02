@@ -331,14 +331,24 @@ admin.post('/api/auto-import', async (c) => {
   if (Array.isArray(body.groups)) {
     groups = body.groups
       .map((g: any) => {
-        const aliases = (Array.isArray(g.aliases) ? g.aliases : [])
+        const rawAliases = (Array.isArray(g.aliases) ? g.aliases : [])
           .map((a: any) => String(a).trim())
           .filter(Boolean)
-        const name = String(g.name ?? aliases[0] ?? '').trim()
-        return { name, aliases: aliases.length ? aliases : (name ? [name] : []) }
+        const name = String(g.name ?? rawAliases[0] ?? '').trim()
+
+        // ★ 대표 이름을 항상 검색어 맨 앞에 포함 + 별칭 추가 + 중복 제거(대소문자 무시)
+        const seen = new Set<string>()
+        const aliases: string[] = []
+        for (const term of [name, ...rawAliases]) {
+          if (!term) continue
+          const k = term.toLowerCase()
+          if (!seen.has(k)) { seen.add(k); aliases.push(term) }
+        }
+        return { name, aliases }
       })
       .filter((g: any) => g.name && g.aliases.length)
   } else {
+
     let titles: string[] = []
     if (Array.isArray(body.titles)) titles = body.titles
     else if (typeof body.titles === 'string') titles = body.titles.split('\n')
