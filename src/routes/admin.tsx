@@ -545,4 +545,45 @@ admin.delete('/api/games/:id', async (c) => {
   }
 })
 
+// ---------- 게임 여러 개 선택 삭제 (체크박스 다중 삭제) ----------
+// 바디: { "ids": [12, 15, 20] }
+admin.post('/api/games/bulk-delete', async (c) => {
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
+  }
+
+  const ids = Array.isArray(body.ids)
+    ? body.ids.map((n: any) => Number(n)).filter((n: number) => !Number.isNaN(n))
+    : []
+
+  if (ids.length === 0) {
+    return c.json({ ok: false, error: '삭제할 게임을 한 개 이상 선택하세요.' }, 400)
+  }
+
+  try {
+    let deleted = 0
+    for (const gameId of ids) {
+      const editions = await c.env.DB
+        .prepare('SELECT id FROM editions WHERE game_id = ?')
+        .bind(gameId)
+        .all<{ id: number }>()
+
+      for (const e of editions.results ?? []) {
+        await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(e.id).run()
+        await c.env.DB.prepare('DELETE FROM price_history WHERE edition_id = ?').bind(e.id).run()
+      }
+      await c.env.DB.prepare('DELETE FROM editions WHERE game_id = ?').bind(gameId).run()
+      await c.env.DB.prepare('DELETE FROM games WHERE id = ?').bind(gameId).run()
+      deleted++
+    }
+
+    return c.json({ ok: true, deleted, message: `${deleted}개 게임과 연결 데이터를 삭제했습니다.` })
+  } catch (err: any) {
+    return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
+  }
+})
+
 export default admin
