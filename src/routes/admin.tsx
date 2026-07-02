@@ -6,6 +6,7 @@
 //   PATCH  /admin/editions/:id               - 에디션 수정 (검색어 등)
 //   POST   /admin/editions/:id/fetch-prices  - 네이버에서 패키지 가격 수집
 //   POST   /admin/editions/:id/prices        - 가격 수동 추가 (디지털 등)
+//   DELETE /admin/api/games/:id              - 게임 삭제(연결 데이터 포함)
 //
 // 인증: X-Admin-Token 헤더
 // ============================================================
@@ -201,7 +202,8 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     if (prices.length === 0) {
       return c.json({ ok: true, found: 0, message: '게임 본품을 찾지 못했습니다. 검색어를 조정하세요.' })
     }
-       // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
+
+    // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
     await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(id).run()
 
     let saved = 0
@@ -217,7 +219,7 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
       })
       saved++
     }
-    
+
     return c.json({
       ok: true,
       query: edition.search_query,
@@ -252,7 +254,6 @@ admin.get('/api/settings', async (c) => {
     },
   })
 })
-
 
 // ---------- 레퍼럴 ID 설정 저장 ----------
 admin.post('/api/settings', async (c) => {
@@ -396,6 +397,10 @@ admin.post('/api/auto-import', async (c) => {
             })
             editionId = Number(r.meta.last_row_id)
           }
+
+          // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
+          await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(editionId).run()
+
           // 3) 가격 저장 (패키지)
           let cnt = 0
           for (const p of b.prices) {
@@ -439,6 +444,34 @@ admin.get('/api/games', async (c) => {
      FROM games g ORDER BY g.id DESC`
   ).all()
   return c.json({ ok: true, games: results ?? [] })
+})
+
+// ---------- 게임 삭제 (연결된 edition/price 함께 삭제) ----------
+admin.delete('/api/games/:id', async (c) => {
+  const gameId = Number(c.req.param('id'))
+  if (Number.isNaN(gameId)) {
+    return c.json({ ok: false, error: '잘못된 게임 ID' }, 400)
+  }
+  try {
+    // 1) 이 게임의 에디션 id 목록
+    const editions = await c.env.DB
+      .prepare('SELECT id FROM editions WHERE game_id = ?')
+      .bind(gameId)
+      .all<{ id: number }>()
+
+    // 2) 각 에디션의 가격 삭제
+    for (const e of editions.results ?? []) {
+      await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(e.id).run()
+    }
+    // 3) 에디션 삭제
+    await c.env.DB.prepare('DELETE FROM editions WHERE game_id = ?').bind(gameId).run()
+    // 4) 게임 삭제
+    await c.env.DB.prepare('DELETE FROM games WHERE id = ?').bind(gameId).run()
+
+    return c.json({ ok: true, message: '게임과 연결된 데이터를 삭제했습니다.' })
+  } catch (err: any) {
+    return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
+  }
 })
 
 export default admin
