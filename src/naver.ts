@@ -3,6 +3,7 @@
 //   - 게임명 검색 → 패키지/디지털 가격 + 구매 링크 수집
 //   - 굿즈/스틸북/계정/중고/회색지대 상품 제외
 //   - PS4+PS5 동시 언급 매물은 실물 기준 PS4로 분류
+//   - "코드" 단독 오탐 방지: 다운로드/온라인 코드 등 명확한 조합만 디지털 인정
 // ============================================================
 
 interface NaverShopItem { title: string; link: string; image: string; lprice: string; hprice: string; mallName: string; productId: string; productType: string; category1: string; category2: string; category3: string; category4: string; }
@@ -22,13 +23,25 @@ const BLACKLIST_REGEX = [
   /(na|aa)\s*$/i                  // 제목 맨 끝 NA/AA
 ];
 // 중고/개인거래성 판매처 차단 (네이버 API 제목엔 "중고"가 없고 상세페이지에만 있는 케이스 대응)
-const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어'];
+const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어','게임하다'];
 
 function isBlacklisted(title: string): boolean { const t = title.toLowerCase(); if (BLACKLIST_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (BLACKLIST_REGEX.some(re => re.test(title))) return true; return false; }
 function isBlockedMall(mallName: string): boolean { return BLOCKED_MALLS.some(w => mallName.toLowerCase().includes(w.toLowerCase())); }
 
-const DIGITAL_KEYWORDS = ['스팀','steam','스팀키','cd키','cd-key','cdkey','시리얼키','시리얼번호','디지털','digital','다운로드','download','이메일발송','온라인코드','pc판 키','에디션 키','이숍','eshop','다운로드 번호'];
-const DIGITAL_REGEX = [/\bcode\b/i, /(^|[^가-힣])코드([^가-힣]|$)/];
+// ---------- 디지털 판별 ----------
+// 주의: "코드"/"code" 단독은 게임 제목(코드 베인, 코드기어스 등)에 흔해 오탐이 크다.
+// 따라서 "다운로드/온라인/디지털/이메일 + 코드/번호/키" 조합처럼 명확한 표현만 디지털로 인정.
+// 네이버 쇼핑 매물은 대부분 실물(패키지)이므로 기본값은 패키지(0).
+const DIGITAL_KEYWORDS = ['스팀','steam','스팀키','cd키','cd-key','cdkey','시리얼키','시리얼번호','디지털','digital','다운로드','download','이메일발송','온라인코드','이숍','eshop','다운로드 번호','psn','플레이스테이션 스토어','닌텐도 e숍'];
+const DIGITAL_REGEX = [
+  /다운로드\s*코드/i,
+  /온라인\s*코드/i,
+  /디지털\s*코드/i,
+  /코드\s*발송/i,
+  /이메일\s*코드/i,
+  /\bcd[\s\-]?key\b/i,
+  /(다운로드|온라인|디지털|이메일)\s*(번호|키)/i,
+];
 function isDigitalKey(title: string): boolean { const t = title.toLowerCase(); if (DIGITAL_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (DIGITAL_REGEX.some(re => re.test(title))) return true; return false; }
 
 function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean {
