@@ -305,10 +305,12 @@ admin.post('/api/games', async (c) => {
 })
 
 // ============================================================
-// 자동 임포트: 제목만 던지면 → 검색 → 게임타이틀/신품 필터 →
-//             플랫폼 자동분류 → (dryRun 아니면) 작품/에디션/가격 자동 저장
+// 자동 임포트: 그룹(별칭묶음) 또는 제목 배열을 받아
+//   → 별칭들로 각각 검색 → 플랫폼별 결과 병합(최저가) →
+//   → 대표이름(name) 하나로 작품/에디션/가격 저장
 //   POST /admin/api/auto-import
-//   바디: { "titles": ["엘든링", ...], "dryRun": true }
+//   바디(신규): { "groups": [{ "name":"발더스 게이트 3", "aliases":["발더스 게이트 3","BG3"] }], "dryRun": true }
+//   바디(구):  { "titles": ["엘든링", ...], "dryRun": true }  ← 그대로 지원
 // ============================================================
 admin.post('/api/auto-import', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
@@ -324,31 +326,83 @@ admin.post('/api/auto-import', async (c) => {
     return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
   }
 
-  // titles: 배열 또는 줄바꿈 문자열 모두 허용
-  let titles: string[] = []
-  if (Array.isArray(body.titles)) {
-    titles = body.titles
-  } else if (typeof body.titles === 'string') {
-    titles = body.titles.split('\n')
-  } else if (typeof body.title === 'string') {
-    titles = [body.title]
+  // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 단일별칭 그룹으로 변환
+  let groups: { name: string; aliases: string[] }[] = []
+  if (Array.isArray(body.groups)) {
+    groups = body.groups
+      .map((g: any) => {
+        const aliases = (Array.isArray(g.aliases) ? g.aliases : [])
+          .map((a: any) => String(a).trim())
+          .filter(Boolean)
+        const name = String(g.name ?? aliases[0] ?? '').trim()
+        return { name, aliases: aliases.length ? aliases : (name ? [name] : []) }
+      })
+      .filter((g: any) => g.name && g.aliases.length)
+  } else {
+    let titles: string[] = []
+    if (Array.isArray(body.titles)) titles = body.titles
+    else if (typeof body.titles === 'string') titles = body.titles.split('\n')
+    else if (typeof body.title === 'string') titles = [body.title]
+    titles = titles.map((t) => String(t).trim()).filter(Boolean)
+    groups = titles.map((t) => ({ name: t, aliases: [t] }))
   }
-  titles = titles.map((t) => String(t).trim()).filter(Boolean)
-  if (titles.length === 0) {
-    return c.json({ ok: false, error: '제목(titles)을 한 개 이상 입력하세요.' }, 400)
+
+  if (groups.length === 0) {
+    return c.json({ ok: false, error: '게임 이름(또는 그룹)을 한 개 이상 입력하세요.' }, 400)
   }
 
   const dryRun = body.dryRun !== false // 기본값: 미리보기(안전)
   const results: any[] = []
 
-  for (const title of titles) {
+  for (const group of groups) {
     try {
-      // 핵심 키워드: 제목 토큰 중 2글자 이상
-      const kw = title.split(/\s+/).filter((w) => w.length >= 2)
-      const classified = await searchAndClassify(clientId, clientSecret, title, kw)
+      const name = group.name
+      // 대표이름 토큰(2글자 이상)을 게임 필터 키워드로 사용
+      const kw = name.split(/\s+/).filter((w) => w.length >= 2)
+
+      // 별칭별로 검색 → 플랫폼별로 병합 (link 기준 중복 제거, 최저가 우선)
+      const mergedByPlatform = new Map<string, Map<string, any>>()
+      const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, outOfRange: 0, noPlatform: 0 }
+      let totalItems = 0
+      let firstImage: string | null = null
+
+      for (const alias of group.aliases) {
+        const classified = await searchAndClassify(clientId, clientSecret, alias, kw)
+        totalItems += classified.totalItems
+        for (const k of Object.keys(skippedTotal)) {
+          if (classified.skipped && (classified.skipped as any)[k] !== undefined) {
+            ;(skippedTotal as any)[k] += (classified.skipped as any)[k]
+          }
+        }
+        for (const b of classified.buckets) {
+          if (!mergedByPlatform.has(b.platform)) mergedByPlatform.set(b.platform, new Map())
+          const pmap = mergedByPlatform.get(b.platform)!
+          for (const p of b.prices) {
+            if (!firstImage && p.image) firstImage = p.image
+            // 중복 판단: 상품 링크가 있으면 링크, 없으면 source+digital
+            const key = p.link || `${p.mallName}|${p.isDigital}`
+            const existing = pmap.get(key)
+            if (!existing || p.price < existing.price) pmap.set(key, p)
+          }
+        }
+      }
+
+      // 병합 결과를 buckets 형태로 정리 (플랫폼 순서 고정, 몰별 최저가순)
+      const order = ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'etc']
+      const mergedBuckets = Array.from(mergedByPlatform.entries())
+        .map(([platform, pmap]) => {
+          const prices = Array.from(pmap.values()).sort((a, b) => a.price - b.price)
+          return {
+            platform,
+            prices,
+            count: prices.length,
+            lowest: prices.length ? prices[0].price : null,
+          }
+        })
+        .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
 
       const platformsView: Record<string, any> = {}
-      for (const b of classified.buckets) {
+      for (const b of mergedBuckets) {
         platformsView[b.platform] = {
           label: PLATFORM_LABELS[b.platform] ?? b.platform,
           count: b.count,
@@ -358,29 +412,28 @@ admin.post('/api/auto-import', async (c) => {
       }
 
       const entry: any = {
-        title,
+        title: name,
+        aliases: group.aliases,
         platforms: platformsView,
-        skipped: classified.skipped,
-        totalItems: classified.totalItems,
+        skipped: skippedTotal,
+        totalItems,
         saved: null,
       }
 
       // 실제 저장 (dryRun=false)
-      if (!dryRun && classified.buckets.length > 0) {
-        // 1) 작품 찾기/생성
-        let game = await findGameByTitle(c.env.DB, title)
+      if (!dryRun && mergedBuckets.length > 0) {
+        // 1) 작품 찾기/생성 (대표이름 기준)
+        let game = await findGameByTitle(c.env.DB, name)
         let gameId: number
         if (game) {
           gameId = game.id
         } else {
-          // 대표 이미지: 첫 버킷 첫 상품 이미지
-          const firstImg = classified.buckets[0]?.prices[0]?.image ?? null
-          const r = await insertGame(c.env.DB, { title, image_url: firstImg })
+          const r = await insertGame(c.env.DB, { title: name, image_url: firstImage })
           gameId = Number(r.meta.last_row_id)
         }
 
         const savedDetail: Record<string, number> = {}
-        for (const b of classified.buckets) {
+        for (const b of mergedBuckets) {
           // 2) 에디션 찾기/생성
           let edition = await findEdition(c.env.DB, gameId, b.platform)
           let editionId: number
@@ -392,7 +445,7 @@ admin.post('/api/auto-import', async (c) => {
               game_id: gameId,
               platform: b.platform,
               edition_name: `${label}판`,
-              search_query: `${title} ${label}`,
+              search_query: `${name} ${label}`,
               keywords: kw.join(','),
             })
             editionId = Number(r.meta.last_row_id)
@@ -401,7 +454,7 @@ admin.post('/api/auto-import', async (c) => {
           // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
           await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(editionId).run()
 
-          // 3) 가격 저장 (패키지)
+          // 3) 가격 저장 (병합된 최저가들)
           let cnt = 0
           for (const p of b.prices) {
             await insertPrice(c.env.DB, {
@@ -409,7 +462,7 @@ admin.post('/api/auto-import', async (c) => {
               source: p.mallName,
               price: p.price,
               currency: 'KRW',
-              is_digital: 0,
+              is_digital: p.isDigital ?? 0,
               product_url: p.link,
               mall_label: p.mallLabel,
             })
@@ -423,7 +476,7 @@ admin.post('/api/auto-import', async (c) => {
 
       results.push(entry)
     } catch (err: any) {
-      results.push({ title, error: err.message })
+      results.push({ title: group.name, error: err.message })
     }
   }
 
@@ -453,19 +506,15 @@ admin.delete('/api/games/:id', async (c) => {
     return c.json({ ok: false, error: '잘못된 게임 ID' }, 400)
   }
   try {
-    // 1) 이 게임의 에디션 id 목록
     const editions = await c.env.DB
       .prepare('SELECT id FROM editions WHERE game_id = ?')
       .bind(gameId)
       .all<{ id: number }>()
 
-    // 2) 각 에디션의 가격 삭제
     for (const e of editions.results ?? []) {
       await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(e.id).run()
     }
-    // 3) 에디션 삭제
     await c.env.DB.prepare('DELETE FROM editions WHERE game_id = ?').bind(gameId).run()
-    // 4) 게임 삭제
     await c.env.DB.prepare('DELETE FROM games WHERE id = ?').bind(gameId).run()
 
     return c.json({ ok: true, message: '게임과 연결된 데이터를 삭제했습니다.' })
