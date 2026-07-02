@@ -356,9 +356,21 @@ admin.post('/api/auto-import', async (c) => {
 
   for (const group of groups) {
     try {
-      const name = group.name
-      // 대표이름 토큰(2글자 이상)을 게임 필터 키워드로 사용
-      const kw = name.split(/\s+/).filter((w) => w.length >= 2)
+           const name = group.name
+      // ★ 필터 키워드: 대표이름 + 모든 별칭의 토큰을 합집합(OR)으로 사용
+      //   별칭 중 하나라도 제목에 있으면 통과 → 별칭이 "추가"로만 작동
+      const kwSet = new Set<string>()
+      for (const term of [name, ...group.aliases]) {
+        // 공백/하이픈/콜론/따옴표 제거한 통짜 형태도 키워드에 포함 (표기차 흡수)
+        const compact = term.replace(/[\s\-:_'’.]/g, '')
+        if (compact.length >= 2) kwSet.add(compact.toLowerCase())
+        // 개별 토큰(2글자 이상)도 포함
+        for (const w of term.split(/\s+/)) {
+          if (w.length >= 2) kwSet.add(w.toLowerCase())
+        }
+      }
+      const kw = Array.from(kwSet)
+
 
       // 별칭별로 검색 → 플랫폼별로 병합 (link 기준 중복 제거, 최저가 우선)
       const mergedByPlatform = new Map<string, Map<string, any>>()
