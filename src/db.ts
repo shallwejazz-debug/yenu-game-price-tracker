@@ -19,7 +19,6 @@ export async function listGames(db: D1Database): Promise<Game[]> {
 }
 
 // 특정 플랫폼의 게임 목록 (메인 콘솔 탭용)
-// editions 와 조인해서 해당 플랫폼 에디션이 있는 게임만, 최저가도 함께
 export async function listGamesByPlatform(
   db: D1Database,
   platform: string
@@ -167,6 +166,70 @@ export async function getPriceTrend(
   return results ?? []
 }
 
+// ============================================================
+// 게임 단위 일괄 조회 (N+1 방지) — /api/games/:id 성능 최적화용
+// 에디션마다 따로 부르지 않고 게임 ID 하나로 한 번에 가져온다
+// ============================================================
+
+// 게임에 속한 모든 에디션의 "현재가"를 한 번에
+export async function getCurrentPricesByGame(db: D1Database, gameId: number): Promise<Price[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.*
+       FROM prices p
+       INNER JOIN editions e ON e.id = p.edition_id
+       INNER JOIN (
+         SELECT edition_id, source, MAX(recorded_at) AS max_at
+         FROM prices
+         WHERE edition_id IN (SELECT id FROM editions WHERE game_id = ?)
+         GROUP BY edition_id, source
+       ) latest
+         ON p.edition_id = latest.edition_id
+        AND p.source = latest.source
+        AND p.recorded_at = latest.max_at
+       WHERE e.game_id = ?
+       ORDER BY p.edition_id, p.is_digital DESC, p.price ASC`
+    )
+    .bind(gameId, gameId)
+    .all<Price>()
+  return results ?? []
+}
+
+// 게임에 속한 모든 에디션의 역대최저가 이력을 한 번에
+export async function getPriceHistoryByGame(db: D1Database, gameId: number): Promise<PriceHistory[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT ph.*
+       FROM price_history ph
+       INNER JOIN editions e ON e.id = ph.edition_id
+       WHERE e.game_id = ?`
+    )
+    .bind(gameId)
+    .all<PriceHistory>()
+  return results ?? []
+}
+
+// 게임에 속한 모든 에디션의 가격추이(최근 N일)를 한 번에
+export async function getPriceTrendByGame(
+  db: D1Database,
+  gameId: number,
+  days: number
+): Promise<Array<{ edition_id: number; is_digital: number; date: string; price: number }>> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.edition_id, p.is_digital, DATE(p.recorded_at) AS date, MIN(p.price) AS price
+       FROM prices p
+       INNER JOIN editions e ON e.id = p.edition_id
+       WHERE e.game_id = ?
+         AND p.recorded_at >= datetime('now', '-' || ? || ' days')
+       GROUP BY p.edition_id, p.is_digital, DATE(p.recorded_at)
+       ORDER BY p.edition_id, p.is_digital, date ASC`
+    )
+    .bind(gameId, days)
+    .all<{ edition_id: number; is_digital: number; date: string; price: number }>()
+  return results ?? []
+}
+
 // 가격 기록 추가 + 역대 최저가 자동 갱신
 export async function insertPrice(
   db: D1Database,
@@ -219,7 +282,6 @@ export async function insertPrice(
 }
 
 // ---------- 사이드바: 할인율 높은 순 ----------
-// 정가 대비 현재 최저가의 할인율이 큰 에디션들
 export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
     .prepare(
@@ -244,7 +306,6 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
 // 설정(settings) - 쇼핑몰별 레퍼럴 ID 등
 // ============================================================
 
-// 모든 설정을 key→value 맵으로 반환
 export async function getAllSettings(db: D1Database): Promise<Record<string, string>> {
   const { results } = await db.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>()
   const map: Record<string, string> = {}
@@ -252,13 +313,11 @@ export async function getAllSettings(db: D1Database): Promise<Record<string, str
   return map
 }
 
-// 단일 설정 값
 export async function getSetting(db: D1Database, key: string): Promise<string | null> {
   const row = await db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>()
   return row?.value ?? null
 }
 
-// 설정 저장 (upsert)
 export async function setSetting(db: D1Database, key: string, value: string): Promise<void> {
   await db
     .prepare(
