@@ -377,6 +377,29 @@
       }
     })
   })()
+  // ---------- 대표 이미지 변경 ----------
+  $('gameList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.ag-image')
+    if (!btn) return
+    const id = btn.getAttribute('data-id')
+    const title = btn.getAttribute('data-title')
+    const current = btn.getAttribute('data-url') || ''
+    const input = prompt(
+      "'" + title + "'의 대표 이미지 URL을 입력하세요.\n" +
+      '(비우고 확인하면 이미지를 제거합니다. 예: 스팀 커버 이미지 주소)',
+      current
+    )
+    if (input === null) return // 취소
+    const url = input.trim()
+    btn.disabled = true
+    try {
+      await api('/games/' + id, 'PATCH', { image_url: url || null })
+      loadGames()
+    } catch (err) {
+      alert('이미지 변경 실패: ' + err.message)
+      btn.disabled = false
+    }
+  })
 
   // ---------- 게임 삭제 (이벤트 위임, 단건) ----------
   $('gameList').addEventListener('click', async (e) => {
