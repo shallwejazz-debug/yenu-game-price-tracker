@@ -1,16 +1,15 @@
 // ============================================================
 // 관리자 콘솔 프론트엔드
 // public/static/admin.js
-//   - 토큰을 localStorage에 보관, API 호출 시 X-Admin-Token 헤더로 전송
-//   - 5분 비활동 시 자동 잠금 + "사이트로" 이동 시 즉시 잠금
+//   - 자동 가져오기: 엑셀식 별칭 그룹(groups) 입력 지원
 // ============================================================
 
 (function () {
   'use strict'
 
   const TOKEN_KEY = 'gpt_admin_token'
-  const TS_KEY = 'gpt_admin_ts'           // 마지막 활동 시각
-  const IDLE_LIMIT = 5 * 60 * 1000        // 5분 (밀리초)
+  const TS_KEY = 'gpt_admin_ts'
+  const IDLE_LIMIT = 5 * 60 * 1000
   const $ = (id) => document.getElementById(id)
 
   let idleTimer = null
@@ -18,22 +17,17 @@
   function getToken() {
     return localStorage.getItem(TOKEN_KEY) || ''
   }
-
-  // 토큰 + 활동시각 기록
   function saveToken(pw) {
     localStorage.setItem(TOKEN_KEY, pw)
     localStorage.setItem(TS_KEY, String(Date.now()))
   }
-  // 활동시각만 갱신 (작업 중일 때)
   function touch() {
     if (getToken()) localStorage.setItem(TS_KEY, String(Date.now()))
   }
-  // 토큰 폐기 (잠금)
   function clearToken() {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(TS_KEY)
   }
-  // 5분 지났는지 확인
   function isExpired() {
     const ts = parseInt(localStorage.getItem(TS_KEY) || '0', 10)
     if (!ts) return true
@@ -60,7 +54,6 @@
     return data
   }
 
-  // ---------- 자동 잠금 타이머 ----------
   function startIdleTimer() {
     stopIdleTimer()
     idleTimer = setInterval(() => {
@@ -68,18 +61,18 @@
         clearToken()
         showLock('5분간 활동이 없어 자동 잠금되었습니다.', true)
       }
-    }, 30 * 1000) // 30초마다 검사
+    }, 30 * 1000)
   }
   function stopIdleTimer() {
     if (idleTimer) { clearInterval(idleTimer); idleTimer = null }
   }
 
-  // ---------- 잠금 화면 / 인증 게이트 ----------
   function showAdmin() {
     $('lockScreen').style.display = 'none'
     $('adminContent').hidden = false
     touch()
     startIdleTimer()
+    ensureAtLeastOneRow()
     loadSettings()
     loadGames()
   }
@@ -90,7 +83,6 @@
     if (msg) setStatus($('lockStatus'), msg, !!ok)
   }
 
-  // 서버에 토큰이 맞는지 확인 (틀리면 관리 화면 안 보여줌)
   async function verifyToken() {
     try {
       await api('/verify', 'POST', {})
@@ -100,7 +92,6 @@
     }
   }
 
-  // 잠금 해제 폼
   $('lockForm').addEventListener('submit', async (e) => {
     e.preventDefault()
     const pw = $('lockPassword').value.trim()
@@ -120,18 +111,15 @@
     }
   })
 
-  // 잠그기 버튼 (로그아웃)
   $('lockBtn').addEventListener('click', () => {
     clearToken()
     showLock('잠금 처리되었습니다.', true)
   })
 
-  // "사이트로" 링크 → 떠날 때 즉시 잠금
   document.querySelectorAll('.admin-back, .lock-back').forEach((a) => {
     a.addEventListener('click', () => { clearToken() })
   })
 
-  // 사용자 활동 감지 → 활동시각 갱신 (작업 중엔 안 잠김)
   ;['click', 'keydown', 'input'].forEach((ev) => {
     document.addEventListener(ev, touch, true)
   })
@@ -143,9 +131,7 @@
       const s = data.settings || {}
       $('coupang_partners_id').value = s.coupang_partners_id || ''
       $('linkprice_id').value = s.linkprice_id || ''
-    } catch (e) {
-      // 토큰 없거나 인증 실패는 조용히
-    }
+    } catch (e) {}
   }
 
   $('saveSettings').addEventListener('click', async () => {
@@ -160,12 +146,79 @@
     }
   })
 
-  // ---------- 자동 임포트 ----------
-  function getTitles() {
-    return $('importTitles').value
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
+  // ============================================================
+  // 자동 임포트 (엑셀식 별칭 그룹)
+  // ============================================================
+  function addGroupRow(name, aliases) {
+    const body = $('importGroups')
+    const row = document.createElement('div')
+    row.className = 'ig-row'
+    row.innerHTML =
+      '<input type="text" class="ig-name" placeholder="예: 발더스 게이트 3" />' +
+      '<input type="text" class="ig-alias" placeholder="예: 발더스게이트3, BG3, Baldurs Gate 3" />' +
+      '<button type="button" class="ig-remove" title="이 행 삭제">−</button>'
+    body.appendChild(row)
+    if (name) row.querySelector('.ig-name').value = name
+    if (aliases) row.querySelector('.ig-alias').value = aliases
+    return row
+  }
+
+  function ensureAtLeastOneRow() {
+    const body = $('importGroups')
+    if (body && body.querySelectorAll('.ig-row').length === 0) {
+      addGroupRow()
+    }
+  }
+
+  $('addGroupRow').addEventListener('click', function () {
+    const row = addGroupRow()
+    const nameInput = row.querySelector('.ig-name')
+    if (nameInput) nameInput.focus()
+  })
+
+  $('importGroups').addEventListener('click', function (e) {
+    const btn = e.target.closest('.ig-remove')
+    if (!btn) return
+    const body = $('importGroups')
+    const rows = body.querySelectorAll('.ig-row')
+    if (rows.length <= 1) {
+      const row = btn.closest('.ig-row')
+      row.querySelector('.ig-name').value = ''
+      row.querySelector('.ig-alias').value = ''
+    } else {
+      btn.closest('.ig-row').remove()
+    }
+  })
+
+  function getGroups() {
+    const rows = Array.from($('importGroups').querySelectorAll('.ig-row'))
+    const groups = []
+    rows.forEach(function (row) {
+      const name = row.querySelector('.ig-name').value.trim()
+      const aliasRaw = row.querySelector('.ig-alias').value.trim()
+      const aliases = aliasRaw
+        .split(',')
+        .map(function (s) { return s.trim() })
+        .filter(Boolean)
+
+      let repName = name
+      if (!repName && aliases.length > 0) repName = aliases[0]
+
+      let terms = aliases.slice()
+      if (terms.length === 0 && repName) terms = [repName]
+
+      if (!repName || terms.length === 0) return
+
+      const seen = {}
+      const uniqTerms = []
+      terms.forEach(function (t) {
+        const k = t.toLowerCase()
+        if (!seen[k]) { seen[k] = true; uniqTerms.push(t) }
+      })
+
+      groups.push({ name: repName, aliases: uniqTerms })
+    })
+    return groups
   }
 
   function won(n) {
@@ -209,15 +262,15 @@
   }
 
   async function doImport(dryRun) {
-    const titles = getTitles()
-    if (titles.length === 0) {
-      setStatus($('importStatus'), '제목을 한 개 이상 입력하세요.', false)
+    const groups = getGroups()
+    if (groups.length === 0) {
+      setStatus($('importStatus'), '게임을 한 개 이상 입력하세요.', false)
       return
     }
     setStatus($('importStatus'), (dryRun ? '🔍 분석' : '⬇️ 수집/저장') + ' 중… (잠시 기다려주세요)', true)
     try {
-      const data = await api('/auto-import', 'POST', { titles: titles, dryRun: dryRun })
-      setStatus($('importStatus'), '✅ ' + data.mode + ' (' + data.count + '개)', true)
+      const data = await api('/auto-import', 'POST', { groups: groups, dryRun: dryRun })
+      setStatus($('importStatus'), '✅ ' + (data.mode || (dryRun ? '미리보기' : '저장')) + ' (' + (data.count || 0) + '개)', true)
       renderImportResult(data)
       if (!dryRun) loadGames()
     } catch (e) {
@@ -281,11 +334,9 @@
       .replace(/>/g, '&gt;')
   }
 
-  // ---------- 초기화 ----------
   document.addEventListener('DOMContentLoaded', async () => {
     const saved = getToken()
     if (saved) {
-      // 5분 지났으면 만료 처리
       if (isExpired()) {
         clearToken()
         showLock('세션이 만료되었습니다. 다시 로그인하세요.', false)
