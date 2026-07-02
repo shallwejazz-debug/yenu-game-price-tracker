@@ -6,7 +6,16 @@ export const renderer = jsxRenderer(({ children }) => {
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>한국 게임 가격 추적</title>
+        <title>여누딜 - 게임가격트래커</title>
+        <meta name="description" content="PS5, 닌텐도 스위치, Xbox, PC 게임 최저가를 한눈에 비교하는 게임가격트래커" />
+
+        {/* Open Graph (카카오톡/티스토리/페이스북 등 링크 카드용) */}
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="여누딜" />
+        <meta property="og:title" content="여누딜 - 게임가격트래커" />
+        <meta property="og:description" content="PS5, 닌텐도 스위치, Xbox, PC 게임 최저가를 한눈에 비교" />
+        <meta property="og:url" content="https://yeonudeal.com" />
+
         <link
           rel="icon"
           href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>"
