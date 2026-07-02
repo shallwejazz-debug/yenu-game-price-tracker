@@ -295,19 +295,25 @@
         updateBulkBar()   // [추가] 선택 카운트 초기화
         return
       }
-      list.innerHTML = games
+          list.innerHTML = games
         .map(
           (g) =>
             '<li class="admin-game-item">' +
-            // [추가] 행 선택용 체크박스
             '<input type="checkbox" class="ag-check" data-id="' + g.id + '" />' +
+            '<span class="ag-thumb">' +
+              (g.image_url
+                ? '<img src="' + escapeHtml(g.image_url) + '" alt="" loading="lazy" />'
+                : '<span class="ag-thumb-empty">?</span>') +
+            '</span>' +
             '<span class="ag-id">#' + g.id + '</span>' +
             '<span class="ag-title">' + escapeHtml(g.title) + '</span>' +
             '<span class="ag-editions">' + (g.edition_count || 0) + '개 플랫폼</span>' +
+            '<button class="ag-image" data-id="' + g.id + '" data-title="' + escapeHtml(g.title) + '" data-url="' + escapeHtml(g.image_url || '') + '" title="대표 이미지 변경">🖼️</button>' +
             '<button class="ag-delete" data-id="' + g.id + '" data-title="' + escapeHtml(g.title) + '" title="삭제">−</button>' +
             '</li>'
         )
         .join('')
+
       // [추가] 목록 새로 그린 뒤 전체선택 해제 + 카운트 갱신
       const selAll = $('selectAllGames')
       if (selAll) selAll.checked = false
