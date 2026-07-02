@@ -1,6 +1,7 @@
 // ============================================================
 // 관리자 콘솔 HTML 페이지
 // src/routes/admin-page.tsx
+//   - 등록된 게임: 전체 선택 / 선택 삭제 컨트롤 추가
 // ============================================================
 
 export function AdminPage(): string {
@@ -84,7 +85,14 @@ export function AdminPage(): string {
 
     <section class="admin-card">
       <h2>📋 등록된 게임</h2>
-      <button id="refreshGames" class="btn btn-sm">새로고침</button>
+      <!-- [추가] 선택 삭제 컨트롤 바 -->
+      <div class="admin-bulk-bar">
+        <label class="admin-selall">
+          <input type="checkbox" id="selectAllGames" /> 전체 선택
+        </label>
+        <button id="bulkDeleteBtn" class="btn btn-sm btn-danger" disabled>선택 삭제</button>
+        <button id="refreshGames" class="btn btn-sm">새로고침</button>
+      </div>
       <ul id="gameList" class="admin-game-list"></ul>
     </section>
   </main>
