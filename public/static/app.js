@@ -494,12 +494,17 @@
       })
     })
 
-    // 창 크기 바뀌면 행 구성이 달라짐 → 열린 패널 닫기 (단순/안전)
+    // 창 "폭"이 바뀔 때만 패널 닫기 (모바일 주소창 접힘=높이변화는 무시)
     let rt
+    let lastW = window.innerWidth
     window.addEventListener('resize', () => {
+      // 폭 변화 없으면(=높이만 바뀐 스크롤 상황) 무시
+      if (window.innerWidth === lastW) return
+      lastW = window.innerWidth
       if (openGameId == null) return
       clearTimeout(rt)
       rt = setTimeout(() => closePanel(), 150)
     })
+
   })
 })()
