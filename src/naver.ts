@@ -22,7 +22,7 @@ const BLACKLIST_REGEX = [
   /(na|aa)\s*$/i                  // 제목 맨 끝 NA/AA
 ];
 // 중고/개인거래성 판매처 차단 (네이버 API 제목엔 "중고"가 없고 상세페이지에만 있는 케이스 대응)
-const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames'];
+const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어'];
 
 function isBlacklisted(title: string): boolean { const t = title.toLowerCase(); if (BLACKLIST_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (BLACKLIST_REGEX.some(re => re.test(title))) return true; return false; }
 function isBlockedMall(mallName: string): boolean { return BLOCKED_MALLS.some(w => mallName.toLowerCase().includes(w.toLowerCase())); }
@@ -42,6 +42,33 @@ function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean
 }
 function isReasonablePrice(price: number): boolean { return price >= 5000 && price <= 300000; }
 function isUsedItem(title: string): boolean { const t = title.toLowerCase(); const usedWords = ['중고','대여','렌탈','렌트','used','리퍼']; return usedWords.some(w => t.includes(w)); }
+
+// ---------- 가격 이상치(중고 의심) 제외 ----------
+// 같은 플랫폼 매물들의 중앙값 대비 지나치게 싼 것을 제외.
+// 중고는 제목에 "중고"가 없어도 가격이 비정상적으로 낮으므로 이걸로 잡힘.
+// 디지털/패키지는 정상 가격대가 다르므로 나눠서 계산.
+function filterPriceOutliers(list: CleanedPrice[]): CleanedPrice[] {
+  const groups: Record<string, CleanedPrice[]> = { '0': [], '1': [] };
+  for (const c of list) groups[String(c.isDigital)].push(c);
+
+  const result: CleanedPrice[] = [];
+  for (const key of Object.keys(groups)) {
+    const g = groups[key];
+    // 매물이 3개 미만이면 중앙값 신뢰도가 낮아 필터 미적용 (정상품 제거 위험)
+    if (g.length < 3) { result.push(...g); continue; }
+
+    const sorted = g.map(c => c.price).sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+    // 중앙값의 55% 미만이면 중고/비정상으로 판단해 제외 (보수적 기준)
+    const floor = median * 0.55;
+    for (const c of g) {
+      if (c.price >= floor) result.push(c);
+    }
+  }
+  return result;
+}
 
 const PLATFORM_RULES: Array<{code:string;patterns:RegExp[]}> = [
   {code:'ps5',patterns:[/ps5/i,/플레이스테이션\s*5/,/플스\s*5/]},
@@ -84,11 +111,16 @@ export async function searchAndClassify(clientId:string,clientSecret:string,quer
   }
   const buckets:PlatformBucket[]=[];
   for (const [platform,list] of byPlatform.entries()) {
+    // 가격 이상치(중고 의심) 제외
+    const filtered = filterPriceOutliers(list);
+    skipped.used += (list.length - filtered.length);
+
     const bySource=new Map<string,CleanedPrice>();
-    for (const c of list) { const key=`${c.mallName}|${c.isDigital}`; const existing=bySource.get(key); if (!existing||c.price<existing.price) bySource.set(key,c); }
+    for (const c of filtered) { const key=`${c.mallName}|${c.isDigital}`; const existing=bySource.get(key); if (!existing||c.price<existing.price) bySource.set(key,c); }
     const prices=Array.from(bySource.values()).sort((a,b)=>a.price-b.price);
-    buckets.push({platform,prices,count:list.length,lowest:prices.length?prices[0].price:null});
+    buckets.push({platform,prices,count:filtered.length,lowest:prices.length?prices[0].price:null});
   }
+
   const order=['pc','ps5','ps4','xbox','switch','etc'];
   buckets.sort((a,b)=>order.indexOf(a.platform)-order.indexOf(b.platform));
   return {buckets,skipped,totalItems:data.items.length};
