@@ -246,7 +246,7 @@
         ${headerHtml}
         <nav class="platform-switch">${switchHtml}</nav>
         <div class="edition-body">${renderEditionDetail(editions[activeIdx], game.original_price)}</div>
-        <p class="notice">※ 디지털 가격은 정보 제공용, 패키지 가격은 한국 쇼핑몰 비교입니다.</p>
+        <p class="notice">※ 디지털 가격은 정보 제공용, 패키지 가격은 한국 쇼핑몰 비교입니다.<br>※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.</p>
       </div>`
   }
 
