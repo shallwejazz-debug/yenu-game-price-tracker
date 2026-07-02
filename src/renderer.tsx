@@ -18,6 +18,10 @@ export const renderer = jsxRenderer(({ children }) => {
         <meta property="og:image" content="https://yeonudeal.com/static/og-image.png" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="633" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="여누딜 - 게임가격트래커" />
+        <meta name="twitter:image" content="https://yeonudeal.com/static/og-image.png" />
+
 
         <link
           rel="icon"
