@@ -193,3 +193,40 @@ textarea#importTitles {
 .lock-back:hover { color: #e6e8ec; }
 
 .admin-head-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ============================================================
+   게임 삭제 버튼 (관리자 게임 목록) — 파일 맨 끝에 추가
+   ============================================================ */
+.admin-game-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-game-item .ag-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-game-item .ag-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #ff6b6b;
+  background: #3a1f2e;
+  color: #ff6b6b;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.admin-game-item .ag-delete:hover {
+  background: #ff6b6b;
+  color: #fff;
+}
+.admin-game-item .ag-delete:disabled {
+  opacity: .5;
+  cursor: default;
+}
