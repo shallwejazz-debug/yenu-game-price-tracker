@@ -544,6 +544,39 @@ admin.delete('/api/games/:id', async (c) => {
     return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
   }
 })
+// ---------- 게임 정보 수정 (현재는 이미지 URL) ----------
+// 바디: { "image_url": "https://..." }  (빈 문자열/null 이면 이미지 제거)
+admin.patch('/api/games/:id', async (c) => {
+  const gameId = Number(c.req.param('id'))
+  if (Number.isNaN(gameId)) {
+    return c.json({ ok: false, error: '잘못된 게임 ID' }, 400)
+  }
+
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
+  }
+
+  if (body.image_url === undefined) {
+    return c.json({ ok: false, error: '수정할 필드(image_url)가 없습니다.' }, 400)
+  }
+
+  const url = body.image_url ? String(body.image_url).trim() : null
+  if (url && !/^https?:\/\//i.test(url)) {
+    return c.json({ ok: false, error: '이미지 URL은 http(s)로 시작해야 합니다.' }, 400)
+  }
+
+  try {
+    await c.env.DB.prepare('UPDATE games SET image_url = ? WHERE id = ?')
+      .bind(url, gameId)
+      .run()
+    return c.json({ ok: true, image_url: url, message: '대표 이미지를 변경했습니다.' })
+  } catch (err: any) {
+    return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
+  }
+})
 
 // ---------- 게임 여러 개 선택 삭제 (체크박스 다중 삭제) ----------
 // 바디: { "ids": [12, 15, 20] }
