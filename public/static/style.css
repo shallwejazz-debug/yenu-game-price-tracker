@@ -679,3 +679,18 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   html, body { overflow-x: hidden; }
   .page { max-width: 100%; overflow-x: hidden; }
 }
+
+/* ---------- 전 페이지 공통 푸터 (제휴 고지) ---------- */
+.site-footer {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  border-top: 1px solid #22262f;
+  text-align: center;
+}
+.site-footer p {
+  color: #6b7280;
+  font-size: .78rem;
+  line-height: 1.5;
+  margin: 0;
+}
