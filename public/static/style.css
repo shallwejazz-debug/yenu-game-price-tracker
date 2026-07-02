@@ -655,3 +655,27 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   .row-panel .price-sections { grid-template-columns: 1fr; }
   .trend-chart-wrap { height: 200px; }
 }
+
+/* ============================================================
+   모바일 겹침 강제 해결 (레이아웃 1열 확정)
+   ============================================================ */
+@media (max-width: 820px) {
+  /* 2열 그리드를 확실히 무력화 → 세로 블록 흐름으로 */
+  .layout {
+    display: block;       /* grid 자체를 끔 */
+  }
+  .main-col,
+  .sidebar {
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    position: static;     /* sticky/absolute 잔재 제거 */
+    top: auto;
+  }
+  .sidebar {
+    margin-bottom: 20px;  /* 특가 → 카드 목록 순서 (위에 특가) */
+  }
+  /* 페이지 가로 overflow 차단 (미디어쿼리 오작동 근본 방지) */
+  html, body { overflow-x: hidden; }
+  .page { max-width: 100%; overflow-x: hidden; }
+}
