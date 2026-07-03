@@ -24,7 +24,7 @@ const BLACKLIST_REGEX = [
   /(na|aa)\s*$/i                  // 제목 맨 끝 NA/AA
 ];
 // 중고/개인거래성 판매처 차단 (네이버 API 제목엔 "중고"가 없고 상세페이지에만 있는 케이스 대응)
-const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어','게임하다'];
+const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어','게임하다','크리스랑'];
 
 function isBlacklisted(title: string): boolean { const t = title.toLowerCase(); if (BLACKLIST_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (BLACKLIST_REGEX.some(re => re.test(title))) return true; return false; }
 function isBlockedMall(mallName: string): boolean { return BLOCKED_MALLS.some(w => mallName.toLowerCase().includes(w.toLowerCase())); }
