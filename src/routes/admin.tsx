@@ -625,4 +625,59 @@ admin.post('/api/games/bulk-delete', async (c) => {
   }
 })
 
+// ---------- 게임 목록 내보내기 (별칭 + 이미지 포함, 붙여넣기 재등록용 텍스트) ----------
+admin.get('/api/export', async (c) => {
+  const { results: games } = await c.env.DB.prepare(
+    'SELECT id, title, image_url FROM games ORDER BY id'
+  ).all<{ id: number; title: string; image_url: string | null }>()
+
+  const lines: string[] = []
+  for (const g of games ?? []) {
+    const { results: eds } = await c.env.DB
+      .prepare('SELECT keywords FROM editions WHERE game_id = ?')
+      .bind(g.id)
+      .all<{ keywords: string | null }>()
+
+    const aliasSet = new Set<string>()
+    for (const e of eds ?? []) {
+      if (e.keywords) {
+        for (const k of e.keywords.split(',')) {
+          const t = k.trim()
+          if (t) aliasSet.add(t)
+        }
+      }
+    }
+    const aliases = Array.from(aliasSet).join(', ')
+    const img = g.image_url ?? ''
+    // 형식: 대표이름 | 별칭들 | 이미지URL
+    lines.push(`${g.title} | ${aliases} | ${img}`)
+  }
+
+  return c.json({ ok: true, count: lines.length, text: lines.join('\n') })
+})
+
+// ---------- DB 전체 초기화 (게임/에디션/가격/이력 삭제, settings 유지) ----------
+// 바디: { "confirm": "RESET" }
+admin.post('/api/reset-all', async (c) => {
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
+  }
+  if (body.confirm !== 'RESET') {
+    return c.json({ ok: false, error: '확인 문구가 올바르지 않습니다. confirm: "RESET" 필요.' }, 400)
+  }
+  try {
+    await c.env.DB.prepare('DELETE FROM price_history').run()
+    await c.env.DB.prepare('DELETE FROM prices').run()
+    await c.env.DB.prepare('DELETE FROM editions').run()
+    await c.env.DB.prepare('DELETE FROM games').run()
+    return c.json({ ok: true, message: '전체 데이터를 초기화했습니다. (레퍼럴 ID는 유지)' })
+  } catch (err: any) {
+    return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
+  }
+})
+
+
 export default admin
