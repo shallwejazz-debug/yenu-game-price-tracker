@@ -1,11 +1,11 @@
-// ============================================================
+// =============================================================
 // 네이버 쇼핑 API 연동 모듈  src/naver.ts
 //   - 게임명 검색 → 패키지/디지털 가격 + 구매 링크 수집
 //   - 굿즈/스틸북/계정/중고/회색지대 상품 제외
 //   - PS4+PS5 동시 언급 매물은 실물 기준 PS4로 분류
 //   - "코드" 단독 오탐 방지: 다운로드/온라인 코드 등 명확한 조합만 디지털 인정
 //   - 네이버 가격비교(catalog) 상품 제외 + exclude 파라미터로 중고/렌탈/직구 원천 제외
-// ============================================================
+// =============================================================
 
 interface NaverShopItem { title: string; link: string; image: string; lprice: string; hprice: string; mallName: string; productId: string; productType: string; category1: string; category2: string; category3: string; category4: string; }
 interface NaverShopResponse { total: number; start: number; display: number; items: NaverShopItem[]; }
