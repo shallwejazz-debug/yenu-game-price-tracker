@@ -1,7 +1,8 @@
 // ============================================================
 // 관리자 콘솔 HTML 페이지
 // src/routes/admin-page.tsx
-//   - 등록된 게임: 전체 선택 / 선택 삭제 컨트롤 추가
+//   - 등록된 게임: 전체 선택 / 선택 삭제 컨트롤
+//   - 백업/복원: 내보내기 / 붙여넣기 재등록 / DB 초기화
 // ============================================================
 
 export function AdminPage(): string {
@@ -85,7 +86,7 @@ export function AdminPage(): string {
 
     <section class="admin-card">
       <h2>📋 등록된 게임</h2>
-      <!-- [추가] 선택 삭제 컨트롤 바 -->
+      <!-- 선택 삭제 컨트롤 바 -->
       <div class="admin-bulk-bar">
         <label class="admin-selall">
           <input type="checkbox" id="selectAllGames" /> 전체 선택
@@ -94,6 +95,49 @@ export function AdminPage(): string {
         <button id="refreshGames" class="btn btn-sm">새로고침</button>
       </div>
       <ul id="gameList" class="admin-game-list"></ul>
+    </section>
+
+    <!-- ============ 백업 / 복원 ============ -->
+    <section class="admin-card">
+      <h2>💾 백업 / 복원</h2>
+      <p class="admin-hint">
+        현재 등록된 게임을 <b>대표이름 | 별칭 | 이미지URL</b> 형식으로 내보냅니다.
+        이 텍스트를 저장해두면, 나중에 아래 붙여넣기 창으로 그대로 재등록할 수 있습니다.
+        (가격은 재등록 시 최신값으로 새로 수집됩니다.)
+      </p>
+
+      <div class="admin-row">
+        <button id="exportBtn" class="btn">⬆️ 현재 목록 내보내기</button>
+      </div>
+      <textarea id="exportArea" class="admin-textarea" rows="6"
+        placeholder="내보내기 버튼을 누르면 여기에 목록이 출력됩니다. (전체 선택 후 복사해서 보관하세요)"></textarea>
+      <p id="exportStatus" class="admin-status"></p>
+
+      <hr class="admin-hr" />
+
+      <p class="admin-hint">
+        아래 창에 <b>대표이름 | 별칭1, 별칭2 | 이미지URL</b> 형식으로 한 줄에 한 게임씩 붙여넣으세요.
+        (이미지URL은 생략 가능 — 생략 시 검색 결과 이미지를 사용)
+      </p>
+      <textarea id="importPasteArea" class="admin-textarea" rows="8"
+        placeholder="예)&#10;보더랜드 4 | 보더랜드4, Borderlands 4 | https://.../header.jpg&#10;발더스 게이트 3 | 발더스게이트3, BG3 | "></textarea>
+      <div class="admin-row">
+        <button id="pastePreviewBtn" class="btn">🔍 붙여넣기 미리보기</button>
+        <button id="pasteImportBtn" class="btn btn-primary">⬇️ 붙여넣기로 재등록 (실제 저장)</button>
+      </div>
+      <p id="pasteStatus" class="admin-status"></p>
+      <div id="pasteResult" class="import-result"></div>
+    </section>
+
+    <!-- ============ 위험 구역 ============ -->
+    <section class="admin-card admin-danger-zone">
+      <h2>⚠️ 위험 구역</h2>
+      <p class="admin-hint">
+        모든 게임/에디션/가격/이력 데이터를 삭제합니다. (레퍼럴 ID 설정은 유지됩니다.)
+        되돌릴 수 없으니 <b>반드시 먼저 위에서 내보내기로 백업</b>하세요.
+      </p>
+      <button id="resetAllBtn" class="btn btn-danger">전체 데이터 초기화</button>
+      <p id="resetStatus" class="admin-status"></p>
     </section>
   </main>
 
