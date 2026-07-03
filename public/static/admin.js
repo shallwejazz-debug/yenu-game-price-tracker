@@ -3,6 +3,7 @@
 // public/static/admin.js
 //   - 자동 가져오기: 엑셀식 별칭 그룹(groups) 입력 지원
 //   - 게임 목록: 체크박스 선택 삭제 지원
+//   - 백업/복원: 내보내기 / 붙여넣기 재등록 / DB 초기화
 // ============================================================
 
 (function () {
@@ -227,8 +228,8 @@
     return '\u20a9' + Number(n).toLocaleString('ko-KR')
   }
 
-  function renderImportResult(data) {
-    const host = $('importResult')
+  function renderImportResult(data, hostId) {
+    const host = $(hostId || 'importResult')
     const mode = data.dryRun ? '미리보기' : '저장 완료'
     const blocks = (data.results || []).map(function (r) {
       if (r.error) {
@@ -250,6 +251,7 @@
       }).join('')
       const sk = r.skipped || {}
       const skText = '제외 — 비게임 ' + (sk.notGameTitle||0) + ', 중고 ' + (sk.used||0) +
+        ', 가격비교 ' + (sk.catalog||0) +
         ', 가격범위밖 ' + (sk.outOfRange||0) + ', 플랫폼불명 ' + (sk.noPlatform||0)
       return (
         '<div class="imp-game">' +
@@ -292,7 +294,7 @@
       const games = data.games || []
       if (games.length === 0) {
         list.innerHTML = '<li class="admin-empty">등록된 게임이 없습니다.</li>'
-        updateBulkBar()   // [추가] 선택 카운트 초기화
+        updateBulkBar()
         return
       }
           list.innerHTML = games
@@ -314,7 +316,6 @@
         )
         .join('')
 
-      // [추가] 목록 새로 그린 뒤 전체선택 해제 + 카운트 갱신
       const selAll = $('selectAllGames')
       if (selAll) selAll.checked = false
       updateBulkBar()
@@ -324,7 +325,7 @@
   }
   $('refreshGames').addEventListener('click', loadGames)
 
-  // ---------- [추가] 선택 삭제 ----------
+  // ---------- 선택 삭제 ----------
   function getCheckedIds() {
     return Array.from($('gameList').querySelectorAll('.ag-check:checked'))
       .map(function (c) { return c.getAttribute('data-id') })
@@ -338,14 +339,12 @@
     btn.textContent = n === 0 ? '선택 삭제' : '선택 삭제 (' + n + ')'
   }
 
-  // 개별 체크박스 변경 → 카운트 갱신
   $('gameList').addEventListener('change', function (e) {
     if (e.target.classList && e.target.classList.contains('ag-check')) {
       updateBulkBar()
     }
   })
 
-  // 전체 선택 토글 (해당 요소가 있을 때만 동작)
   ;(function () {
     const selAll = $('selectAllGames')
     if (!selAll) return
@@ -356,7 +355,6 @@
     })
   })()
 
-  // 선택 삭제 실행 (해당 버튼이 있을 때만 동작)
   ;(function () {
     const btn = $('bulkDeleteBtn')
     if (!btn) return
@@ -377,6 +375,7 @@
       }
     })
   })()
+
   // ---------- 대표 이미지 변경 ----------
   $('gameList').addEventListener('click', async (e) => {
     const btn = e.target.closest('.ag-image')
@@ -389,7 +388,7 @@
       '(비우고 확인하면 이미지를 제거합니다. 예: 스팀 커버 이미지 주소)',
       current
     )
-    if (input === null) return // 취소
+    if (input === null) return
     const url = input.trim()
     btn.disabled = true
     try {
@@ -401,7 +400,7 @@
     }
   })
 
-  // ---------- 게임 삭제 (이벤트 위임, 단건) ----------
+  // ---------- 게임 삭제 (단건) ----------
   $('gameList').addEventListener('click', async (e) => {
     const btn = e.target.closest('.ag-delete')
     if (!btn) return
@@ -417,6 +416,149 @@
       btn.disabled = false
     }
   })
+
+  // ============================================================
+  // 백업 / 복원
+  // ============================================================
+
+  // ---------- 내보내기 ----------
+  ;(function () {
+    const btn = $('exportBtn')
+    if (!btn) return
+    btn.addEventListener('click', async function () {
+      setStatus($('exportStatus'), '내보내는 중…', true)
+      try {
+        const data = await api('/export')
+        $('exportArea').value = data.text || ''
+        setStatus($('exportStatus'), '✅ ' + (data.count || 0) + '개 게임 내보냄. 전체 선택해서 복사·보관하세요.', true)
+      } catch (e) {
+        setStatus($('exportStatus'), '❌ ' + e.message, false)
+      }
+    })
+  })()
+
+  // 붙여넣기 텍스트 → { groups:[{name,aliases}], images:{name:url} } 로 파싱
+  // 한 줄 형식: 대표이름 | 별칭1, 별칭2 | 이미지URL
+  function parsePasteText(text) {
+    const lines = String(text || '').split('\n')
+    const groups = []
+    const images = {}
+    lines.forEach(function (line) {
+      const raw = line.trim()
+      if (!raw) return
+      const parts = raw.split('|').map(function (s) { return s.trim() })
+      const name = parts[0] || ''
+      if (!name) return
+      const aliasRaw = parts[1] || ''
+      const imgUrl = parts[2] || ''
+
+      let aliases = aliasRaw.split(',').map(function (s) { return s.trim() }).filter(Boolean)
+      if (aliases.length === 0) aliases = [name]
+
+      // 대표이름을 맨 앞에 포함 + 중복 제거
+      const seen = {}
+      const uniq = []
+      ;[name].concat(aliases).forEach(function (t) {
+        if (!t) return
+        const k = t.toLowerCase()
+        if (!seen[k]) { seen[k] = true; uniq.push(t) }
+      })
+
+      groups.push({ name: name, aliases: uniq })
+      if (imgUrl) images[name] = imgUrl
+    })
+    return { groups: groups, images: images }
+  }
+
+  // ---------- 붙여넣기 미리보기 ----------
+  ;(function () {
+    const btn = $('pastePreviewBtn')
+    if (!btn) return
+    btn.addEventListener('click', async function () {
+      const parsed = parsePasteText($('importPasteArea').value)
+      if (parsed.groups.length === 0) {
+        setStatus($('pasteStatus'), '붙여넣은 내용이 없습니다.', false)
+        return
+      }
+      setStatus($('pasteStatus'), '🔍 ' + parsed.groups.length + '개 분석 중…', true)
+      try {
+        const data = await api('/auto-import', 'POST', { groups: parsed.groups, dryRun: true })
+        setStatus($('pasteStatus'), '✅ 미리보기 (' + (data.count || 0) + '개)', true)
+        renderImportResult(data, 'pasteResult')
+      } catch (e) {
+        setStatus($('pasteStatus'), '❌ ' + e.message, false)
+      }
+    })
+  })()
+
+  // ---------- 붙여넣기로 재등록 (실제 저장 + 이미지 적용) ----------
+  ;(function () {
+    const btn = $('pasteImportBtn')
+    if (!btn) return
+    btn.addEventListener('click', async function () {
+      const parsed = parsePasteText($('importPasteArea').value)
+      if (parsed.groups.length === 0) {
+        setStatus($('pasteStatus'), '붙여넣은 내용이 없습니다.', false)
+        return
+      }
+      if (!confirm(parsed.groups.length + '개 게임을 실제로 등록합니다. 진행할까요?')) return
+
+      setStatus($('pasteStatus'), '⬇️ 등록 중… (게임 수에 따라 시간이 걸립니다)', true)
+      btn.disabled = true
+      try {
+        const data = await api('/auto-import', 'POST', { groups: parsed.groups, dryRun: false })
+        renderImportResult(data, 'pasteResult')
+
+        // 이미지 URL이 지정된 게임은 등록 후 PATCH로 덮어쓰기
+        let imgApplied = 0
+        for (const r of (data.results || [])) {
+          if (r.game_id && parsed.images[r.title]) {
+            try {
+              await api('/games/' + r.game_id, 'PATCH', { image_url: parsed.images[r.title] })
+              imgApplied++
+            } catch (e) {}
+          }
+        }
+        setStatus($('pasteStatus'),
+          '✅ 재등록 완료 (' + (data.count || 0) + '개' +
+          (imgApplied ? ', 이미지 ' + imgApplied + '건 적용' : '') + ')', true)
+        loadGames()
+      } catch (e) {
+        setStatus($('pasteStatus'), '❌ ' + e.message, false)
+      } finally {
+        btn.disabled = false
+      }
+    })
+  })()
+
+  // ---------- 전체 초기화 ----------
+  ;(function () {
+    const btn = $('resetAllBtn')
+    if (!btn) return
+    btn.addEventListener('click', async function () {
+      const answer = prompt(
+        '⚠️ 모든 게임 데이터를 삭제합니다. 되돌릴 수 없습니다.\n' +
+        '먼저 위에서 내보내기로 백업했는지 확인하세요.\n\n' +
+        '삭제하려면 RESET 을 입력하세요.'
+      )
+      if (answer === null) return
+      if (answer !== 'RESET') {
+        setStatus($('resetStatus'), '취소되었습니다. (RESET 을 정확히 입력해야 실행됩니다)', false)
+        return
+      }
+      btn.disabled = true
+      setStatus($('resetStatus'), '초기화 중…', true)
+      try {
+        const data = await api('/reset-all', 'POST', { confirm: 'RESET' })
+        setStatus($('resetStatus'), '✅ ' + (data.message || '초기화 완료'), true)
+        loadGames()
+      } catch (e) {
+        setStatus($('resetStatus'), '❌ ' + e.message, false)
+      } finally {
+        btn.disabled = false
+      }
+    })
+  })()
 
   function escapeHtml(s) {
     return String(s == null ? '' : s)
