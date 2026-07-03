@@ -1,8 +1,9 @@
 // =============================================================
 // 네이버 쇼핑 API 연동 모듈  src/naver.ts
 //   - 게임명 검색 → 패키지/디지털 가격 + 구매 링크 수집
-//   - 굿즈/스틸북/계정/중고/회색지대 상품 제외
+//   - 굿즈/스틸북/계정/중고/회색지대/특수판(CE·디럭스·예약) 상품 제외
 //   - PS4+PS5 동시 언급 매물은 실물 기준 PS4로 분류
+//   - 검색 대상 플랫폼과 상품 실제 플랫폼 불일치 시 제외(교차 오염 방지)
 //   - "코드" 단독 오탐 방지: 다운로드/온라인 코드 등 명확한 조합만 디지털 인정
 //   - 네이버 가격비교(catalog) 상품 제외 + exclude 파라미터로 중고/렌탈/직구 원천 제외
 // =============================================================
@@ -65,12 +66,30 @@ const DIGITAL_REGEX = [
 ];
 function isDigitalKey(title: string): boolean { const t = title.toLowerCase(); if (DIGITAL_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (DIGITAL_REGEX.some(re => re.test(title))) return true; return false; }
 
+// ---------- 특수판(CE/디럭스/한정판/예약) 판별 ----------
+// 일반판보다 훨씬 비싸 최저가를 왜곡하므로 제외한다.
+const EDITION_REGEX = [
+  /\bce\b/i,                       // 독립 단어 CE (예: Steam CE)
+  /\bdx\b/i,                       // 디럭스 약어
+  /컬(렉|랙)터/,                    // 컬렉터즈/콜렉터즈
+  /collector/i,
+  /디럭스|deluxe/i,
+  /얼티밋|ultimate/i,
+  /골드\s*에디션|gold\s*edition/i,
+  /스페셜\s*에디션|special\s*edition/i,
+  /한정|리미티드|limited/i,
+  /예약|예구|선주문|pre[\s-]?order/i,
+];
+function isSpecialEdition(title: string): boolean { return EDITION_REGEX.some(re => re.test(title)); }
+
 function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean {
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
   // 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (가짜 초저가의 주범)
   const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost'];
   if (banned.some(w => title.includes(w))) return false;
+  // 특수판(CE/디럭스/한정판/예약 등) 제외
+  if (isSpecialEdition(title)) return false;
   if (gameKeywords.length > 0 && !gameKeywords.some(k => title.includes(k.toLowerCase()))) return false;
   return true;
 }
@@ -124,6 +143,9 @@ export interface PlatformBucket { platform:string; prices:CleanedPrice[]; count:
 export interface ClassifyResult { buckets:PlatformBucket[]; skipped:{notGameTitle:number;blacklisted:number;used:number;catalog:number;outOfRange:number;noPlatform:number;}; totalItems:number; }
 
 export async function searchAndClassify(clientId:string,clientSecret:string,query:string,keywords:string[]=[]): Promise<ClassifyResult> {
+  // 검색어에 담긴 대상 플랫폼 추출 (예: "둠 다크에이지 switch" → switch)
+  const targetPlatform = detectPlatform(query);
+
   // exclude=used:rental:cbshop → 중고/렌탈/해외직구·구매대행을 네이버 단에서 원천 제외
   const url='https://openapi.naver.com/v1/search/shop.json?query=' + encodeURIComponent(query) + '&display=100&sort=sim&exclude=used:rental:cbshop';
   const res=await fetch(url,{headers:{'X-Naver-Client-Id':clientId,'X-Naver-Client-Secret':clientSecret}});
@@ -142,6 +164,9 @@ export async function searchAndClassify(clientId:string,clientSecret:string,quer
     if (!isReasonablePrice(price)) {skipped.outOfRange++; continue;}
     const platform=detectPlatform(title);
     if (!platform) {skipped.noPlatform++; continue;}
+    // 검색 대상 플랫폼과 상품 실제 플랫폼이 다르면 버림 (교차 오염 방지)
+    // 예: switch로 검색했는데 제목이 "PC Steam 둠"이면 pc로 판정 → 제외
+    if (targetPlatform && platform !== targetPlatform) {skipped.noPlatform++; continue;}
     const cleaned:CleanedPrice={mallName:mapMallToSource(item.mallName),mallLabel:item.mallName,price,link:item.link,title,image:item.image,isDigital:isDigitalKey(title)?1:0};
     const arr=byPlatform.get(platform)||[]; arr.push(cleaned); byPlatform.set(platform,arr);
   }
