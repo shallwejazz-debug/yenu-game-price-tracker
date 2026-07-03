@@ -3,7 +3,7 @@
 // public/static/admin.js
 //   - 자동 가져오기: 엑셀식 별칭 그룹(groups) 입력 지원
 //   - 게임 목록: 체크박스 선택 삭제 지원
-//   - 백업/복원: 내보내기 / 붙여넣기 재등록 / DB 초기화
+//   - 백업/복원: 내보내기 / 붙여넣기 재등록(1개씩 순차) / DB 초기화
 // ============================================================
 
 (function () {
@@ -455,7 +455,6 @@
       let aliases = aliasRaw.split(',').map(function (s) { return s.trim() }).filter(Boolean)
       if (aliases.length === 0) aliases = [name]
 
-      // 대표이름을 맨 앞에 포함 + 중복 제거
       const seen = {}
       const uniq = []
       ;[name].concat(aliases).forEach(function (t) {
@@ -470,64 +469,116 @@
     return { groups: groups, images: images }
   }
 
-  // ---------- 붙여넣기 미리보기 ----------
+  // ---------- 붙여넣기 미리보기 (게임 1개씩 순차 호출) ----------
   ;(function () {
     const btn = $('pastePreviewBtn')
     if (!btn) return
     btn.addEventListener('click', async function () {
       const parsed = parsePasteText($('importPasteArea').value)
-      if (parsed.groups.length === 0) {
+      const total = parsed.groups.length
+      if (total === 0) {
         setStatus($('pasteStatus'), '붙여넣은 내용이 없습니다.', false)
         return
       }
-      setStatus($('pasteStatus'), '🔍 ' + parsed.groups.length + '개 분석 중…', true)
-      try {
-        const data = await api('/auto-import', 'POST', { groups: parsed.groups, dryRun: true })
-        setStatus($('pasteStatus'), '✅ 미리보기 (' + (data.count || 0) + '개)', true)
-        renderImportResult(data, 'pasteResult')
-      } catch (e) {
-        setStatus($('pasteStatus'), '❌ ' + e.message, false)
+      btn.disabled = true
+      $('pasteResult').innerHTML = ''
+      const okResults = []
+      const failed = []
+      let done = 0
+
+      for (const group of parsed.groups) {
+        done++
+        setStatus($('pasteStatus'), '🔍 분석 중… (' + done + '/' + total + ') ' + group.name, true)
+        try {
+          const data = await api('/auto-import', 'POST', { groups: [group], dryRun: true })
+          const r = (data.results || [])[0]
+          if (r) okResults.push(r)
+        } catch (e) {
+          failed.push({ title: group.name, error: e.message })
+        }
       }
+
+      renderImportResult({ dryRun: true, count: okResults.length, results: okResults }, 'pasteResult')
+      if (failed.length > 0) {
+        const failHtml = failed.map(function (f) {
+          return '<div class="imp-game imp-err"><b>' + escapeHtml(f.title) + '</b> — ' + escapeHtml(f.error) + '</div>'
+        }).join('')
+        $('pasteResult').innerHTML +=
+          '<div class="imp-mode">⚠️ 실패 ' + failed.length + '개</div>' + failHtml
+      }
+      setStatus($('pasteStatus'),
+        '✅ 미리보기 완료 (' + okResults.length + '/' + total + '개)' +
+        (failed.length ? ' · 실패 ' + failed.length + '개' : ''),
+        failed.length === 0)
+      btn.disabled = false
     })
   })()
 
-  // ---------- 붙여넣기로 재등록 (실제 저장 + 이미지 적용) ----------
+  // ---------- 붙여넣기로 재등록 (게임 1개씩 순차 호출 → subrequest 한도 회피) ----------
   ;(function () {
     const btn = $('pasteImportBtn')
     if (!btn) return
     btn.addEventListener('click', async function () {
       const parsed = parsePasteText($('importPasteArea').value)
-      if (parsed.groups.length === 0) {
+      const total = parsed.groups.length
+      if (total === 0) {
         setStatus($('pasteStatus'), '붙여넣은 내용이 없습니다.', false)
         return
       }
-      if (!confirm(parsed.groups.length + '개 게임을 실제로 등록합니다. 진행할까요?')) return
+      if (!confirm(total + '개 게임을 실제로 등록합니다.\n게임 수가 많으면 시간이 걸립니다. 진행할까요?')) return
 
-      setStatus($('pasteStatus'), '⬇️ 등록 중… (게임 수에 따라 시간이 걸립니다)', true)
       btn.disabled = true
-      try {
-        const data = await api('/auto-import', 'POST', { groups: parsed.groups, dryRun: false })
-        renderImportResult(data, 'pasteResult')
+      $('pasteResult').innerHTML = ''
 
-        // 이미지 URL이 지정된 게임은 등록 후 PATCH로 덮어쓰기
-        let imgApplied = 0
-        for (const r of (data.results || [])) {
-          if (r.game_id && parsed.images[r.title]) {
-            try {
-              await api('/games/' + r.game_id, 'PATCH', { image_url: parsed.images[r.title] })
-              imgApplied++
-            } catch (e) {}
-          }
-        }
+      const okResults = []
+      const failed = []
+      let imgApplied = 0
+      let done = 0
+
+      for (const group of parsed.groups) {
+        done++
         setStatus($('pasteStatus'),
-          '✅ 재등록 완료 (' + (data.count || 0) + '개' +
-          (imgApplied ? ', 이미지 ' + imgApplied + '건 적용' : '') + ')', true)
-        loadGames()
-      } catch (e) {
-        setStatus($('pasteStatus'), '❌ ' + e.message, false)
-      } finally {
-        btn.disabled = false
+          '⬇️ 등록 중… (' + done + '/' + total + ') ' + group.name, true)
+        try {
+          const data = await api('/auto-import', 'POST', { groups: [group], dryRun: false })
+          const r = (data.results || [])[0]
+          if (r && !r.error) {
+            okResults.push(r)
+            if (r.game_id && parsed.images[r.title]) {
+              try {
+                await api('/games/' + r.game_id, 'PATCH', { image_url: parsed.images[r.title] })
+                imgApplied++
+              } catch (e) {}
+            }
+          } else {
+            failed.push({ title: group.name, error: (r && r.error) || '알 수 없는 오류' })
+          }
+        } catch (e) {
+          failed.push({ title: group.name, error: e.message })
+        }
       }
+
+      renderImportResult({
+        dryRun: false,
+        count: okResults.length,
+        results: okResults,
+      }, 'pasteResult')
+
+      if (failed.length > 0) {
+        const failHtml = failed.map(function (f) {
+          return '<div class="imp-game imp-err"><b>' + escapeHtml(f.title) + '</b> — ' + escapeHtml(f.error) + '</div>'
+        }).join('')
+        $('pasteResult').innerHTML +=
+          '<div class="imp-mode">⚠️ 실패 ' + failed.length + '개 (아래 목록만 다시 붙여넣어 재시도하세요)</div>' + failHtml
+      }
+
+      const okMsg = '✅ 성공 ' + okResults.length + '/' + total + '개' +
+        (imgApplied ? ', 이미지 ' + imgApplied + '건 적용' : '')
+      const failMsg = failed.length ? (' · ❌ 실패 ' + failed.length + '개') : ''
+      setStatus($('pasteStatus'), okMsg + failMsg, failed.length === 0)
+
+      btn.disabled = false
+      loadGames()
     })
   })()
 
