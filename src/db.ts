@@ -281,12 +281,12 @@ export async function insertPrice(
   return result
 }
 
-// ---------- 사이드바: 특가 순위 (역대 최저가 근접 순) ----------
+// ---------- 사이드바: 특가 순위 (역대 최저가 근접 순, 게임당 1개) ----------
 // 정가 대신 price_history의 역대 최저가(lowest_ever)를 기준으로 삼는다.
 //   근접도 = 현재최저가 / 역대최저가  (1.0에 가까울수록 "지금이 바닥값 = 특가")
 // 안전장치:
 //   - 현재가가 역대최저가의 55% 미만이면 이상치(중고 오염) 의심 → 제외
-//   - 역대최저가 데이터가 있는 에디션만 대상
+//   - 한 게임은 가장 특가인 플랫폼 1개만 노출 (같은 게임 도배 방지)
 export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
     .prepare(
@@ -295,28 +295,39 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
          SELECT p.edition_id, p.is_digital, MIN(p.price) AS cur_price
          FROM prices p
          GROUP BY p.edition_id, p.is_digital
+       ),
+       ranked AS (
+         SELECT g.id AS game_id, g.title, g.image_url, g.original_price,
+                e.id AS edition_id, e.platform,
+                l.is_digital,
+                l.cur_price AS lowest_price,
+                ph.lowest_ever,
+                (CAST(l.cur_price AS REAL) / ph.lowest_ever) AS ratio,
+                -- 게임별로 근접도가 가장 좋은(=ratio 낮은) 1건에 1번을 매김
+                ROW_NUMBER() OVER (
+                  PARTITION BY g.id
+                  ORDER BY (CAST(l.cur_price AS REAL) / ph.lowest_ever) ASC, l.cur_price ASC
+                ) AS rn
+         FROM latest l
+         JOIN editions e ON e.id = l.edition_id
+         JOIN games g ON g.id = e.game_id
+         JOIN price_history ph
+           ON ph.edition_id = l.edition_id AND ph.is_digital = l.is_digital
+         WHERE ph.lowest_ever IS NOT NULL AND ph.lowest_ever > 0
+           AND l.cur_price >= ph.lowest_ever * 0.55
        )
-       SELECT g.id AS game_id, g.title, g.image_url, g.original_price,
-              e.id AS edition_id, e.platform,
-              l.is_digital,
-              l.cur_price AS lowest_price,
-              ph.lowest_ever
-       FROM latest l
-       JOIN editions e ON e.id = l.edition_id
-       JOIN games g ON g.id = e.game_id
-       JOIN price_history ph
-         ON ph.edition_id = l.edition_id AND ph.is_digital = l.is_digital
-       WHERE ph.lowest_ever IS NOT NULL AND ph.lowest_ever > 0
-         -- 이상치 방어: 현재가가 역대최저가의 55% 미만이면 제외
-         AND l.cur_price >= ph.lowest_ever * 0.55
-       -- 근접도(현재가/역대최저가)가 낮을수록(=바닥값에 가까울수록) 상위
-       ORDER BY (CAST(l.cur_price AS REAL) / ph.lowest_ever) ASC
+       SELECT game_id, title, image_url, original_price,
+              edition_id, platform, is_digital, lowest_price, lowest_ever
+       FROM ranked
+       WHERE rn = 1
+       ORDER BY ratio ASC, lowest_price ASC
        LIMIT ?`
     )
     .bind(limit)
     .all()
   return (results ?? []) as any[]
 }
+
 
 
 // ============================================================
