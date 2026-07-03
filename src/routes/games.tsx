@@ -31,19 +31,21 @@ function discountRate(price: number, original: number | null): number | null {
   return Math.round((1 - price / original) * 100)
 }
 
-// ---------- 사이드바: 할인율 높은 순 ----------
+// ---------- 사이드바: 특가 순위 (역대 최저가 근접 순) ----------
 async function DiscountSidebar({ db }: { db: D1Database }) {
   const items = await getTopDiscounts(db, 10)
   return (
     <aside class="sidebar">
       <h2 class="sidebar-title">🔥 특가 순위</h2>
-      <p class="sidebar-sub">할인율 높은 순</p>
+      <p class="sidebar-sub">지금 사기 좋은 순</p>
       {items.length === 0 ? (
-        <p class="no-data">아직 할인 데이터가 없습니다.</p>
+        <p class="no-data">아직 가격 데이터가 없습니다.</p>
       ) : (
         <ol class="discount-list">
           {items.map((it) => {
-            const rate = discountRate(it.lowest_price, it.original_price)
+            // 현재가가 역대 최저가와 같거나 낮으면 "역대 최저" 표시
+            const atLowest =
+              it.lowest_ever != null && it.lowest_price != null && it.lowest_price <= it.lowest_ever
             return (
               <li class="discount-item">
                 <a href={`/games/${it.game_id}/${it.platform}`}>
@@ -51,7 +53,7 @@ async function DiscountSidebar({ db }: { db: D1Database }) {
                   <span class="discount-name">{it.title}</span>
                   <span class="discount-price">
                     {won(it.lowest_price)}
-                    {rate !== null && <span class="discount-rate">-{rate}%</span>}
+                    {atLowest && <span class="discount-rate">역대최저</span>}
                   </span>
                 </a>
               </li>
@@ -62,6 +64,7 @@ async function DiscountSidebar({ db }: { db: D1Database }) {
     </aside>
   )
 }
+
 
 // ---------- 콘솔 탭 ----------
 function ConsoleTabs({ active }: { active: string }) {
