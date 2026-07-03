@@ -198,7 +198,12 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     : []
 
   try {
-    const prices = await searchGamePrices(clientId, clientSecret, edition.search_query, keywords)
+    const classified = await searchAndClassify(clientId, clientSecret, edition.search_query, keywords)
+
+    // 이 에디션의 플랫폼에 해당하는 버킷만 골라서 저장
+    const bucket = classified.buckets.find((b) => b.platform === edition.platform)
+    const prices = bucket ? bucket.prices : []
+
     if (prices.length === 0) {
       return c.json({ ok: true, found: 0, message: '게임 본품을 찾지 못했습니다. 검색어를 조정하세요.' })
     }
@@ -213,7 +218,7 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
         source: p.mallName,
         price: p.price,
         currency: 'KRW',
-        is_digital: 0,
+        is_digital: p.isDigital ?? 0,
         product_url: p.link,
         mall_label: p.mallLabel,
       })
@@ -384,7 +389,7 @@ admin.post('/api/auto-import', async (c) => {
 
       // 별칭별로 검색 → 플랫폼별로 병합 (link 기준 중복 제거, 최저가 우선)
       const mergedByPlatform = new Map<string, Map<string, any>>()
-      const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, outOfRange: 0, noPlatform: 0 }
+      const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, catalog: 0, outOfRange: 0, noPlatform: 0 }
       let totalItems = 0
       let firstImage: string | null = null
 
@@ -535,6 +540,7 @@ admin.delete('/api/games/:id', async (c) => {
 
     for (const e of editions.results ?? []) {
       await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(e.id).run()
+      await c.env.DB.prepare('DELETE FROM price_history WHERE edition_id = ?').bind(e.id).run()
     }
     await c.env.DB.prepare('DELETE FROM editions WHERE game_id = ?').bind(gameId).run()
     await c.env.DB.prepare('DELETE FROM games WHERE id = ?').bind(gameId).run()
