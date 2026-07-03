@@ -23,7 +23,7 @@ import {
   findGameByTitle,
   findEdition,
 } from '../db'
-import { searchGamePrices, searchAndClassify } from '../naver'
+import { searchAndClassify } from '../naver'
 import { PLATFORM_LABELS } from '../types'
 import { AdminPage } from './admin-page'
 
