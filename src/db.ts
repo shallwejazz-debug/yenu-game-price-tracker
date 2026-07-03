@@ -291,9 +291,9 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
     .prepare(
       `WITH latest AS (
-         -- 에디션 × is_digital 별 현재 최저가
          SELECT p.edition_id, p.is_digital, MIN(p.price) AS cur_price
          FROM prices p
+         WHERE p.is_digital = 0          -- 패키지만 (디지털 코드 오염 제외)
          GROUP BY p.edition_id, p.is_digital
        ),
        ranked AS (
@@ -303,7 +303,6 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
                 l.cur_price AS lowest_price,
                 ph.lowest_ever,
                 (CAST(l.cur_price AS REAL) / ph.lowest_ever) AS ratio,
-                -- 게임별로 근접도가 가장 좋은(=ratio 낮은) 1건에 1번을 매김
                 ROW_NUMBER() OVER (
                   PARTITION BY g.id
                   ORDER BY (CAST(l.cur_price AS REAL) / ph.lowest_ever) ASC, l.cur_price ASC
@@ -327,6 +326,7 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
     .all()
   return (results ?? []) as any[]
 }
+
 
 
 
