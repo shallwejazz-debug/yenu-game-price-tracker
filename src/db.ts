@@ -281,26 +281,43 @@ export async function insertPrice(
   return result
 }
 
-// ---------- 사이드바: 할인율 높은 순 ----------
+// ---------- 사이드바: 특가 순위 (역대 최저가 근접 순) ----------
+// 정가 대신 price_history의 역대 최저가(lowest_ever)를 기준으로 삼는다.
+//   근접도 = 현재최저가 / 역대최저가  (1.0에 가까울수록 "지금이 바닥값 = 특가")
+// 안전장치:
+//   - 현재가가 역대최저가의 55% 미만이면 이상치(중고 오염) 의심 → 제외
+//   - 역대최저가 데이터가 있는 에디션만 대상
 export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
     .prepare(
-      `SELECT g.id AS game_id, g.title, g.image_url, g.original_price,
+      `WITH latest AS (
+         -- 에디션 × is_digital 별 현재 최저가
+         SELECT p.edition_id, p.is_digital, MIN(p.price) AS cur_price
+         FROM prices p
+         GROUP BY p.edition_id, p.is_digital
+       )
+       SELECT g.id AS game_id, g.title, g.image_url, g.original_price,
               e.id AS edition_id, e.platform,
-              MIN(p.price) AS lowest_price
-       FROM editions e
+              l.is_digital,
+              l.cur_price AS lowest_price,
+              ph.lowest_ever
+       FROM latest l
+       JOIN editions e ON e.id = l.edition_id
        JOIN games g ON g.id = e.game_id
-       JOIN prices p ON p.edition_id = e.id
-       WHERE g.original_price IS NOT NULL AND g.original_price > 0
-       GROUP BY e.id
-       HAVING lowest_price < g.original_price
-       ORDER BY (1.0 - CAST(lowest_price AS REAL) / g.original_price) DESC
+       JOIN price_history ph
+         ON ph.edition_id = l.edition_id AND ph.is_digital = l.is_digital
+       WHERE ph.lowest_ever IS NOT NULL AND ph.lowest_ever > 0
+         -- 이상치 방어: 현재가가 역대최저가의 55% 미만이면 제외
+         AND l.cur_price >= ph.lowest_ever * 0.55
+       -- 근접도(현재가/역대최저가)가 낮을수록(=바닥값에 가까울수록) 상위
+       ORDER BY (CAST(l.cur_price AS REAL) / ph.lowest_ever) ASC
        LIMIT ?`
     )
     .bind(limit)
     .all()
   return (results ?? []) as any[]
 }
+
 
 // ============================================================
 // 설정(settings) - 쇼핑몰별 레퍼럴 ID 등
