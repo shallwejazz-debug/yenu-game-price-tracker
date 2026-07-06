@@ -622,6 +622,38 @@ admin.post('/api/games/bulk-delete', async (c) => {
   }
 })
 
+// ---------- 게임의 모든 에디션에 keywords/exclude 일괄 적용 (백업 복원용) ----------
+// [2026-07-06] 복원 시 대표 keywords/exclude를 그 게임의 전체 에디션에 반영
+// 바디: { keywords: "용과같이,2" | null, exclude_keywords: "나이트레인" | null }
+admin.post('/api/games/:id/apply-filters', async (c) => {
+  const gameId = Number(c.req.param('id'))
+  if (Number.isNaN(gameId)) {
+    return c.json({ ok: false, error: '잘못된 게임 ID' }, 400)
+  }
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
+  }
+  const kw = body.keywords != null && String(body.keywords).trim() ? String(body.keywords).trim() : null
+  const exkw =
+    body.exclude_keywords != null && String(body.exclude_keywords).trim()
+      ? String(body.exclude_keywords).trim()
+      : null
+  try {
+    await c.env.DB.prepare(
+      'UPDATE editions SET keywords = ?, exclude_keywords = ? WHERE game_id = ?'
+    )
+      .bind(kw, exkw, gameId)
+      .run()
+    return c.json({ ok: true, message: 'keywords/exclude 적용 완료' })
+  } catch (err: any) {
+    return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
+  }
+})
+
+
 // ---------- 게임 목록 내보내기 (별칭 + 이미지 포함, 붙여넣기 재등록용 텍스트) ----------
 admin.get('/api/export', async (c) => {
   const { results: games } = await c.env.DB.prepare(
