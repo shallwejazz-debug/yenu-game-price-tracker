@@ -108,7 +108,10 @@ export function AdminPage(): string {
 
       <div class="admin-row">
         <button id="exportBtn" class="btn">⬆️ 현재 목록 내보내기</button>
+        <button id="exportTxtBtn" class="btn">📄 TXT로 저장</button>
+        <button id="exportCsvBtn" class="btn">📊 CSV(엑셀)로 저장</button>
       </div>
+
       <textarea id="exportArea" class="admin-textarea" rows="6"
         placeholder="내보내기 버튼을 누르면 여기에 목록이 출력됩니다. (전체 선택 후 복사해서 보관하세요)"></textarea>
       <p id="exportStatus" class="admin-status"></p>
