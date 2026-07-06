@@ -198,7 +198,7 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     : []
 
   try {
-    const classified = await searchAndClassify(clientId, clientSecret, edition.search_query, keywords)
+  const classified = await searchAndClassify(clientId, clientSecret, alias, [])
 
     // 이 에디션의 플랫폼에 해당하는 버킷만 골라서 저장
     const bucket = classified.buckets.find((b) => b.platform === edition.platform)
@@ -473,7 +473,7 @@ admin.post('/api/auto-import', async (c) => {
               platform: b.platform,
               edition_name: `${label}판`,
               search_query: `${name} ${label}`,
-              keywords: kw.join(','),
+              keywords: null,
             })
             editionId = Number(r.meta.last_row_id)
           }
