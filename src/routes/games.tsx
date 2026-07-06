@@ -82,6 +82,80 @@ function ConsoleTabs({ active }: { active: string }) {
   )
 }
 
+// ---------- 오늘의 특가 페이지 ----------
+//   GET /games/deals  - 역대 최저가 근접 순 특가 모음 (구매 유도)
+//   ※ 주의: 이 라우트는 반드시 /:gameId 보다 "위"에 있어야 함.
+//     아래에 두면 '/deals'가 gameId로 잡혀버림. 그래서 export 직전이 아니라
+//     여기(:gameId 라우트 위)에 두는 게 안전.
+games.get('/deals', async (c) => {
+  const items = await getTopDiscounts(c.env.DB, 30)
+
+  // 역대 최저가에 도달한 항목을 위로 (지금이 살 때)
+  const sorted = [...items].sort((a, b) => {
+    const aLow = a.lowest_ever != null && a.lowest_price != null && a.lowest_price <= a.lowest_ever
+    const bLow = b.lowest_ever != null && b.lowest_price != null && b.lowest_price <= b.lowest_ever
+    if (aLow !== bLow) return aLow ? -1 : 1
+    return (a.lowest_price ?? Infinity) - (b.lowest_price ?? Infinity)
+  })
+
+  return c.render(
+    <main class="container">
+      <a href="/games" class="back-link">← 전체 목록으로</a>
+
+      <div class="deals-head">
+        <h1>🔥 오늘의 특가</h1>
+        <p class="subtitle">지금 사기 좋은 게임을 역대 최저가 근접 순으로 모았습니다.</p>
+      </div>
+
+      {sorted.length === 0 ? (
+        <p class="no-data">아직 특가로 보여줄 가격 데이터가 없습니다.</p>
+      ) : (
+        <ul class="deals-list">
+          {sorted.map((it) => {
+            const atLowest =
+              it.lowest_ever != null && it.lowest_price != null && it.lowest_price <= it.lowest_ever
+            const rate = discountRate(it.lowest_price ?? Infinity, it.original_price ?? null)
+            return (
+              <li class={`deal-card ${atLowest ? 'deal-hot' : ''}`}>
+                <a href={`/games/${it.game_id}/${it.platform}`} class="deal-link">
+                  <div
+                    class="deal-thumb-wrap"
+                    style={it.image_url ? `--thumb-bg:url('${it.image_url}')` : undefined}
+                  >
+                    {it.image_url ? (
+                      <img src={it.image_url} alt={it.title} class="deal-thumb" loading="lazy" />
+                    ) : (
+                      <div class="game-thumb-placeholder" aria-hidden="true">🎮</div>
+                    )}
+                  </div>
+                  <div class="deal-body">
+                    <span class="platform-badge">{PLATFORM_LABELS[it.platform] ?? it.platform}</span>
+                    <h3 class="deal-title">{it.title}</h3>
+                    <p class="deal-price">
+                      최저 <strong>{won(it.lowest_price)}</strong>
+                      {rate !== null && <span class="card-discount"> -{rate}%</span>}
+                      {atLowest && <span class="discount-rate">역대최저</span>}
+                    </p>
+                  </div>
+                  <span class="deal-cta">보러가기 →</span>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <p class="notice">
+        ※ 표시 가격은 수집 시점의 노출가 기준이며, 쿠폰·카드할인·배송비 등에 따라 실제 결제가와 다를 수 있습니다.
+        <br />
+        ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.
+      </p>
+    </main>
+  )
+})
+
+
+
 // ---------- 메인: 콘솔별 게임 목록 ----------
 games.get('/', async (c) => {
   const platform = c.req.query('platform') || 'pc'
