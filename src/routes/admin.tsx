@@ -198,7 +198,8 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     : []
 
   try {
-  const classified = await searchAndClassify(clientId, clientSecret, alias, [])
+    // 에디션 단위 수집: 정제된 editions.keywords(예: '용과같이,2')를 필수 필터로 사용
+    const classified = await searchAndClassify(clientId, clientSecret, edition.search_query, keywords)
 
     // 이 에디션의 플랫폼에 해당하는 버킷만 골라서 저장
     const bucket = classified.buckets.find((b) => b.platform === edition.platform)
@@ -311,11 +312,17 @@ admin.post('/api/games', async (c) => {
 
 // ============================================================
 // 자동 임포트: 그룹(별칭묶음) 또는 제목 배열을 받아
-//   → 별칭들로 각각 검색 → 플랫폼별 결과 병합(최저가) →
+//   → 대표이름 + 별칭들로 각각 검색 → 플랫폼별 결과 병합(최저가) →
 //   → 대표이름(name) 하나로 작품/에디션/가격 저장
 //   POST /admin/api/auto-import
 //   바디(신규): { "groups": [{ "name":"발더스 게이트 3", "aliases":["발더스 게이트 3","BG3"] }], "dryRun": true }
 //   바디(구):  { "titles": ["엘든링", ...], "dryRun": true }  ← 그대로 지원
+//
+//   ※ 필터 정책: 자동 임포트는 "검색어(별칭) 자체"가 필터 역할을 하므로
+//     searchAndClassify에 keywords를 넘기지 않는다([]). 이렇게 해야
+//     대표 이름 검색 결과가 별칭 토큰 every 필터에 죽지 않는다.
+//     시리즈 오염(용과 같이 2/3 등)은 등록 후 에디션 keywords에
+//     최소 조각(예: '용과같이,2')을 수동 입력해 관리한다.
 // ============================================================
 admin.post('/api/auto-import', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
@@ -341,12 +348,13 @@ admin.post('/api/auto-import', async (c) => {
           .filter(Boolean)
         const name = String(g.name ?? rawAliases[0] ?? '').trim()
 
-        // ★ 대표 이름을 항상 검색어 맨 앞에 포함 + 별칭 추가 + 중복 제거(대소문자 무시)
+        // ★ 대표 이름을 항상 검색어 맨 앞에 포함 + 별칭 추가 + 중복 제거(공백무시·대소문자무시)
+        //   '용과 같이 2'와 '용과같이2'처럼 공백만 다른 별칭은 같은 검색으로 보고 1회만 검색.
         const seen = new Set<string>()
         const aliases: string[] = []
         for (const term of [name, ...rawAliases]) {
           if (!term) continue
-          const k = term.toLowerCase()
+          const k = term.toLowerCase().replace(/\s+/g, '')
           if (!seen.has(k)) { seen.add(k); aliases.push(term) }
         }
         return { name, aliases }
@@ -371,30 +379,18 @@ admin.post('/api/auto-import', async (c) => {
 
   for (const group of groups) {
     try {
-           const name = group.name
-      // ★ 필터 키워드: 대표이름 + 모든 별칭의 토큰을 합집합(OR)으로 사용
-      //   별칭 중 하나라도 제목에 있으면 통과 → 별칭이 "추가"로만 작동
-      const kwSet = new Set<string>()
-      for (const term of [name, ...group.aliases]) {
-        // 공백/하이픈/콜론/따옴표 제거한 통짜 형태도 키워드에 포함 (표기차 흡수)
-        const compact = term.replace(/[\s\-:_'’.]/g, '')
-        if (compact.length >= 2) kwSet.add(compact.toLowerCase())
-        // 개별 토큰(2글자 이상)도 포함
-        for (const w of term.split(/\s+/)) {
-          if (w.length >= 2) kwSet.add(w.toLowerCase())
-        }
-      }
-      const kw = Array.from(kwSet)
+      const name = group.name
 
-
-      // 별칭별로 검색 → 플랫폼별로 병합 (link 기준 중복 제거, 최저가 우선)
+      // 별칭(대표 이름 포함)별로 검색 → 플랫폼별로 병합 (link 기준 중복 제거, 최저가 우선)
       const mergedByPlatform = new Map<string, Map<string, any>>()
       const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, catalog: 0, outOfRange: 0, noPlatform: 0 }
       let totalItems = 0
       let firstImage: string | null = null
 
       for (const alias of group.aliases) {
-        const classified = await searchAndClassify(clientId, clientSecret, alias, kw)
+        // ★ keywords는 넘기지 않음([]). 검색어(alias) 자체가 필터 역할.
+        //   every 필터에 대표 이름 결과가 죽는 문제 방지.
+        const classified = await searchAndClassify(clientId, clientSecret, alias, [])
         totalItems += classified.totalItems
         for (const k of Object.keys(skippedTotal)) {
           if (classified.skipped && (classified.skipped as any)[k] !== undefined) {
@@ -473,6 +469,7 @@ admin.post('/api/auto-import', async (c) => {
               platform: b.platform,
               edition_name: `${label}판`,
               search_query: `${name} ${label}`,
+              // 자동 임포트 단계에선 keywords 비움. 시리즈 오염 시 관리자가 수동 입력.
               keywords: null,
             })
             editionId = Number(r.meta.last_row_id)
