@@ -7,6 +7,8 @@
 //   - "코드" 단독 오탐 방지: 다운로드/온라인 코드 등 명확한 조합만 디지털 인정
 //   - 네이버 가격비교(catalog) 상품 제외 + exclude 파라미터로 중고/렌탈/직구 원천 제외
 //   - 필수 키워드(keywords) AND 매칭 + 공백무시: 시리즈물 오염 차단
+//   - 제외 키워드(excludeKeywords) OR 매칭 + 공백무시: 스핀오프/파생판 차단
+//     (예: 원작 "엘든링"에서 "나이트레인/nightreign" 제외)
 // =============================================================
 
 interface NaverShopItem { title: string; link: string; image: string; lprice: string; hprice: string; mallName: string; productId: string; productType: string; category1: string; category2: string; category3: string; category4: string; }
@@ -83,7 +85,23 @@ const EDITION_REGEX = [
 ];
 function isSpecialEdition(title: string): boolean { return EDITION_REGEX.some(re => re.test(title)); }
 
-function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean {
+// ---------- 제외 키워드(excludeKeywords) 매칭 ----------
+// keywords가 "반드시 포함(AND)"이라면, excludeKeywords는 "하나라도 있으면 탈락(OR)".
+// 파생판/스핀오프가 원작 이름을 그대로 달고 나오는 경우를 차단하는 용도.
+//   예: 원작 "엘든링" 에디션에 excludeKeywords=['나이트레인','nightreign'] 지정 →
+//       "엘든 링 밤의 통치자 ELDEN RING NIGHTREIGN" 상품이 탈락.
+// 공백/대소문자를 무시해 'NIGHTREIGN'/'nightreign'/'Night reign'을 모두 한 조각으로 흡수.
+// 주의: 제외어는 "파생판에만 있고 원본엔 절대 없는 단어"여야 한다.
+//       (원본 이름에도 들어있는 단어를 넣으면 원본까지 탈락하니 금지)
+function isExcludedTitle(normTitle: string, excludeKeywords: string[]): boolean {
+  if (excludeKeywords.length === 0) return false;
+  return excludeKeywords.some(k => {
+    const nk = k.toLowerCase().replace(/\s+/g, '');
+    return nk.length > 0 && normTitle.includes(nk);
+  });
+}
+
+function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[], excludeKeywords: string[] = []): boolean {
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
   // 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (가짜 초저가의 주범)
@@ -92,12 +110,17 @@ function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean
   // 특수판(CE/디럭스/한정판/예약 등) 제외
   if (isSpecialEdition(title)) return false;
 
+  const normTitle = title.replace(/\s+/g, '');
+
+  // ★ 제외 키워드 매칭 (OR + 공백무시)
+  //   파생판/스핀오프 단어가 하나라도 보이면 즉시 탈락.
+  if (isExcludedTitle(normTitle, excludeKeywords)) return false;
+
   // ★ 필수 키워드 매칭 (AND + 공백무시)
   //   keywords에 등록된 조각은 "전부" 상품명에 있어야 통과.
   //   공백을 제거하고 비교해 '용과 같이 2'/'용과같이2', '바이오하자드'/'바이오 하자드' 차이를 흡수.
   //   keywords가 비어있으면(대부분의 단독 타이틀) 이 검사를 건너뛰고 제목 자동 매칭에 맡긴다.
   if (gameKeywords.length > 0) {
-    const normTitle = title.replace(/\s+/g, '');
     const allMatch = gameKeywords.every(k => {
       const nk = k.toLowerCase().replace(/\s+/g, '');
       return nk.length > 0 && normTitle.includes(nk);
@@ -153,22 +176,32 @@ export function detectPlatform(title: string): string | null {
 }
 
 export interface PlatformBucket { platform:string; prices:CleanedPrice[]; count:number; lowest:number|null; }
-export interface ClassifyResult { buckets:PlatformBucket[]; skipped:{notGameTitle:number;blacklisted:number;used:number;catalog:number;outOfRange:number;noPlatform:number;}; totalItems:number; }
+export interface ClassifyResult { buckets:PlatformBucket[]; skipped:{notGameTitle:number;blacklisted:number;used:number;catalog:number;outOfRange:number;noPlatform:number;excluded:number;}; totalItems:number; }
 
-export async function searchAndClassify(clientId:string,clientSecret:string,query:string,keywords:string[]=[]): Promise<ClassifyResult> {
+export async function searchAndClassify(clientId:string,clientSecret:string,query:string,keywords:string[]=[],excludeKeywords:string[]=[]): Promise<ClassifyResult> {
   // 검색어에 담긴 대상 플랫폼 추출 (예: "둠 다크에이지 switch" → switch)
   const targetPlatform = detectPlatform(query);
+
+  // 제외 키워드 정규화용: 상품명에서 제외어가 몇 개나 걸렸는지 카운트하기 위해 미리 준비
+  const normExcludes = excludeKeywords.map(k => k.toLowerCase().replace(/\s+/g, '')).filter(k => k.length > 0);
 
   // exclude=used:rental:cbshop → 중고/렌탈/해외직구·구매대행을 네이버 단에서 원천 제외
   const url='https://openapi.naver.com/v1/search/shop.json?query=' + encodeURIComponent(query) + '&display=100&sort=sim&exclude=used:rental:cbshop';
   const res=await fetch(url,{headers:{'X-Naver-Client-Id':clientId,'X-Naver-Client-Secret':clientSecret}});
   if (!res.ok) { const txt=await res.text(); throw new Error(`네이버 API 오류 (${res.status}): ${txt}`); }
   const data=await res.json() as NaverShopResponse;
-  const skipped={notGameTitle:0,blacklisted:0,used:0,catalog:0,outOfRange:0,noPlatform:0};
+  const skipped={notGameTitle:0,blacklisted:0,used:0,catalog:0,outOfRange:0,noPlatform:0,excluded:0};
   const byPlatform=new Map<string,CleanedPrice[]>();
   for (const item of data.items) {
     const title=stripTags(item.title);
-    if (!isLikelyGameTitle(item,keywords)) {skipped.notGameTitle++; continue;}
+
+    // 제외 키워드 우선 검사 (디버깅용 카운트 분리)
+    if (normExcludes.length > 0) {
+      const normTitle = title.toLowerCase().replace(/\s+/g, '');
+      if (normExcludes.some(nk => normTitle.includes(nk))) { skipped.excluded++; continue; }
+    }
+
+    if (!isLikelyGameTitle(item,keywords,excludeKeywords)) {skipped.notGameTitle++; continue;}
     if (isBlacklisted(title)) {skipped.blacklisted++; continue;}
     if (isCatalogProduct(item)) {skipped.catalog++; continue;}
     if (isUsedItem(title)) {skipped.used++; continue;}
