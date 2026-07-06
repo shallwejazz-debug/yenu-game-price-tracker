@@ -321,13 +321,14 @@ function PriceSection({
             역대 최저가: <strong>{won(lowestEver)}</strong>
             {hist?.lowest_date && <span class="lowest-date"> ({hist.lowest_date.slice(0, 10)})</span>}
           </div>
-          <ul class="price-list">
+                    <ul class="price-list">
             {filtered.map((p) => (
               <PriceRow p={p} original={original} lowest={currentLowest} />
             ))}
           </ul>
-        </>
-      )}
+          {isDigital === 0 && (
+            <p class="price-note">ⓘ 표시가는 쇼핑몰 노출가입니다. 쿠폰·배송비에 따라 실제 결제가가 달라질 수 있어요.</p>
+          )}
     </section>
   )
 }
