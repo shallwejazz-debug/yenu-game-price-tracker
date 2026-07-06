@@ -5,6 +5,7 @@
 //   GET /games?platform=ps5  - 특정 콘솔 필터
 //   GET /games/:gameId            - 게임 상세 (플랫폼 탭)
 //   GET /games/:gameId/:platform  - 특정 플랫폼 가격 상세
+// [2026-07-06] 패키지 섹션에 쿠폰·배송비 안내(price-note) 추가
 // ============================================================
 
 import { Hono } from 'hono'
@@ -321,7 +322,7 @@ function PriceSection({
             역대 최저가: <strong>{won(lowestEver)}</strong>
             {hist?.lowest_date && <span class="lowest-date"> ({hist.lowest_date.slice(0, 10)})</span>}
           </div>
-                    <ul class="price-list">
+          <ul class="price-list">
             {filtered.map((p) => (
               <PriceRow p={p} original={original} lowest={currentLowest} />
             ))}
@@ -329,6 +330,8 @@ function PriceSection({
           {isDigital === 0 && (
             <p class="price-note">ⓘ 표시가는 쇼핑몰 노출가입니다. 쿠폰·배송비에 따라 실제 결제가가 달라질 수 있어요.</p>
           )}
+        </>
+      )}
     </section>
   )
 }
@@ -430,10 +433,10 @@ games.get('/:gameId/:platform', async (c) => {
       </div>
 
       <p class="notice">
-  ※ 디지털 가격은 정보 제공용, 패키지 가격은 한국 쇼핑몰 비교입니다. 플랫폼마다 가격이 다릅니다.
-  <br />
-  ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.
-</p>
+        ※ 디지털 가격은 정보 제공용, 패키지 가격은 한국 쇼핑몰 비교입니다. 플랫폼마다 가격이 다릅니다.
+        <br />
+        ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.
+      </p>
 
     </main>
   )
