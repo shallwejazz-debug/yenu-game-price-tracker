@@ -119,11 +119,13 @@ export function AdminPage(): string {
       <hr class="admin-hr" />
 
       <p class="admin-hint">
-        아래 창에 <b>대표이름 | 별칭1, 별칭2 | 이미지URL</b> 형식으로 한 줄에 한 게임씩 붙여넣으세요.
-        (이미지URL은 생략 가능 — 생략 시 검색 결과 이미지를 사용)
+        아래 창에 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어</b> 형식으로 한 줄에 한 게임씩 붙여넣으세요.<br />
+        (검색어·이미지·keywords·제외어는 모두 생략 가능. 검색어 생략 시 대표이름으로 검색.
+        keywords는 시리즈물 구분용 필수조각 예:<code>용과같이,2</code>, 제외어는 예:<code>나이트레인</code>)
+
       </p>
       <textarea id="importPasteArea" class="admin-textarea" rows="8"
-        placeholder="예)&#10;보더랜드 4 | 보더랜드4, Borderlands 4 | https://.../header.jpg&#10;발더스 게이트 3 | 발더스게이트3, BG3 | "></textarea>
+        placeholder="예)&#10;용과 같이 2 | 용과 같이 2 | https://.../img.jpg | 용과같이,2 | &#10;엘든링 | 엘든링 | | | 나이트레인"></textarea>
       <div class="admin-row">
         <button id="pastePreviewBtn" class="btn">🔍 붙여넣기 미리보기</button>
         <button id="pasteImportBtn" class="btn btn-primary">⬇️ 붙여넣기로 재등록 (실제 저장)</button>
