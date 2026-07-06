@@ -6,6 +6,7 @@
 //   - 검색 대상 플랫폼과 상품 실제 플랫폼 불일치 시 제외(교차 오염 방지)
 //   - "코드" 단독 오탐 방지: 다운로드/온라인 코드 등 명확한 조합만 디지털 인정
 //   - 네이버 가격비교(catalog) 상품 제외 + exclude 파라미터로 중고/렌탈/직구 원천 제외
+//   - 필수 키워드(keywords) AND 매칭 + 공백무시: 시리즈물 오염 차단
 // =============================================================
 
 interface NaverShopItem { title: string; link: string; image: string; lprice: string; hprice: string; mallName: string; productId: string; productType: string; category1: string; category2: string; category3: string; category4: string; }
@@ -90,7 +91,19 @@ function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[]): boolean
   if (banned.some(w => title.includes(w))) return false;
   // 특수판(CE/디럭스/한정판/예약 등) 제외
   if (isSpecialEdition(title)) return false;
-  if (gameKeywords.length > 0 && !gameKeywords.some(k => title.includes(k.toLowerCase()))) return false;
+
+  // ★ 필수 키워드 매칭 (AND + 공백무시)
+  //   keywords에 등록된 조각은 "전부" 상품명에 있어야 통과.
+  //   공백을 제거하고 비교해 '용과 같이 2'/'용과같이2', '바이오하자드'/'바이오 하자드' 차이를 흡수.
+  //   keywords가 비어있으면(대부분의 단독 타이틀) 이 검사를 건너뛰고 제목 자동 매칭에 맡긴다.
+  if (gameKeywords.length > 0) {
+    const normTitle = title.replace(/\s+/g, '');
+    const allMatch = gameKeywords.every(k => {
+      const nk = k.toLowerCase().replace(/\s+/g, '');
+      return nk.length > 0 && normTitle.includes(nk);
+    });
+    if (!allMatch) return false;
+  }
   return true;
 }
 function isReasonablePrice(price: number): boolean { return price >= 5000 && price <= 300000; }
