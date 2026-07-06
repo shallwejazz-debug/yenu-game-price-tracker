@@ -654,7 +654,9 @@ admin.post('/api/games/:id/apply-filters', async (c) => {
 })
 
 
-// ---------- 게임 목록 내보내기 (별칭 + 이미지 포함, 붙여넣기 재등록용 텍스트) ----------
+// ---------- 게임 목록 내보내기 (keywords/exclude 포함, 붙여넣기 재등록용 텍스트) ----------
+// [2026-07-06] 5칸 형식: 대표이름 | 검색어(미사용) | 이미지URL | keywords | exclude
+//   keywords/exclude는 그 게임의 에디션 중 값이 있는 것을 대표로 사용(전 플랫폼 동일 정책)
 admin.get('/api/export', async (c) => {
   const { results: games } = await c.env.DB.prepare(
     'SELECT id, title, image_url FROM games ORDER BY id'
@@ -663,27 +665,26 @@ admin.get('/api/export', async (c) => {
   const lines: string[] = []
   for (const g of games ?? []) {
     const { results: eds } = await c.env.DB
-      .prepare('SELECT keywords FROM editions WHERE game_id = ?')
+      .prepare('SELECT keywords, exclude_keywords FROM editions WHERE game_id = ?')
       .bind(g.id)
-      .all<{ keywords: string | null }>()
+      .all<{ keywords: string | null; exclude_keywords: string | null }>()
 
-    const aliasSet = new Set<string>()
+    // 에디션들 중 값이 있는 첫 keywords / exclude 를 대표로 채택
+    let keywords = ''
+    let exclude = ''
     for (const e of eds ?? []) {
-      if (e.keywords) {
-        for (const k of e.keywords.split(',')) {
-          const t = k.trim()
-          if (t) aliasSet.add(t)
-        }
-      }
+      if (!keywords && e.keywords && e.keywords.trim()) keywords = e.keywords.trim()
+      if (!exclude && e.exclude_keywords && e.exclude_keywords.trim()) exclude = e.exclude_keywords.trim()
     }
-    const aliases = Array.from(aliasSet).join(', ')
+
     const img = g.image_url ?? ''
-    // 형식: 대표이름 | 별칭들 | 이미지URL
-    lines.push(`${g.title} | ${aliases} | ${img}`)
+    // 형식: 대표이름 | 검색어(비움) | 이미지URL | keywords | exclude
+    lines.push(`${g.title} |  | ${img} | ${keywords} | ${exclude}`)
   }
 
   return c.json({ ok: true, count: lines.length, text: lines.join('\n') })
 })
+
 
 // ---------- DB 전체 초기화 (게임/에디션/가격/이력 삭제, settings 유지) ----------
 // 바디: { "confirm": "RESET" }
