@@ -422,20 +422,87 @@
   // ============================================================
 
   // ---------- 내보내기 ----------
+  // [2026-07-06] 화면 표시 + txt/CSV 파일 다운로드 지원
   ;(function () {
     const btn = $('exportBtn')
     if (!btn) return
+
+    let lastExportText = ''   // 마지막 내보낸 원문 보관 (파일 저장용)
+
+    // 공통 다운로드 헬퍼: 텍스트를 Blob으로 만들어 브라우저 다운로드
+    function downloadFile(filename, content, mime) {
+      const blob = new Blob(['\uFEFF' + content], { type: mime })  // BOM: 엑셀 한글 깨짐 방지
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
+    // 오늘 날짜 문자열 (파일명용) → 2026-07-06
+    function todayStr() {
+      const d = new Date()
+      const p = (n) => String(n).padStart(2, '0')
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+    }
+
+    // 내보내기 원문(파이프 형식)을 CSV로 변환
+    //   대표이름 | 별칭 | 이미지URL  →  "대표이름","별칭","이미지URL"
+    function toCsv(text) {
+      const esc = (s) => '"' + String(s || '').replace(/"/g, '""') + '"'
+      const rows = String(text || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const parts = line.split('|').map((s) => s.trim())
+          const name = parts[0] || ''
+          const alias = parts[1] || ''
+          const img = parts[2] || ''
+          return [esc(name), esc(alias), esc(img)].join(',')
+        })
+      // 헤더 포함
+      return ['대표이름,별칭,이미지URL'].concat(rows).join('\r\n')
+    }
+
+    // 내보내기 실행 (서버에서 최신 목록 받아 화면에 표시 + 원문 보관)
     btn.addEventListener('click', async function () {
       setStatus($('exportStatus'), '내보내는 중…', true)
       try {
         const data = await api('/export')
-        $('exportArea').value = data.text || ''
-        setStatus($('exportStatus'), '✅ ' + (data.count || 0) + '개 게임 내보냄. 전체 선택해서 복사·보관하세요.', true)
+        lastExportText = data.text || ''
+        $('exportArea').value = lastExportText
+        setStatus($('exportStatus'),
+          '✅ ' + (data.count || 0) + '개 게임 내보냄. 복사하거나 아래 버튼으로 파일 저장하세요.', true)
       } catch (e) {
         setStatus($('exportStatus'), '❌ ' + e.message, false)
       }
     })
+
+    // TXT 다운로드 버튼
+    const txtBtn = $('exportTxtBtn')
+    if (txtBtn) {
+      txtBtn.addEventListener('click', function () {
+        const text = lastExportText || $('exportArea').value || ''
+        if (!text.trim()) { setStatus($('exportStatus'), '먼저 내보내기를 실행하세요.', false); return }
+        downloadFile('games-backup-' + todayStr() + '.txt', text, 'text/plain;charset=utf-8')
+      })
+    }
+
+    // CSV(엑셀) 다운로드 버튼
+    const csvBtn = $('exportCsvBtn')
+    if (csvBtn) {
+      csvBtn.addEventListener('click', function () {
+        const text = lastExportText || $('exportArea').value || ''
+        if (!text.trim()) { setStatus($('exportStatus'), '먼저 내보내기를 실행하세요.', false); return }
+        downloadFile('games-backup-' + todayStr() + '.csv', toCsv(text), 'text/csv;charset=utf-8')
+      })
+    }
   })()
+
 
   // 붙여넣기 텍스트 → { groups:[{name,aliases}], images:{name:url} } 로 파싱
   // 한 줄 형식: 대표이름 | 별칭1, 별칭2 | 이미지URL
