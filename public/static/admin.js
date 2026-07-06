@@ -504,37 +504,46 @@
   })()
 
 
-  // 붙여넣기 텍스트 → { groups:[{name,aliases}], images:{name:url} } 로 파싱
-  // 한 줄 형식: 대표이름 | 별칭1, 별칭2 | 이미지URL
+  // 붙여넣기 텍스트 → { groups, images, keywords, excludes } 로 파싱
+  // [2026-07-06] 형식 확장: 대표이름 | 검색어 | 이미지URL | keywords | exclude_keywords
+  //   - 2번(검색어)은 A방식: 비어있으면 대표이름을 검색어로 사용
+  //   - keywords/exclude는 게임명(name) 기준으로 매핑 → 복원 시 에디션에 재적용
   function parsePasteText(text) {
     const lines = String(text || '').split('\n')
     const groups = []
     const images = {}
+    const keywords = {}   // { 대표이름: 'keywords 문자열' }
+    const excludes = {}   // { 대표이름: 'exclude 문자열' }
+
     lines.forEach(function (line) {
       const raw = line.trim()
       if (!raw) return
       const parts = raw.split('|').map(function (s) { return s.trim() })
       const name = parts[0] || ''
       if (!name) return
-      const aliasRaw = parts[1] || ''
+
+      const searchRaw = parts[1] || ''
       const imgUrl = parts[2] || ''
+      const kw = parts[3] || ''
+      const exkw = parts[4] || ''
 
-      let aliases = aliasRaw.split(',').map(function (s) { return s.trim() }).filter(Boolean)
-      if (aliases.length === 0) aliases = [name]
+      // 검색어: 지정돼 있으면 그걸(쉼표 분리), 없으면 대표이름 하나로
+      let searchTerms = searchRaw
+        .split(',')
+        .map(function (s) { return s.trim() })
+        .filter(Boolean)
+      if (searchTerms.length === 0) searchTerms = [name]
 
-      const seen = {}
-      const uniq = []
-      ;[name].concat(aliases).forEach(function (t) {
-        if (!t) return
-        const k = t.toLowerCase()
-        if (!seen[k]) { seen[k] = true; uniq.push(t) }
-      })
-
-      groups.push({ name: name, aliases: uniq })
+      // auto-import는 groups.aliases를 "검색어 목록"으로 사용
+      groups.push({ name: name, aliases: searchTerms })
       if (imgUrl) images[name] = imgUrl
+      if (kw) keywords[name] = kw
+      if (exkw) excludes[name] = exkw
     })
-    return { groups: groups, images: images }
+
+    return { groups: groups, images: images, keywords: keywords, excludes: excludes }
   }
+
 
   // ---------- 붙여넣기 미리보기 (게임 1개씩 순차 호출) ----------
   ;(function () {
