@@ -459,14 +459,17 @@
         .filter(Boolean)
         .map((line) => {
           const parts = line.split('|').map((s) => s.trim())
-          const name = parts[0] || ''
-          const alias = parts[1] || ''
-          const img = parts[2] || ''
-          return [esc(name), esc(alias), esc(img)].join(',')
+          return [
+            esc(parts[0] || ''), // 대표이름
+            esc(parts[1] || ''), // 검색어
+            esc(parts[2] || ''), // 이미지URL
+            esc(parts[3] || ''), // keywords
+            esc(parts[4] || ''), // exclude
+          ].join(',')
         })
-      // 헤더 포함
-      return ['대표이름,별칭,이미지URL'].concat(rows).join('\r\n')
+      return ['대표이름,검색어,이미지URL,keywords,exclude'].concat(rows).join('\r\n')
     }
+
 
     // 내보내기 실행 (서버에서 최신 목록 받아 화면에 표시 + 원문 보관)
     btn.addEventListener('click', async function () {
