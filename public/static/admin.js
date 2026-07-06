@@ -620,13 +620,26 @@
           const r = (data.results || [])[0]
           if (r && !r.error) {
             okResults.push(r)
+            // 이미지 적용
             if (r.game_id && parsed.images[r.title]) {
               try {
                 await api('/games/' + r.game_id, 'PATCH', { image_url: parsed.images[r.title] })
                 imgApplied++
               } catch (e) {}
             }
+            // [2026-07-06] keywords/exclude 복원: 해당 게임의 모든 에디션에 동일 적용
+            const kw = parsed.keywords[r.title]
+            const exkw = parsed.excludes[r.title]
+            if (r.game_id && (kw !== undefined || exkw !== undefined)) {
+              try {
+                await api('/games/' + r.game_id + '/apply-filters', 'POST', {
+                  keywords: kw || null,
+                  exclude_keywords: exkw || null,
+                })
+              } catch (e) {}
+            }
           } else {
+
             failed.push({ title: group.name, error: (r && r.error) || '알 수 없는 오류' })
           }
         } catch (e) {
