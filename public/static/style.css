@@ -694,3 +694,121 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   line-height: 1.5;
   margin: 0;
 }
+
+/* ============================================================
+   오늘의 특가 페이지  /games/deals
+   ============================================================ */
+.deals-head { text-align: center; margin-bottom: 28px; }
+.deals-head h1 { font-size: 1.9rem; margin-bottom: 6px; }
+.deals-head .subtitle { color: #9aa0aa; margin-bottom: 0; }
+
+.deals-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.deal-card {
+  background: #1a1d27;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform .15s, box-shadow .15s;
+}
+.deal-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+
+/* 역대최저 카드 강조 (불 붙은 특가) */
+.deal-card.deal-hot {
+  box-shadow: 0 0 0 2px #ff6b6b inset;
+}
+.deal-card.deal-hot:hover {
+  box-shadow: 0 0 0 2px #ff6b6b inset, 0 8px 24px rgba(0,0,0,.4);
+}
+
+.deal-link { display: block; }
+
+/* 썸네일: game-thumb-wrap 스타일 재활용 (배경 블러 포함) */
+.deal-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #0c0e14;
+  overflow: hidden;
+}
+.deal-thumb-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--thumb-bg, none);
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) brightness(.5);
+  transform: scale(1.15);
+  z-index: 0;
+}
+.deal-thumb {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .25s;
+}
+.deal-card:hover .deal-thumb { transform: scale(1.04); }
+.deal-thumb-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 38%;
+  background: linear-gradient(to top, rgba(26,29,39,.85), transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.deal-body { padding: 12px 14px 14px; }
+.deal-title { font-size: 1rem; margin: 4px 0 6px; }
+.deal-price { color: #9aa0aa; font-size: .9rem; }
+.deal-price strong { color: #e6e8ec; font-size: 1.05rem; }
+
+.deal-cta {
+  display: block;
+  padding: 0 14px 14px;
+  color: #4f7cff;
+  font-size: .85rem;
+  font-weight: 600;
+}
+.deal-card.deal-hot .deal-cta { color: #ff8585; }
+
+/* 모바일: 가로형 리스트 (게임 그리드와 동일 패턴) */
+@media (max-width: 640px) {
+  .deals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .deal-link { display: flex; align-items: stretch; }
+  .deal-thumb-wrap {
+    flex: 0 0 108px;
+    width: 108px;
+    aspect-ratio: auto;
+    height: auto;
+    border-radius: 12px 0 0 12px;
+  }
+  .deal-thumb-wrap::after { display: none; }
+  .deal-body {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .deal-cta {
+    align-self: center;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+}
+
