@@ -2,9 +2,17 @@
 // DB 조회 헬퍼 함수 모음
 // src/db.ts
 //   구조: games → editions → prices / price_history
+//   + 품절 필터: 각 에디션의 최신 갱신 시각 기준 STALE_HOURS 이상
+//     오래된 source(=이번 수집에 안 잡힌 품절 샵)는 현재가에서 제외
 // ============================================================
 
 import type { Game, Edition, Price, PriceHistory } from './types'
+
+// 품절 판정 기준(시간): 에디션의 최신 recorded_at보다 이 시간 이상
+// 오래된 source는 "이번 수집에 안 나온 = 품절"로 보고 현재가에서 제외한다.
+// cron이 하루 1회 배치로 도므로, 24시간 window면 같은 회차는 포함하고
+// 지난 회차 이후 사라진 샵은 정확히 걸러진다.
+const STALE_HOURS = 24
 
 // ---------- 게임(작품) ----------
 export async function getGameById(db: D1Database, id: number): Promise<Game | null> {
@@ -117,10 +125,17 @@ export async function insertEdition(
 
 // ---------- 가격 ----------
 // 특정 에디션의 소스별 현재가
+//   ★ 품절 필터: 이 에디션의 최신 recorded_at 기준 STALE_HOURS 이내에
+//     기록된 source만 인정. 지난 수집 이후 사라진(품절) 샵은 제외된다.
 export async function getCurrentPrices(db: D1Database, editionId: number): Promise<Price[]> {
   const { results } = await db
     .prepare(
-      `SELECT p.*
+      `WITH ed_latest AS (
+         SELECT MAX(recorded_at) AS ed_max
+         FROM prices
+         WHERE edition_id = ?
+       )
+       SELECT p.*
        FROM prices p
        INNER JOIN (
          SELECT source, MAX(recorded_at) AS max_at
@@ -129,10 +144,12 @@ export async function getCurrentPrices(db: D1Database, editionId: number): Promi
          GROUP BY source
        ) latest
          ON p.source = latest.source AND p.recorded_at = latest.max_at
+       CROSS JOIN ed_latest
        WHERE p.edition_id = ?
+         AND p.recorded_at >= datetime(ed_latest.ed_max, '-' || ? || ' hours')
        ORDER BY p.is_digital DESC, p.price ASC`
     )
-    .bind(editionId, editionId)
+    .bind(editionId, editionId, editionId, STALE_HOURS)
     .all<Price>()
   return results ?? []
 }
@@ -172,10 +189,17 @@ export async function getPriceTrend(
 // ============================================================
 
 // 게임에 속한 모든 에디션의 "현재가"를 한 번에
+//   ★ 품절 필터: 에디션별 최신 recorded_at 기준 STALE_HOURS 이내만 인정
 export async function getCurrentPricesByGame(db: D1Database, gameId: number): Promise<Price[]> {
   const { results } = await db
     .prepare(
-      `SELECT p.*
+      `WITH ed_latest AS (
+         SELECT edition_id, MAX(recorded_at) AS ed_max
+         FROM prices
+         WHERE edition_id IN (SELECT id FROM editions WHERE game_id = ?)
+         GROUP BY edition_id
+       )
+       SELECT p.*
        FROM prices p
        INNER JOIN editions e ON e.id = p.edition_id
        INNER JOIN (
@@ -187,10 +211,13 @@ export async function getCurrentPricesByGame(db: D1Database, gameId: number): Pr
          ON p.edition_id = latest.edition_id
         AND p.source = latest.source
         AND p.recorded_at = latest.max_at
+       INNER JOIN ed_latest
+         ON ed_latest.edition_id = p.edition_id
        WHERE e.game_id = ?
+         AND p.recorded_at >= datetime(ed_latest.ed_max, '-' || ? || ' hours')
        ORDER BY p.edition_id, p.is_digital DESC, p.price ASC`
     )
-    .bind(gameId, gameId)
+    .bind(gameId, gameId, gameId, STALE_HOURS)
     .all<Price>()
   return results ?? []
 }
@@ -287,13 +314,21 @@ export async function insertPrice(
 // 안전장치:
 //   - 현재가가 역대최저가의 55% 미만이면 이상치(중고 오염) 의심 → 제외
 //   - 한 게임은 가장 특가인 플랫폼 1개만 노출 (같은 게임 도배 방지)
+//   ★ 품절 필터: 에디션별 최신 recorded_at 기준 STALE_HOURS 이내 가격만 사용
 export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
     .prepare(
-      `WITH latest AS (
+      `WITH ed_latest AS (
+         SELECT edition_id, MAX(recorded_at) AS ed_max
+         FROM prices
+         GROUP BY edition_id
+       ),
+       latest AS (
          SELECT p.edition_id, p.is_digital, MIN(p.price) AS cur_price
          FROM prices p
+         INNER JOIN ed_latest el ON el.edition_id = p.edition_id
          WHERE p.is_digital = 0          -- 패키지만 (디지털 코드 오염 제외)
+           AND p.recorded_at >= datetime(el.ed_max, '-' || ? || ' hours')
          GROUP BY p.edition_id, p.is_digital
        ),
        ranked AS (
@@ -322,13 +357,10 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
        ORDER BY ratio ASC, lowest_price ASC
        LIMIT ?`
     )
-    .bind(limit)
+    .bind(STALE_HOURS, limit)
     .all()
   return (results ?? []) as any[]
 }
-
-
-
 
 // ============================================================
 // 설정(settings) - 쇼핑몰별 레퍼럴 ID 등
