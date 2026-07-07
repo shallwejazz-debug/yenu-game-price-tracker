@@ -58,19 +58,23 @@ export function AdminPage(): string {
 
     <section class="admin-card">
       <h2>🤖 게임 자동 가져오기</h2>
-      <p class="admin-hint">
-        한 행이 하나의 게임입니다. <b>대표 이름</b>으로 네이버를 검색해 플랫폼별 최저가를 자동 수집합니다.<br />
-        <b>제외어</b>는 파생판/스핀오프를 걸러낼 때만 씁니다 (쉼표로 여러 개). 예) 엘든링에서 <code>나이트레인,nightreign</code> 제외.<br />
-        <b>이미지URL</b>은 비우면 자동 수집, 넣으면 그 이미지를 대표로 씁니다.
-      </p>
+        <p class="admin-hint">
+          한 행이 하나의 게임입니다. <b>대표 이름</b>으로 네이버를 검색해 플랫폼별 최저가를 자동 수집합니다.<br />
+          <b>키워드</b>는 시리즈/스핀오프에서 특정 작품만 남길 때 씁니다. 제목에 <b>모두 포함</b>돼야 통과(예: 할로우 나이트 실크송에서 <code>실크송</code>).<br />
+          <b>제외어</b>는 파생판/스핀오프를 걸러낼 때만 씁니다 (쉼표로 여러 개). 예) 엘든링에서 <code>나이트레인,nightreign</code> 제외.<br />
+          <b>이미지URL</b>은 비우면 자동 수집, 넣으면 그 이미지를 대표로 씁니다.
+        </p>
+
 
       <div class="ig-table">
         <div class="ig-head">
           <span class="ig-col-name">대표 이름 (표시용)</span>
+          <span class="ig-col-keywords">키워드 (포함, 쉼표)</span>
           <span class="ig-col-exclude">제외어 (쉼표, 없으면 비움)</span>
           <span class="ig-col-image">이미지URL (없으면 자동)</span>
           <span class="ig-col-act"></span>
         </div>
+
         <div id="importGroups" class="ig-body"></div>
       </div>
 
