@@ -1,3 +1,4 @@
+/* [2026-07-07] 자동 가져오기 4칸화(대표이름/키워드/제외어/이미지URL): .ig-head/.ig-row 2줄 그리드 + 모바일 세로스택 */
 /* [2026-07-06] 자동 가져오기 3칸화(대표이름/제외어/이미지URL): .ig-head/.ig-row 그리드 + 모바일 세로스택 개편 */
 /* ============================================================
    관리자 콘솔 전용 스타일
@@ -333,7 +334,7 @@ textarea#importTitles {
 
 /* ============================================================
    자동 가져오기: 입력 그리드 (다크 테마)
-   [2026-07-06] 3칸: 대표이름 / 제외어 / 이미지URL
+   [2026-07-07] 4칸(대표이름/키워드/제외어/이미지URL) — 데스크톱 2줄 배치
    ============================================================ */
 .ig-table {
   border: 1px solid #2a2e3a;
@@ -341,9 +342,13 @@ textarea#importTitles {
   overflow: hidden;
   margin: 8px 0 12px;
 }
+/* 헤더: 라벨 4개를 2x2 배치 (삭제 열은 세로 병합) */
 .ig-head {
   display: grid;
-  grid-template-columns: 1fr 1.3fr 1.5fr 40px;
+  grid-template-columns: 1fr 1fr 40px;
+  grid-template-areas:
+    "h-name    h-keywords h-act"
+    "h-exclude h-image    h-act";
   gap: 8px;
   padding: 8px 10px;
   background: #232735;
@@ -351,15 +356,32 @@ textarea#importTitles {
   font-weight: 600;
   color: #9aa0aa;
 }
+.ig-head .ig-col-name     { grid-area: h-name; }
+.ig-head .ig-col-keywords { grid-area: h-keywords; }
+.ig-head .ig-col-exclude  { grid-area: h-exclude; }
+.ig-head .ig-col-image    { grid-area: h-image; }
+.ig-head .ig-col-act      { grid-area: h-act; }
+
 .ig-body { display: flex; flex-direction: column; }
+
+/* 입력 행: 윗줄 이름/키워드, 아랫줄 제외어/이미지, 우측 삭제(세로 병합) */
 .ig-row {
   display: grid;
-  grid-template-columns: 1fr 1.3fr 1.5fr 40px;
+  grid-template-columns: 1fr 1fr 40px;
+  grid-template-areas:
+    "name    keywords remove"
+    "exclude image    remove";
   gap: 8px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-top: 1px solid #232735;
   align-items: center;
 }
+.ig-row .ig-name     { grid-area: name; }
+.ig-row .ig-keywords { grid-area: keywords; }
+.ig-row .ig-exclude  { grid-area: exclude; }
+.ig-row .ig-image    { grid-area: image; }
+.ig-row .ig-remove   { grid-area: remove; align-self: stretch; height: auto; }
+
 .ig-row input {
   width: 100%;
   padding: 8px 10px;
@@ -373,7 +395,7 @@ textarea#importTitles {
 .ig-row input:focus { outline: none; border-color: #4f7cff; }
 .ig-remove {
   width: 32px;
-  height: 32px;
+  min-height: 32px;
   border: 1px solid #ff6b6b;
   background: #3a1f2e;
   color: #ff6b6b;
@@ -385,7 +407,7 @@ textarea#importTitles {
 }
 .ig-remove:hover { background: #ff6b6b; color: #fff; }
 
-/* 모바일: 세로 스택 */
+/* 모바일: 세로 스택 (한 칸씩) */
 @media (max-width: 640px) {
   .ig-head { display: none; }
   .ig-row {
@@ -401,7 +423,7 @@ textarea#importTitles {
   .ig-row .ig-keywords { grid-area: keywords; }
   .ig-row .ig-exclude  { grid-area: exclude; }
   .ig-row .ig-image    { grid-area: image; }
-  .ig-row .ig-remove   { grid-area: remove; }
+  .ig-row .ig-remove   { grid-area: remove; align-self: start; }
 }
 
 
