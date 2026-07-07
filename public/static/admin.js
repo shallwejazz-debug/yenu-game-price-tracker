@@ -1,7 +1,8 @@
+// [2026-07-06] 자동 가져오기 3칸화(대표이름/제외어/이미지URL): addGroupRow·getGroups 개편, doImport에서 등록 후 exclude·이미지 적용
 // ============================================================
 // 관리자 콘솔 프론트엔드
 // public/static/admin.js
-//   - 자동 가져오기: 엑셀식 별칭 그룹(groups) 입력 지원
+//   - 자동 가져오기: 대표이름/제외어/이미지URL 3칸 입력
 //   - 게임 목록: 체크박스 선택 삭제 지원
 //   - 백업/복원: 내보내기 / 붙여넣기 재등록(1개씩 순차) / DB 초기화
 // ============================================================
@@ -149,19 +150,21 @@
   })
 
   // ============================================================
-  // 자동 임포트 (엑셀식 별칭 그룹)
+  // 자동 임포트 (3칸: 대표이름 / 제외어 / 이미지URL)
   // ============================================================
-  function addGroupRow(name, aliases) {
+  function addGroupRow(name, exclude, image) {
     const body = $('importGroups')
     const row = document.createElement('div')
     row.className = 'ig-row'
     row.innerHTML =
-      '<input type="text" class="ig-name" placeholder="예: 발더스 게이트 3" />' +
-      '<input type="text" class="ig-alias" placeholder="예: 발더스게이트3, BG3, Baldurs Gate 3" />' +
+      '<input type="text" class="ig-name" placeholder="예: 엘든링" />' +
+      '<input type="text" class="ig-exclude" placeholder="예: 나이트레인, nightreign (없으면 비움)" />' +
+      '<input type="text" class="ig-image" placeholder="이미지URL (없으면 자동)" />' +
       '<button type="button" class="ig-remove" title="이 행 삭제">−</button>'
     body.appendChild(row)
     if (name) row.querySelector('.ig-name').value = name
-    if (aliases) row.querySelector('.ig-alias').value = aliases
+    if (exclude) row.querySelector('.ig-exclude').value = exclude
+    if (image) row.querySelector('.ig-image').value = image
     return row
   }
 
@@ -186,41 +189,28 @@
     if (rows.length <= 1) {
       const row = btn.closest('.ig-row')
       row.querySelector('.ig-name').value = ''
-      row.querySelector('.ig-alias').value = ''
+      row.querySelector('.ig-exclude').value = ''
+      row.querySelector('.ig-image').value = ''
     } else {
       btn.closest('.ig-row').remove()
     }
   })
 
-  function getGroups() {
+  // 3칸 입력을 읽어 { name, exclude, image } 목록으로 반환
+  //   - 별칭은 쓰지 않음(A방식). 검색은 대표이름 하나로.
+  //   - auto-import에는 groups[{name, aliases:[name]}]로 보내고,
+  //     exclude/image는 등록 성공 후 별도 API로 적용(doImport 참고).
+  function getRows() {
     const rows = Array.from($('importGroups').querySelectorAll('.ig-row'))
-    const groups = []
+    const out = []
     rows.forEach(function (row) {
       const name = row.querySelector('.ig-name').value.trim()
-      const aliasRaw = row.querySelector('.ig-alias').value.trim()
-      const aliases = aliasRaw
-        .split(',')
-        .map(function (s) { return s.trim() })
-        .filter(Boolean)
-
-      let repName = name
-      if (!repName && aliases.length > 0) repName = aliases[0]
-
-      let terms = aliases.slice()
-      if (terms.length === 0 && repName) terms = [repName]
-
-      if (!repName || terms.length === 0) return
-
-      const seen = {}
-      const uniqTerms = []
-      terms.forEach(function (t) {
-        const k = t.toLowerCase()
-        if (!seen[k]) { seen[k] = true; uniqTerms.push(t) }
-      })
-
-      groups.push({ name: repName, aliases: uniqTerms })
+      if (!name) return
+      const exclude = row.querySelector('.ig-exclude').value.trim()
+      const image = row.querySelector('.ig-image').value.trim()
+      out.push({ name: name, exclude: exclude, image: image })
     })
-    return groups
+    return out
   }
 
   function won(n) {
@@ -265,14 +255,42 @@
   }
 
   async function doImport(dryRun) {
-    const groups = getGroups()
-    if (groups.length === 0) {
+    const rows = getRows()
+    if (rows.length === 0) {
       setStatus($('importStatus'), '게임을 한 개 이상 입력하세요.', false)
       return
     }
     setStatus($('importStatus'), (dryRun ? '🔍 분석' : '⬇️ 수집/저장') + ' 중… (잠시 기다려주세요)', true)
     try {
+      // 검색은 대표이름 하나로 (별칭 미사용)
+      const groups = rows.map(function (r) { return { name: r.name, aliases: [r.name] } })
       const data = await api('/auto-import', 'POST', { groups: groups, dryRun: dryRun })
+
+      // 실제 저장일 때만 제외어/이미지 후처리 적용
+      if (!dryRun) {
+        // 대표이름 → 입력행 매핑 (제외어·이미지 찾기용)
+        const byName = {}
+        rows.forEach(function (r) { byName[r.name] = r })
+        for (const res of (data.results || [])) {
+          if (!res || res.error || !res.game_id) continue
+          const src = byName[res.title]
+          if (!src) continue
+          // 이미지: 입력값 있으면 적용
+          if (src.image) {
+            try { await api('/games/' + res.game_id, 'PATCH', { image_url: src.image }) } catch (e) {}
+          }
+          // 제외어: 입력값 있으면 그 게임 전체 에디션에 적용 (다음 cron부터 반영)
+          if (src.exclude) {
+            try {
+              await api('/games/' + res.game_id + '/apply-filters', 'POST', {
+                keywords: null,
+                exclude_keywords: src.exclude,
+              })
+            } catch (e) {}
+          }
+        }
+      }
+
       setStatus($('importStatus'), '✅ ' + (data.mode || (dryRun ? '미리보기' : '저장')) + ' (' + (data.count || 0) + '개)', true)
       renderImportResult(data)
       if (!dryRun) loadGames()
@@ -422,16 +440,14 @@
   // ============================================================
 
   // ---------- 내보내기 ----------
-  // [2026-07-06] 화면 표시 + txt/CSV 파일 다운로드 지원
   ;(function () {
     const btn = $('exportBtn')
     if (!btn) return
 
-    let lastExportText = ''   // 마지막 내보낸 원문 보관 (파일 저장용)
+    let lastExportText = ''
 
-    // 공통 다운로드 헬퍼: 텍스트를 Blob으로 만들어 브라우저 다운로드
     function downloadFile(filename, content, mime) {
-      const blob = new Blob(['\uFEFF' + content], { type: mime })  // BOM: 엑셀 한글 깨짐 방지
+      const blob = new Blob(['\uFEFF' + content], { type: mime })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -442,15 +458,12 @@
       URL.revokeObjectURL(url)
     }
 
-    // 오늘 날짜 문자열 (파일명용) → 2026-07-06
     function todayStr() {
       const d = new Date()
       const p = (n) => String(n).padStart(2, '0')
       return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
     }
 
-    // 내보내기 원문(파이프 형식)을 CSV로 변환
-    //   대표이름 | 별칭 | 이미지URL  →  "대표이름","별칭","이미지URL"
     function toCsv(text) {
       const esc = (s) => '"' + String(s || '').replace(/"/g, '""') + '"'
       const rows = String(text || '')
@@ -470,8 +483,6 @@
       return ['대표이름,검색어,이미지URL,keywords,exclude'].concat(rows).join('\r\n')
     }
 
-
-    // 내보내기 실행 (서버에서 최신 목록 받아 화면에 표시 + 원문 보관)
     btn.addEventListener('click', async function () {
       setStatus($('exportStatus'), '내보내는 중…', true)
       try {
@@ -485,7 +496,6 @@
       }
     })
 
-    // TXT 다운로드 버튼
     const txtBtn = $('exportTxtBtn')
     if (txtBtn) {
       txtBtn.addEventListener('click', function () {
@@ -495,7 +505,6 @@
       })
     }
 
-    // CSV(엑셀) 다운로드 버튼
     const csvBtn = $('exportCsvBtn')
     if (csvBtn) {
       csvBtn.addEventListener('click', function () {
@@ -506,17 +515,14 @@
     }
   })()
 
-
   // 붙여넣기 텍스트 → { groups, images, keywords, excludes } 로 파싱
-  // [2026-07-06] 형식 확장: 대표이름 | 검색어 | 이미지URL | keywords | exclude_keywords
-  //   - 2번(검색어)은 A방식: 비어있으면 대표이름을 검색어로 사용
-  //   - keywords/exclude는 게임명(name) 기준으로 매핑 → 복원 시 에디션에 재적용
+  // 형식: 대표이름 | 검색어 | 이미지URL | keywords | exclude_keywords
   function parsePasteText(text) {
     const lines = String(text || '').split('\n')
     const groups = []
     const images = {}
-    const keywords = {}   // { 대표이름: 'keywords 문자열' }
-    const excludes = {}   // { 대표이름: 'exclude 문자열' }
+    const keywords = {}
+    const excludes = {}
 
     lines.forEach(function (line) {
       const raw = line.trim()
@@ -530,14 +536,12 @@
       const kw = parts[3] || ''
       const exkw = parts[4] || ''
 
-      // 검색어: 지정돼 있으면 그걸(쉼표 분리), 없으면 대표이름 하나로
       let searchTerms = searchRaw
         .split(',')
         .map(function (s) { return s.trim() })
         .filter(Boolean)
       if (searchTerms.length === 0) searchTerms = [name]
 
-      // auto-import는 groups.aliases를 "검색어 목록"으로 사용
       groups.push({ name: name, aliases: searchTerms })
       if (imgUrl) images[name] = imgUrl
       if (kw) keywords[name] = kw
@@ -546,7 +550,6 @@
 
     return { groups: groups, images: images, keywords: keywords, excludes: excludes }
   }
-
 
   // ---------- 붙여넣기 미리보기 (게임 1개씩 순차 호출) ----------
   ;(function () {
@@ -623,14 +626,12 @@
           const r = (data.results || [])[0]
           if (r && !r.error) {
             okResults.push(r)
-            // 이미지 적용
             if (r.game_id && parsed.images[r.title]) {
               try {
                 await api('/games/' + r.game_id, 'PATCH', { image_url: parsed.images[r.title] })
                 imgApplied++
               } catch (e) {}
             }
-            // [2026-07-06] keywords/exclude 복원: 해당 게임의 모든 에디션에 동일 적용
             const kw = parsed.keywords[r.title]
             const exkw = parsed.excludes[r.title]
             if (r.game_id && (kw !== undefined || exkw !== undefined)) {
@@ -642,7 +643,6 @@
               } catch (e) {}
             }
           } else {
-
             failed.push({ title: group.name, error: (r && r.error) || '알 수 없는 오류' })
           }
         } catch (e) {
@@ -709,6 +709,7 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
   }
+
 
   document.addEventListener('DOMContentLoaded', async () => {
     const saved = getToken()
