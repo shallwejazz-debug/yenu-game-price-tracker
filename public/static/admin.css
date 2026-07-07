@@ -391,16 +391,19 @@ textarea#importTitles {
   .ig-row {
     grid-template-columns: 1fr 40px;
     grid-template-areas:
-      "name    remove"
-      "exclude exclude"
-      "image   image";
+      "name     remove"
+      "keywords keywords"
+      "exclude  exclude"
+      "image    image";
     row-gap: 6px;
   }
-  .ig-row .ig-name    { grid-area: name; }
-  .ig-row .ig-exclude { grid-area: exclude; }
-  .ig-row .ig-image   { grid-area: image; }
-  .ig-row .ig-remove  { grid-area: remove; }
+  .ig-row .ig-name     { grid-area: name; }
+  .ig-row .ig-keywords { grid-area: keywords; }
+  .ig-row .ig-exclude  { grid-area: exclude; }
+  .ig-row .ig-image    { grid-area: image; }
+  .ig-row .ig-remove   { grid-area: remove; }
 }
+
 
 /* ============================================================
    [2026-07-06] 백업/복원 textarea 넓히기 + 가로 레이아웃
