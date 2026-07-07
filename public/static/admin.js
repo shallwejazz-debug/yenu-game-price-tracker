@@ -152,21 +152,24 @@
   // ============================================================
   // 자동 임포트 (3칸: 대표이름 / 제외어 / 이미지URL)
   // ============================================================
-  function addGroupRow(name, exclude, image) {
+  function addGroupRow(name, keywords, exclude, image) {
     const body = $('importGroups')
     const row = document.createElement('div')
     row.className = 'ig-row'
     row.innerHTML =
       '<input type="text" class="ig-name" placeholder="예: 엘든링" />' +
-      '<input type="text" class="ig-exclude" placeholder="예: 나이트레인, nightreign (없으면 비움)" />' +
+      '<input type="text" class="ig-keywords" placeholder="예: 실크송, silksong (포함 조건, 없으면 비움)" />' +
+      '<input type="text" class="ig-exclude" placeholder="예: 나이트레인 (제외, 없으면 비움)" />' +
       '<input type="text" class="ig-image" placeholder="이미지URL (없으면 자동)" />' +
       '<button type="button" class="ig-remove" title="이 행 삭제">−</button>'
     body.appendChild(row)
     if (name) row.querySelector('.ig-name').value = name
+    if (keywords) row.querySelector('.ig-keywords').value = keywords
     if (exclude) row.querySelector('.ig-exclude').value = exclude
     if (image) row.querySelector('.ig-image').value = image
     return row
   }
+
 
   function ensureAtLeastOneRow() {
     const body = $('importGroups')
@@ -186,9 +189,10 @@
     if (!btn) return
     const body = $('importGroups')
     const rows = body.querySelectorAll('.ig-row')
-    if (rows.length <= 1) {
+        if (rows.length <= 1) {
       const row = btn.closest('.ig-row')
       row.querySelector('.ig-name').value = ''
+      row.querySelector('.ig-keywords').value = ''
       row.querySelector('.ig-exclude').value = ''
       row.querySelector('.ig-image').value = ''
     } else {
@@ -200,18 +204,20 @@
   //   - 별칭은 쓰지 않음(A방식). 검색은 대표이름 하나로.
   //   - auto-import에는 groups[{name, aliases:[name]}]로 보내고,
   //     exclude/image는 등록 성공 후 별도 API로 적용(doImport 참고).
-  function getRows() {
+    function getRows() {
     const rows = Array.from($('importGroups').querySelectorAll('.ig-row'))
     const out = []
     rows.forEach(function (row) {
       const name = row.querySelector('.ig-name').value.trim()
       if (!name) return
+      const keywords = row.querySelector('.ig-keywords').value.trim()
       const exclude = row.querySelector('.ig-exclude').value.trim()
       const image = row.querySelector('.ig-image').value.trim()
-      out.push({ name: name, exclude: exclude, image: image })
+      out.push({ name: name, keywords: keywords, exclude: exclude, image: image })
     })
     return out
   }
+
 
   function won(n) {
     if (n === null || n === undefined) return '-'
@@ -264,8 +270,9 @@
     try {
       // [2026-07-07] 검색은 대표이름 하나로 + 제외어(exclude)를 함께 전달(미리보기·저장 모두 반영)
       const groups = rows.map(function (r) {
-        return { name: r.name, aliases: [r.name], exclude: r.exclude || '' }
+        return { name: r.name, aliases: [r.name], keywords: r.keywords || '', exclude: r.exclude || '' }
       })
+
       const data = await api('/auto-import', 'POST', { groups: groups, dryRun: dryRun })
 
       // [2026-07-07] 실제 저장일 때 이미지만 후처리. 제외어는 서버가 저장하므로 apply-filters 불필요.
