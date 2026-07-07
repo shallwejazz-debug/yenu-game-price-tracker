@@ -324,6 +324,9 @@ admin.post('/api/games', async (c) => {
 //     시리즈 오염(용과 같이 2/3 등)은 등록 후 에디션 keywords에
 //     최소 조각(예: '용과같이,2')을 수동 입력해 관리한다.
 // ============================================================
+// [2026-07-07] 제외어(exclude)를 미리보기·실제저장 검색에 즉시 반영 + 저장 시 exclude_keywords 저장.
+//   기존: exclude를 검색에 안 넘겨 미리보기에서 무시 + 저장 후 apply-filters로만 반영(당일 오염).
+//   변경: groups[].exclude 를 받아 searchAndClassify 에 전달, insertEdition 에 저장.
 admin.post('/api/auto-import', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
   const clientSecret = c.env.NAVER_CLIENT_SECRET
@@ -339,7 +342,7 @@ admin.post('/api/auto-import', async (c) => {
   }
 
   // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 단일별칭 그룹으로 변환
-  let groups: { name: string; aliases: string[] }[] = []
+  let groups: { name: string; aliases: string[]; exclude: string[] }[] = []
   if (Array.isArray(body.groups)) {
     groups = body.groups
       .map((g: any) => {
@@ -348,8 +351,7 @@ admin.post('/api/auto-import', async (c) => {
           .filter(Boolean)
         const name = String(g.name ?? rawAliases[0] ?? '').trim()
 
-        // ★ 대표 이름을 항상 검색어 맨 앞에 포함 + 별칭 추가 + 중복 제거(공백무시·대소문자무시)
-        //   '용과 같이 2'와 '용과같이2'처럼 공백만 다른 별칭은 같은 검색으로 보고 1회만 검색.
+        // 대표 이름을 항상 검색어 맨 앞에 포함 + 별칭 추가 + 중복 제거(공백무시·대소문자무시)
         const seen = new Set<string>()
         const aliases: string[] = []
         for (const term of [name, ...rawAliases]) {
@@ -357,17 +359,25 @@ admin.post('/api/auto-import', async (c) => {
           const k = term.toLowerCase().replace(/\s+/g, '')
           if (!seen.has(k)) { seen.add(k); aliases.push(term) }
         }
-        return { name, aliases }
+
+        // [2026-07-07] 제외어 파싱: 문자열/배열 모두 허용, 쉼표 분리·트림·중복제거
+        let rawExclude: string[] = []
+        if (Array.isArray(g.exclude)) rawExclude = g.exclude.map((s: any) => String(s))
+        else if (typeof g.exclude === 'string') rawExclude = g.exclude.split(',')
+        const exclude = Array.from(
+          new Set(rawExclude.map((s) => s.trim()).filter(Boolean))
+        )
+
+        return { name, aliases, exclude }
       })
       .filter((g: any) => g.name && g.aliases.length)
   } else {
-
     let titles: string[] = []
     if (Array.isArray(body.titles)) titles = body.titles
     else if (typeof body.titles === 'string') titles = body.titles.split('\n')
     else if (typeof body.title === 'string') titles = [body.title]
     titles = titles.map((t) => String(t).trim()).filter(Boolean)
-    groups = titles.map((t) => ({ name: t, aliases: [t] }))
+    groups = titles.map((t) => ({ name: t, aliases: [t], exclude: [] }))
   }
 
   if (groups.length === 0) {
@@ -380,17 +390,17 @@ admin.post('/api/auto-import', async (c) => {
   for (const group of groups) {
     try {
       const name = group.name
+      const excludeKeywords = group.exclude // [2026-07-07] 이 그룹의 제외어
 
-      // 별칭(대표 이름 포함)별로 검색 → 플랫폼별로 병합 (link 기준 중복 제거, 최저가 우선)
       const mergedByPlatform = new Map<string, Map<string, any>>()
-      const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, catalog: 0, outOfRange: 0, noPlatform: 0 }
+      const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, catalog: 0, outOfRange: 0, noPlatform: 0, excluded: 0 }
       let totalItems = 0
       let firstImage: string | null = null
 
       for (const alias of group.aliases) {
         // ★ keywords는 넘기지 않음([]). 검색어(alias) 자체가 필터 역할.
-        //   every 필터에 대표 이름 결과가 죽는 문제 방지.
-        const classified = await searchAndClassify(clientId, clientSecret, alias, [])
+        //   [2026-07-07] excludeKeywords는 전달 → 미리보기·저장 모두 제외 즉시 반영.
+        const classified = await searchAndClassify(clientId, clientSecret, alias, [], excludeKeywords)
         totalItems += classified.totalItems
         for (const k of Object.keys(skippedTotal)) {
           if (classified.skipped && (classified.skipped as any)[k] !== undefined) {
@@ -402,7 +412,6 @@ admin.post('/api/auto-import', async (c) => {
           const pmap = mergedByPlatform.get(b.platform)!
           for (const p of b.prices) {
             if (!firstImage && p.image) firstImage = p.image
-            // 중복 판단: 상품 링크가 있으면 링크, 없으면 source+digital
             const key = p.link || `${p.mallName}|${p.isDigital}`
             const existing = pmap.get(key)
             if (!existing || p.price < existing.price) pmap.set(key, p)
@@ -410,7 +419,6 @@ admin.post('/api/auto-import', async (c) => {
         }
       }
 
-      // 병합 결과를 buckets 형태로 정리 (플랫폼 순서 고정, 몰별 최저가순)
       const order = ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'etc']
       const mergedBuckets = Array.from(mergedByPlatform.entries())
         .map(([platform, pmap]) => {
@@ -437,6 +445,7 @@ admin.post('/api/auto-import', async (c) => {
       const entry: any = {
         title: name,
         aliases: group.aliases,
+        exclude: excludeKeywords,   // [2026-07-07] 응답에 제외어 표시(확인용)
         platforms: platformsView,
         skipped: skippedTotal,
         totalItems,
@@ -445,7 +454,6 @@ admin.post('/api/auto-import', async (c) => {
 
       // 실제 저장 (dryRun=false)
       if (!dryRun && mergedBuckets.length > 0) {
-        // 1) 작품 찾기/생성 (대표이름 기준)
         let game = await findGameByTitle(c.env.DB, name)
         let gameId: number
         if (game) {
@@ -455,13 +463,21 @@ admin.post('/api/auto-import', async (c) => {
           gameId = Number(r.meta.last_row_id)
         }
 
+        // [2026-07-07] 제외어를 문자열로(에디션 저장용). 빈 배열이면 null.
+        const excludeStr = excludeKeywords.length ? excludeKeywords.join(',') : null
+
         const savedDetail: Record<string, number> = {}
         for (const b of mergedBuckets) {
-          // 2) 에디션 찾기/생성
           let edition = await findEdition(c.env.DB, gameId, b.platform)
           let editionId: number
           if (edition) {
             editionId = edition.id
+            // [2026-07-07] 기존 에디션이면 제외어 갱신(입력값 있을 때만 덮어씀)
+            if (excludeStr !== null) {
+              await c.env.DB
+                .prepare('UPDATE editions SET exclude_keywords = ? WHERE id = ?')
+                .bind(excludeStr, editionId).run()
+            }
           } else {
             const label = PLATFORM_LABELS[b.platform] ?? b.platform
             const r = await insertEdition(c.env.DB, {
@@ -469,16 +485,14 @@ admin.post('/api/auto-import', async (c) => {
               platform: b.platform,
               edition_name: `${label}판`,
               search_query: `${name} ${label}`,
-              // 자동 임포트 단계에선 keywords 비움. 시리즈 오염 시 관리자가 수동 입력.
               keywords: null,
+              exclude_keywords: excludeStr,  // [2026-07-07] 등록 시 제외어 저장
             })
             editionId = Number(r.meta.last_row_id)
           }
 
-          // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
           await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(editionId).run()
 
-          // 3) 가격 저장 (병합된 최저가들)
           let cnt = 0
           for (const p of b.prices) {
             await insertPrice(c.env.DB, {
@@ -512,6 +526,8 @@ admin.post('/api/auto-import', async (c) => {
     results,
   })
 })
+
+
 
 // ---------- 등록된 게임 목록 (관리자 콘솔 표시용) ----------
 admin.get('/api/games', async (c) => {
