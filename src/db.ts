@@ -104,13 +104,14 @@ export async function insertEdition(
     edition_name?: string | null
     search_query?: string | null
     keywords?: string | null
+    exclude_keywords?: string | null   // [2026-07-07] 추가: 자동 임포트 시 제외어 저장
     steam_appid?: number | null
   }
 ) {
   return await db
     .prepare(
-      `INSERT INTO editions (game_id, platform, edition_name, search_query, keywords, steam_appid)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO editions (game_id, platform, edition_name, search_query, keywords, exclude_keywords, steam_appid)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       data.game_id,
@@ -118,10 +119,12 @@ export async function insertEdition(
       data.edition_name ?? null,
       data.search_query ?? null,
       data.keywords ?? null,
+      data.exclude_keywords ?? null,
       data.steam_appid ?? null
     )
     .run()
 }
+
 
 // ---------- 가격 ----------
 // 특정 에디션의 소스별 현재가
