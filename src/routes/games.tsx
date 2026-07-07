@@ -327,9 +327,7 @@ function PriceSection({
               <PriceRow p={p} original={original} lowest={currentLowest} />
             ))}
           </ul>
-          {isDigital === 0 && (
-            <p class="price-note">ⓘ 표시가는 쇼핑몰 노출가입니다. 쿠폰·배송비에 따라 실제 결제가가 달라질 수 있어요.</p>
-          )}
+            <p class="price-note">※ 모든 가격은 쇼핑몰 판매가 기준이며, 쿠폰·카드 즉시할인·배송비 등에 따라 실제 결제 금액과 다를 수 있습니다.</p>
         </>
       )}
     </section>
