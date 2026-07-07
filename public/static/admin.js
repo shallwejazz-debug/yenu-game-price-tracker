@@ -262,31 +262,22 @@
     }
     setStatus($('importStatus'), (dryRun ? '🔍 분석' : '⬇️ 수집/저장') + ' 중… (잠시 기다려주세요)', true)
     try {
-      // 검색은 대표이름 하나로 (별칭 미사용)
-      const groups = rows.map(function (r) { return { name: r.name, aliases: [r.name] } })
+      // [2026-07-07] 검색은 대표이름 하나로 + 제외어(exclude)를 함께 전달(미리보기·저장 모두 반영)
+      const groups = rows.map(function (r) {
+        return { name: r.name, aliases: [r.name], exclude: r.exclude || '' }
+      })
       const data = await api('/auto-import', 'POST', { groups: groups, dryRun: dryRun })
 
-      // 실제 저장일 때만 제외어/이미지 후처리 적용
+      // [2026-07-07] 실제 저장일 때 이미지만 후처리. 제외어는 서버가 저장하므로 apply-filters 불필요.
       if (!dryRun) {
-        // 대표이름 → 입력행 매핑 (제외어·이미지 찾기용)
         const byName = {}
         rows.forEach(function (r) { byName[r.name] = r })
         for (const res of (data.results || [])) {
           if (!res || res.error || !res.game_id) continue
           const src = byName[res.title]
           if (!src) continue
-          // 이미지: 입력값 있으면 적용
           if (src.image) {
             try { await api('/games/' + res.game_id, 'PATCH', { image_url: src.image }) } catch (e) {}
-          }
-          // 제외어: 입력값 있으면 그 게임 전체 에디션에 적용 (다음 cron부터 반영)
-          if (src.exclude) {
-            try {
-              await api('/games/' + res.game_id + '/apply-filters', 'POST', {
-                keywords: null,
-                exclude_keywords: src.exclude,
-              })
-            } catch (e) {}
           }
         }
       }
@@ -298,6 +289,7 @@
       setStatus($('importStatus'), '❌ ' + e.message, false)
     }
   }
+
 
   $('previewImport').addEventListener('click', function () { doImport(true) })
   $('runImport').addEventListener('click', function () {
@@ -542,7 +534,7 @@
         .filter(Boolean)
       if (searchTerms.length === 0) searchTerms = [name]
 
-      groups.push({ name: name, aliases: searchTerms })
+      groups.push({ name: name, aliases: searchTerms, exclude: exkw })
       if (imgUrl) images[name] = imgUrl
       if (kw) keywords[name] = kw
       if (exkw) excludes[name] = exkw
