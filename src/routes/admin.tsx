@@ -318,15 +318,15 @@ admin.post('/api/games', async (c) => {
 //   바디(신규): { "groups": [{ "name":"발더스 게이트 3", "aliases":["발더스 게이트 3","BG3"] }], "dryRun": true }
 //   바디(구):  { "titles": ["엘든링", ...], "dryRun": true }  ← 그대로 지원
 //
-//   ※ 필터 정책: 자동 임포트는 "검색어(별칭) 자체"가 필터 역할을 하므로
-//     searchAndClassify에 keywords를 넘기지 않는다([]). 이렇게 해야
-//     대표 이름 검색 결과가 별칭 토큰 every 필터에 죽지 않는다.
-//     시리즈 오염(용과 같이 2/3 등)은 등록 후 에디션 keywords에
-//     최소 조각(예: '용과같이,2')을 수동 입력해 관리한다.
+//   ※ 필터 정책: 자동 임포트는 "검색어(별칭) 자체"가 기본 필터 역할을 한다.
+//     다만 시리즈/스핀오프 오염(할로우 나이트 vs 실크송 등)을 막기 위해
+//     그룹별 keywords(포함 조건)를 받아 searchAndClassify에 전달한다.
+//     keywords가 비어 있으면 기존과 동일하게 검색어만으로 필터한다.
 // ============================================================
-// [2026-07-07] 제외어(exclude)를 미리보기·실제저장 검색에 즉시 반영 + 저장 시 exclude_keywords 저장.
-//   기존: exclude를 검색에 안 넘겨 미리보기에서 무시 + 저장 후 apply-filters로만 반영(당일 오염).
-//   변경: groups[].exclude 를 받아 searchAndClassify 에 전달, insertEdition 에 저장.
+// [2026-07-07] 제외어(exclude) 즉시 반영 + 저장.
+// [2026-07-07] 키워드(keywords, 포함 조건)를 미리보기·저장 검색에 전달 + editions.keywords 저장.
+//   - groups[].keywords 를 받아 searchAndClassify(alias, keywords, excludeKeywords) 로 전달
+//   - 저장 시 insertEdition/UPDATE 에 keywords 반영 (실크송 등 시리즈 분리)
 admin.post('/api/auto-import', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
   const clientSecret = c.env.NAVER_CLIENT_SECRET
@@ -342,7 +342,7 @@ admin.post('/api/auto-import', async (c) => {
   }
 
   // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 단일별칭 그룹으로 변환
-  let groups: { name: string; aliases: string[]; exclude: string[] }[] = []
+  let groups: { name: string; aliases: string[]; exclude: string[]; keywords: string[] }[] = []
   if (Array.isArray(body.groups)) {
     groups = body.groups
       .map((g: any) => {
@@ -368,7 +368,15 @@ admin.post('/api/auto-import', async (c) => {
           new Set(rawExclude.map((s) => s.trim()).filter(Boolean))
         )
 
-        return { name, aliases, exclude }
+        // [2026-07-07] 키워드(포함 조건) 파싱: exclude와 동일 방식
+        let rawKeywords: string[] = []
+        if (Array.isArray(g.keywords)) rawKeywords = g.keywords.map((s: any) => String(s))
+        else if (typeof g.keywords === 'string') rawKeywords = g.keywords.split(',')
+        const keywords = Array.from(
+          new Set(rawKeywords.map((s) => s.trim()).filter(Boolean))
+        )
+
+        return { name, aliases, exclude, keywords }
       })
       .filter((g: any) => g.name && g.aliases.length)
   } else {
@@ -377,7 +385,7 @@ admin.post('/api/auto-import', async (c) => {
     else if (typeof body.titles === 'string') titles = body.titles.split('\n')
     else if (typeof body.title === 'string') titles = [body.title]
     titles = titles.map((t) => String(t).trim()).filter(Boolean)
-    groups = titles.map((t) => ({ name: t, aliases: [t], exclude: [] }))
+    groups = titles.map((t) => ({ name: t, aliases: [t], exclude: [], keywords: [] }))
   }
 
   if (groups.length === 0) {
@@ -390,7 +398,8 @@ admin.post('/api/auto-import', async (c) => {
   for (const group of groups) {
     try {
       const name = group.name
-      const excludeKeywords = group.exclude // [2026-07-07] 이 그룹의 제외어
+      const excludeKeywords = group.exclude   // [2026-07-07] 이 그룹의 제외어
+      const includeKeywords = group.keywords  // [2026-07-07] 이 그룹의 포함 조건(키워드)
 
       const mergedByPlatform = new Map<string, Map<string, any>>()
       const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, catalog: 0, outOfRange: 0, noPlatform: 0, excluded: 0 }
@@ -398,9 +407,9 @@ admin.post('/api/auto-import', async (c) => {
       let firstImage: string | null = null
 
       for (const alias of group.aliases) {
-        // ★ keywords는 넘기지 않음([]). 검색어(alias) 자체가 필터 역할.
-        //   [2026-07-07] excludeKeywords는 전달 → 미리보기·저장 모두 제외 즉시 반영.
-        const classified = await searchAndClassify(clientId, clientSecret, alias, [], excludeKeywords)
+        // [2026-07-07] 키워드(포함)·제외어를 함께 전달 → 미리보기·저장 모두 즉시 반영.
+        //   keywords가 빈 배열이면 기존과 동일(검색어만으로 필터).
+        const classified = await searchAndClassify(clientId, clientSecret, alias, includeKeywords, excludeKeywords)
         totalItems += classified.totalItems
         for (const k of Object.keys(skippedTotal)) {
           if (classified.skipped && (classified.skipped as any)[k] !== undefined) {
@@ -445,7 +454,8 @@ admin.post('/api/auto-import', async (c) => {
       const entry: any = {
         title: name,
         aliases: group.aliases,
-        exclude: excludeKeywords,   // [2026-07-07] 응답에 제외어 표시(확인용)
+        keywords: includeKeywords,   // [2026-07-07] 응답에 키워드 표시(확인용)
+        exclude: excludeKeywords,    // [2026-07-07] 응답에 제외어 표시(확인용)
         platforms: platformsView,
         skipped: skippedTotal,
         totalItems,
@@ -463,8 +473,9 @@ admin.post('/api/auto-import', async (c) => {
           gameId = Number(r.meta.last_row_id)
         }
 
-        // [2026-07-07] 제외어를 문자열로(에디션 저장용). 빈 배열이면 null.
+        // [2026-07-07] 키워드·제외어를 문자열로(에디션 저장용). 빈 배열이면 null.
         const excludeStr = excludeKeywords.length ? excludeKeywords.join(',') : null
+        const keywordsStr = includeKeywords.length ? includeKeywords.join(',') : null
 
         const savedDetail: Record<string, number> = {}
         for (const b of mergedBuckets) {
@@ -472,11 +483,13 @@ admin.post('/api/auto-import', async (c) => {
           let editionId: number
           if (edition) {
             editionId = edition.id
-            // [2026-07-07] 기존 에디션이면 제외어 갱신(입력값 있을 때만 덮어씀)
-            if (excludeStr !== null) {
+            // [2026-07-07] 기존 에디션이면 입력값 있을 때만 덮어씀(둘 다 null이면 스킵)
+            if (excludeStr !== null || keywordsStr !== null) {
               await c.env.DB
-                .prepare('UPDATE editions SET exclude_keywords = ? WHERE id = ?')
-                .bind(excludeStr, editionId).run()
+                .prepare(
+                  'UPDATE editions SET exclude_keywords = COALESCE(?, exclude_keywords), keywords = COALESCE(?, keywords) WHERE id = ?'
+                )
+                .bind(excludeStr, keywordsStr, editionId).run()
             }
           } else {
             const label = PLATFORM_LABELS[b.platform] ?? b.platform
@@ -485,8 +498,8 @@ admin.post('/api/auto-import', async (c) => {
               platform: b.platform,
               edition_name: `${label}판`,
               search_query: `${name} ${label}`,
-              keywords: null,
-              exclude_keywords: excludeStr,  // [2026-07-07] 등록 시 제외어 저장
+              keywords: keywordsStr,           // [2026-07-07] 등록 시 키워드 저장
+              exclude_keywords: excludeStr,    // [2026-07-07] 등록 시 제외어 저장
             })
             editionId = Number(r.meta.last_row_id)
           }
