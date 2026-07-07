@@ -1,3 +1,4 @@
+// [2026-07-07] 로마자 숫자 정규화(매칭 전용) 추가: isLikelyGameTitle의 키워드 AND 매칭 시 제목의 독립 로마자(II·VII 등)를 아라비아 숫자로 변환해 비교. normalizeTitleForMatch 신설, normTitle 생성부만 교체. excludeKeywords 사전검사/화면표시/저장값은 원본 유지.
 // =============================================================
 // 네이버 쇼핑 API 연동 모듈  src/naver.ts
 //   - 게임명 검색 → 패키지/디지털 가격 + 구매 링크 수집
@@ -6,7 +7,7 @@
 //   - 검색 대상 플랫폼과 상품 실제 플랫폼 불일치 시 제외(교차 오염 방지)
 //   - "코드" 단독 오탐 방지: 다운로드/온라인 코드 등 명확한 조합만 디지털 인정
 //   - 네이버 가격비교(catalog) 상품 제외 + exclude 파라미터로 중고/렌탈/직구 원천 제외
-//   - 필수 키워드(keywords) AND 매칭 + 공백무시: 시리즈물 오염 차단
+//   - 필수 키워드(keywords) AND 매칭 + 공백무시 + 로마자정규화: 시리즈물 오염 차단
 //   - 제외 키워드(excludeKeywords) OR 매칭 + 공백무시: 스핀오프/파생판 차단
 //     (예: 원작 "엘든링"에서 "나이트레인/nightreign" 제외)
 // =============================================================
@@ -17,6 +18,28 @@ export interface CleanedPrice { mallName: string; mallLabel: string; price: numb
 
 function stripTags(s: string): string { return s.replace(/<[^>]+>/g, '').trim(); }
 function mapMallToSource(mallName: string): string { const n = mallName.toLowerCase(); if (n.includes('쿠팡') || n.includes('coupang')) return 'coupang'; if (n.includes('g마켓') || n.includes('gmarket') || n.includes('지마켓')) return 'gmarket'; if (n.includes('11번가') || n.includes('11st')) return '11st'; if (n.includes('옥션') || n.includes('auction')) return 'auction'; if (n === '네이버' || n.includes('naver') || n.includes('스마트스토어')) return 'naver'; return 'etc'; }
+
+// ---------- 로마자 숫자 정규화 (키워드 매칭 전용) ----------
+// 목적: "드래곤 퀘스트 VII", "페이탈 프레임 II" 처럼 로마자 표기 시리즈 숫자를
+//       아라비아 숫자로 바꿔 keywords(예: '드래곤퀘스트,7')와 매칭되게 한다.
+// ★ 매우 보수적 처리: "단어 경계(\b)로 완전히 독립된 순수 로마자 토큰"만 변환.
+//   - xbox의 x, live의 i·v, mix의 x 등 "단어 내부" 문자는 절대 건드리지 않음.
+//   - 이 결과는 오직 isLikelyGameTitle의 키워드 매칭 비교용이며,
+//     화면표시(title)/저장값/플랫폼판정/excludeKeywords 사전검사에는 영향 없음.
+const ROMAN_MAP: Record<string, string> = {
+  i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8',
+  ix: '9', x: '10', xi: '11', xii: '12', xiii: '13'
+};
+function normalizeTitleForMatch(loweredTitle: string): string {
+  // 이미 소문자화된 제목을 받아, 독립 로마자 토큰만 아라비아 숫자로 치환.
+  // 정렬 순서상 긴 토큰(viii, xiii 등)이 먼저 매칭되도록 정규식 대안을 구성.
+  const converted = loweredTitle.replace(
+    /\b(viii|vii|vi|iv|ix|xiii|xii|xi|x|iii|ii|i|v)\b/g,
+    (m) => ROMAN_MAP[m] ?? m
+  );
+  // 기존 매칭 방식과 동일하게 공백무시 비교를 위해 공백 제거본 반환.
+  return converted.replace(/\s+/g, '');
+}
 
 // ---------- 블랙리스트 & 차단몰 ----------
 const BLACKLIST_KEYWORDS = ['계정','기존계정','공유계정','신규계정','대리','대행','해외계정','지역우회','vpn','미개통','미사용계정','na버전','aa버전','na 버전','aa 버전','상점환율','상점국가','국가변경','환율변경'];
@@ -110,15 +133,18 @@ function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[], excludeK
   // 특수판(CE/디럭스/한정판/예약 등) 제외
   if (isSpecialEdition(title)) return false;
 
-  const normTitle = title.replace(/\s+/g, '');
+  // ★ 매칭용 정규화 문자열 생성 (로마자→아라비아 변환 + 공백제거)
+  //   이 값은 아래 키워드 AND/제외어 매칭 비교에만 쓰인다.
+  const normTitle = normalizeTitleForMatch(title);
 
   // ★ 제외 키워드 매칭 (OR + 공백무시)
   //   파생판/스핀오프 단어가 하나라도 보이면 즉시 탈락.
   if (isExcludedTitle(normTitle, excludeKeywords)) return false;
 
-  // ★ 필수 키워드 매칭 (AND + 공백무시)
+  // ★ 필수 키워드 매칭 (AND + 공백무시 + 로마자정규화)
   //   keywords에 등록된 조각은 "전부" 상품명에 있어야 통과.
   //   공백을 제거하고 비교해 '용과 같이 2'/'용과같이2', '바이오하자드'/'바이오 하자드' 차이를 흡수.
+  //   로마자 정규화로 '드래곤 퀘스트 VII'도 keywords='드래곤퀘스트,7'와 매칭됨.
   //   keywords가 비어있으면(대부분의 단독 타이틀) 이 검사를 건너뛰고 제목 자동 매칭에 맡긴다.
   if (gameKeywords.length > 0) {
     const allMatch = gameKeywords.every(k => {
