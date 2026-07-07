@@ -1,3 +1,4 @@
+/* [2026-07-06] 자동 가져오기 3칸화(대표이름/제외어/이미지URL): .ig-head/.ig-row 그리드 + 모바일 세로스택 개편 */
 /* ============================================================
    관리자 콘솔 전용 스타일
    public/static/admin.css
@@ -331,7 +332,8 @@ textarea#importTitles {
 }
 
 /* ============================================================
-   자동 가져오기: 엑셀식 별칭 그룹 입력 (다크 테마)
+   자동 가져오기: 입력 그리드 (다크 테마)
+   [2026-07-06] 3칸: 대표이름 / 제외어 / 이미지URL
    ============================================================ */
 .ig-table {
   border: 1px solid #2a2e3a;
@@ -341,7 +343,7 @@ textarea#importTitles {
 }
 .ig-head {
   display: grid;
-  grid-template-columns: 1fr 1.6fr 40px;
+  grid-template-columns: 1fr 1.3fr 1.5fr 40px;
   gap: 8px;
   padding: 8px 10px;
   background: #232735;
@@ -352,7 +354,7 @@ textarea#importTitles {
 .ig-body { display: flex; flex-direction: column; }
 .ig-row {
   display: grid;
-  grid-template-columns: 1fr 1.6fr 40px;
+  grid-template-columns: 1fr 1.3fr 1.5fr 40px;
   gap: 8px;
   padding: 6px 10px;
   border-top: 1px solid #232735;
@@ -389,13 +391,15 @@ textarea#importTitles {
   .ig-row {
     grid-template-columns: 1fr 40px;
     grid-template-areas:
-      "name   remove"
-      "alias  alias";
+      "name    remove"
+      "exclude exclude"
+      "image   image";
     row-gap: 6px;
   }
-  .ig-row .ig-name  { grid-area: name; }
-  .ig-row .ig-alias { grid-area: alias; }
-  .ig-row .ig-remove { grid-area: remove; }
+  .ig-row .ig-name    { grid-area: name; }
+  .ig-row .ig-exclude { grid-area: exclude; }
+  .ig-row .ig-image   { grid-area: image; }
+  .ig-row .ig-remove  { grid-area: remove; }
 }
 
 /* ============================================================
