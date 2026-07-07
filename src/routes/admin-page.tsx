@@ -1,3 +1,4 @@
+// [2026-07-06] 자동 가져오기 UI 3칸화(대표이름/제외어/이미지URL), 별칭 입력 폐지 · 힌트 문구 정리
 // ============================================================
 // 관리자 콘솔 HTML 페이지
 // src/routes/admin-page.tsx
@@ -58,15 +59,16 @@ export function AdminPage(): string {
     <section class="admin-card">
       <h2>🤖 게임 자동 가져오기</h2>
       <p class="admin-hint">
-        한 행이 하나의 게임입니다. <b>대표 이름</b>은 사이트에 표시될 제목이고,
-        <b>검색어(별칭)</b>는 쉼표(,)로 여러 개 넣으면 각각 검색한 결과를 하나로 합쳐 최저가를 뽑습니다.<br />
-        예) 대표: <code>발더스 게이트 3</code> / 검색어: <code>발더스게이트3, BG3, Baldurs Gate 3</code>
+        한 행이 하나의 게임입니다. <b>대표 이름</b>으로 네이버를 검색해 플랫폼별 최저가를 자동 수집합니다.<br />
+        <b>제외어</b>는 파생판/스핀오프를 걸러낼 때만 씁니다 (쉼표로 여러 개). 예) 엘든링에서 <code>나이트레인,nightreign</code> 제외.<br />
+        <b>이미지URL</b>은 비우면 자동 수집, 넣으면 그 이미지를 대표로 씁니다.
       </p>
 
       <div class="ig-table">
         <div class="ig-head">
           <span class="ig-col-name">대표 이름 (표시용)</span>
-          <span class="ig-col-alias">검색어 / 별칭 (쉼표로 구분)</span>
+          <span class="ig-col-exclude">제외어 (쉼표, 없으면 비움)</span>
+          <span class="ig-col-image">이미지URL (없으면 자동)</span>
           <span class="ig-col-act"></span>
         </div>
         <div id="importGroups" class="ig-body"></div>
@@ -101,7 +103,7 @@ export function AdminPage(): string {
     <section class="admin-card">
       <h2>💾 백업 / 복원</h2>
       <p class="admin-hint">
-        현재 등록된 게임을 <b>대표이름 | 별칭 | 이미지URL</b> 형식으로 내보냅니다.
+        현재 등록된 게임을 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어</b> 형식으로 내보냅니다.
         이 텍스트를 저장해두면, 나중에 아래 붙여넣기 창으로 그대로 재등록할 수 있습니다.
         (가격은 재등록 시 최신값으로 새로 수집됩니다.)
       </p>
@@ -122,7 +124,6 @@ export function AdminPage(): string {
         아래 창에 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어</b> 형식으로 한 줄에 한 게임씩 붙여넣으세요.<br />
         (검색어·이미지·keywords·제외어는 모두 생략 가능. 검색어 생략 시 대표이름으로 검색.
         keywords는 시리즈물 구분용 필수조각 예:<code>용과같이,2</code>, 제외어는 예:<code>나이트레인</code>)
-
       </p>
       <textarea id="importPasteArea" class="admin-textarea" rows="8"
         placeholder="예)&#10;용과 같이 2 | 용과 같이 2 | https://.../img.jpg | 용과같이,2 | &#10;엘든링 | 엘든링 | | | 나이트레인"></textarea>
