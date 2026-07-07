@@ -70,11 +70,13 @@
           </li>`
       })
       .join('')
-    return `<section class="price-section">
+        return `<section class="price-section">
         <h2><span class="section-icon">${icon}</span> ${title}</h2>
         ${lowestEverHtml}
         <ul class="price-list">${rowsHtml}</ul>
+        <p class="price-note">※ 모든 가격은 쇼핑몰 판매가 기준이며, 쿠폰·카드 즉시할인·배송비 등에 따라 실제 결제 금액과 다를 수 있습니다.</p>
       </section>`
+
   }
 
   // 인사이트 배너 (디지털 vs 패키지 비교 한 줄)
