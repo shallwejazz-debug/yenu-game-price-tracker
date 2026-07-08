@@ -3,6 +3,7 @@
 // src/index.tsx
 //   - 각 라우트 그룹 연결
 //   - 리다이렉터 패턴(/go/:priceId) 으로 어필리에이트 변조 방지
+// [2026-07-08] SEO: /sitemap.xml, /robots.txt 라우트 추가 (구글 색인 유도)
 // ============================================================
 
 import { Hono } from 'hono'
@@ -11,7 +12,7 @@ import type { Bindings, Price } from './types'
 import admin from './routes/admin'
 import games from './routes/games'
 import api from './routes/api'
-import { getAllSettings } from './db'
+import { getAllSettings, listGames, listEditionsByGame } from './db'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -20,6 +21,64 @@ app.use(renderer)
 
 // ---------- 홈 → 게임 목록(PC 탭)으로 ----------
 app.get('/', (c) => c.redirect('/games?platform=pc'))
+
+// ---------- robots.txt ----------
+// 크롤러 허용 + 관리자/리다이렉터/API 경로 차단 + sitemap 위치 안내
+app.get('/robots.txt', (c) => {
+  const host = new URL(c.req.url).origin
+  const body = [
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /admin',
+    'Disallow: /go/',
+    'Disallow: /api/',
+    '',
+    `Sitemap: ${host}/sitemap.xml`,
+    '',
+  ].join('\n')
+  return c.body(body, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+})
+
+// ---------- sitemap.xml ----------
+// 메인 + deals + 모든 게임 상세(/games/:id/:platform) URL을 담아 구글 색인 유도
+//   ※ renderer(HTML 래핑)를 거치지 않도록 c.body로 XML 직접 반환
+app.get('/sitemap.xml', async (c) => {
+  const host = new URL(c.req.url).origin
+  const urls: Array<{ loc: string; priority: string }> = []
+
+  // 고정 페이지
+  urls.push({ loc: `${host}/games?platform=pc`, priority: '0.9' })
+  urls.push({ loc: `${host}/games/deals`, priority: '0.8' })
+
+  // 게임별 상세 페이지 (에디션 = 플랫폼별 URL)
+  try {
+    const gameList = await listGames(c.env.DB)
+    for (const g of gameList) {
+      const editions = await listEditionsByGame(c.env.DB, g.id)
+      for (const e of editions) {
+        urls.push({
+          loc: `${host}/games/${g.id}/${e.platform}`,
+          priority: '0.7',
+        })
+      }
+    }
+  } catch {
+    // DB 조회 실패 시 고정 페이지만이라도 반환
+  }
+
+  const body =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls
+      .map(
+        (u) =>
+          `  <url><loc>${u.loc.replace(/&/g, '&amp;')}</loc><priority>${u.priority}</priority></url>`
+      )
+      .join('\n') +
+    `\n</urlset>\n`
+
+  return c.body(body, 200, { 'Content-Type': 'application/xml; charset=utf-8' })
+})
 
 // ---------- 라우트 그룹 연결 ----------
 app.route('/admin', admin)
