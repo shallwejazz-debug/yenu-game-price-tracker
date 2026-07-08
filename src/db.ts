@@ -1,11 +1,334 @@
-// ---------- 사이드바: 특가 순위 (이번 주 하락폭 큰 순) ----------
-// [2026-07-08 재변경] 정가 없이 "이번 주 최고가 대비 하락률"로 특가 판정.
-//   week_high = 최근 7일 price_log의 MAX(패키지 기준)
-//   drop_rate = (week_high - cur_price) / week_high  (0.10 = 10% 하락)
-//   → 하락률 큰 순으로 정렬, 화면에는 하락이 있을 때만 "▼X%" 표시.
+// ============================================================
+// DB 조회 헬퍼 함수 모음
+// src/db.ts
+//   구조: games → editions → prices / price_history / price_log
+//   + 품절 필터: 각 에디션의 최신 갱신 시각 기준 STALE_HOURS 이상
+//     오래된 source(=이번 수집에 안 잡힌 품절 샵)는 현재가에서 제외
+//   [2026-07-08] 역대최저 → 이번 주 최저(price_log 7일) 전환
+//     + getLastUpdated / getWeekLow 추가, getTopDiscounts 재작성
+// ============================================================
+
+import type { Game, Edition, Price, PriceHistory } from './types'
+
+const STALE_HOURS = 24
+
+// ---------- 게임(작품) ----------
+export async function getGameById(db: D1Database, id: number): Promise<Game | null> {
+  return await db.prepare('SELECT * FROM games WHERE id = ?').bind(id).first<Game>()
+}
+
+export async function listGames(db: D1Database): Promise<Game[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM games ORDER BY created_at DESC')
+    .all<Game>()
+  return results ?? []
+}
+
+export async function listGamesByPlatform(
+  db: D1Database,
+  platform: string
+): Promise<Array<Game & { edition_id: number; lowest_price: number | null; original_price: number | null }>> {
+  const { results } = await db
+    .prepare(
+      `SELECT g.*, e.id AS edition_id,
+              (SELECT MIN(p.price) FROM prices p WHERE p.edition_id = e.id) AS lowest_price
+       FROM games g
+       INNER JOIN editions e ON e.game_id = g.id
+       WHERE e.platform = ?
+       ORDER BY g.created_at DESC`
+    )
+    .bind(platform)
+    .all()
+  return (results ?? []) as any
+}
+
+export async function insertGame(
+  db: D1Database,
+  data: {
+    title: string
+    image_url?: string | null
+    release_date?: string | null
+    original_price?: number | null
+  }
+) {
+  return await db
+    .prepare(
+      `INSERT INTO games (title, image_url, release_date, original_price)
+       VALUES (?, ?, ?, ?)`
+    )
+    .bind(data.title, data.image_url ?? null, data.release_date ?? null, data.original_price ?? null)
+    .run()
+}
+
+export async function findGameByTitle(db: D1Database, title: string): Promise<Game | null> {
+  return await db
+    .prepare('SELECT * FROM games WHERE title = ? COLLATE NOCASE LIMIT 1')
+    .bind(title.trim())
+    .first<Game>()
+}
+
+// ---------- 에디션(플랫폼판) ----------
+export async function getEditionById(db: D1Database, id: number): Promise<Edition | null> {
+  return await db.prepare('SELECT * FROM editions WHERE id = ?').bind(id).first<Edition>()
+}
+
+export async function findEdition(
+  db: D1Database,
+  gameId: number,
+  platform: string
+): Promise<Edition | null> {
+  return await db
+    .prepare('SELECT * FROM editions WHERE game_id = ? AND platform = ? LIMIT 1')
+    .bind(gameId, platform)
+    .first<Edition>()
+}
+
+export async function listEditionsByGame(db: D1Database, gameId: number): Promise<Edition[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM editions WHERE game_id = ? ORDER BY platform')
+    .bind(gameId)
+    .all<Edition>()
+  return results ?? []
+}
+
+export async function insertEdition(
+  db: D1Database,
+  data: {
+    game_id: number
+    platform: string
+    edition_name?: string | null
+    search_query?: string | null
+    keywords?: string | null
+    exclude_keywords?: string | null
+    steam_appid?: number | null
+  }
+) {
+  return await db
+    .prepare(
+      `INSERT INTO editions (game_id, platform, edition_name, search_query, keywords, exclude_keywords, steam_appid)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      data.game_id,
+      data.platform,
+      data.edition_name ?? null,
+      data.search_query ?? null,
+      data.keywords ?? null,
+      data.exclude_keywords ?? null,
+      data.steam_appid ?? null
+    )
+    .run()
+}
+
+// ---------- 가격 ----------
+export async function getCurrentPrices(db: D1Database, editionId: number): Promise<Price[]> {
+  const { results } = await db
+    .prepare(
+      `WITH ed_latest AS (
+         SELECT MAX(recorded_at) AS ed_max
+         FROM prices
+         WHERE edition_id = ?
+       )
+       SELECT p.*
+       FROM prices p
+       INNER JOIN (
+         SELECT source, MAX(recorded_at) AS max_at
+         FROM prices
+         WHERE edition_id = ?
+         GROUP BY source
+       ) latest
+         ON p.source = latest.source AND p.recorded_at = latest.max_at
+       CROSS JOIN ed_latest
+       WHERE p.edition_id = ?
+         AND p.recorded_at >= datetime(ed_latest.ed_max, '-' || ? || ' hours')
+       ORDER BY p.is_digital DESC, p.price ASC`
+    )
+    .bind(editionId, editionId, editionId, STALE_HOURS)
+    .all<Price>()
+  return results ?? []
+}
+
+export async function getPriceHistory(db: D1Database, editionId: number): Promise<PriceHistory[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM price_history WHERE edition_id = ?')
+    .bind(editionId)
+    .all<PriceHistory>()
+  return results ?? []
+}
+
+export async function getPriceTrend(
+  db: D1Database,
+  editionId: number,
+  isDigital: number,
+  days: number
+): Promise<Array<{ date: string; price: number }>> {
+  const { results } = await db
+    .prepare(
+      `SELECT DATE(recorded_at) AS date, MIN(price) AS price
+       FROM prices
+       WHERE edition_id = ? AND is_digital = ?
+         AND recorded_at >= datetime('now', '-' || ? || ' days')
+       GROUP BY DATE(recorded_at)
+       ORDER BY date ASC`
+    )
+    .bind(editionId, isDigital, days)
+    .all<{ date: string; price: number }>()
+  return results ?? []
+}
+
+// ★ [2026-07-08 추가] 최근 7일 최저가 (price_log 기반, UTC 날짜 기준)
+export async function getWeekLow(
+  db: D1Database,
+  editionId: number,
+  isDigital: number
+): Promise<number | null> {
+  const row = await db
+    .prepare(
+      `SELECT MIN(price) AS week_low
+       FROM price_log
+       WHERE edition_id = ? AND is_digital = ?
+         AND log_date >= date('now', '-6 days')`
+    )
+    .bind(editionId, isDigital)
+    .first<{ week_low: number | null }>()
+  return row?.week_low ?? null
+}
+
+// ★ [2026-07-08 추가] 전체 가격 마지막 업데이트 시각 (UTC 문자열)
+export async function getLastUpdated(db: D1Database): Promise<string | null> {
+  const row = await db
+    .prepare('SELECT MAX(recorded_at) AS last FROM prices')
+    .first<{ last: string | null }>()
+  return row?.last ?? null
+}
+
+// ============================================================
+// 게임 단위 일괄 조회 (N+1 방지)
+// ============================================================
+
+export async function getCurrentPricesByGame(db: D1Database, gameId: number): Promise<Price[]> {
+  const { results } = await db
+    .prepare(
+      `WITH ed_latest AS (
+         SELECT edition_id, MAX(recorded_at) AS ed_max
+         FROM prices
+         WHERE edition_id IN (SELECT id FROM editions WHERE game_id = ?)
+         GROUP BY edition_id
+       )
+       SELECT p.*
+       FROM prices p
+       INNER JOIN editions e ON e.id = p.edition_id
+       INNER JOIN (
+         SELECT edition_id, source, MAX(recorded_at) AS max_at
+         FROM prices
+         WHERE edition_id IN (SELECT id FROM editions WHERE game_id = ?)
+         GROUP BY edition_id, source
+       ) latest
+         ON p.edition_id = latest.edition_id
+        AND p.source = latest.source
+        AND p.recorded_at = latest.max_at
+       INNER JOIN ed_latest
+         ON ed_latest.edition_id = p.edition_id
+       WHERE e.game_id = ?
+         AND p.recorded_at >= datetime(ed_latest.ed_max, '-' || ? || ' hours')
+       ORDER BY p.edition_id, p.is_digital DESC, p.price ASC`
+    )
+    .bind(gameId, gameId, gameId, STALE_HOURS)
+    .all<Price>()
+  return results ?? []
+}
+
+export async function getPriceHistoryByGame(db: D1Database, gameId: number): Promise<PriceHistory[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT ph.*
+       FROM price_history ph
+       INNER JOIN editions e ON e.id = ph.edition_id
+       WHERE e.game_id = ?`
+    )
+    .bind(gameId)
+    .all<PriceHistory>()
+  return results ?? []
+}
+
+export async function getPriceTrendByGame(
+  db: D1Database,
+  gameId: number,
+  days: number
+): Promise<Array<{ edition_id: number; is_digital: number; date: string; price: number }>> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.edition_id, p.is_digital, DATE(p.recorded_at) AS date, MIN(p.price) AS price
+       FROM prices p
+       INNER JOIN editions e ON e.id = p.edition_id
+       WHERE e.game_id = ?
+         AND p.recorded_at >= datetime('now', '-' || ? || ' days')
+       GROUP BY p.edition_id, p.is_digital, DATE(p.recorded_at)
+       ORDER BY p.edition_id, p.is_digital, date ASC`
+    )
+    .bind(gameId, days)
+    .all<{ edition_id: number; is_digital: number; date: string; price: number }>()
+  return results ?? []
+}
+
+// 가격 기록 추가 + 역대 최저가 자동 갱신 (기존 유지)
+export async function insertPrice(
+  db: D1Database,
+  data: {
+    edition_id: number
+    source: string
+    price: number
+    currency?: string
+    is_digital?: number
+    product_url?: string | null
+    mall_label?: string | null
+  }
+) {
+  const currency = data.currency ?? 'KRW'
+  const isDigital = data.is_digital ?? 1
+
+  const result = await db
+    .prepare(
+      `INSERT INTO prices (edition_id, source, price, currency, is_digital, product_url, mall_label)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(data.edition_id, data.source, data.price, currency, isDigital, data.product_url ?? null, data.mall_label ?? null)
+    .run()
+
+  const existing = await db
+    .prepare('SELECT lowest_ever FROM price_history WHERE edition_id = ? AND is_digital = ?')
+    .bind(data.edition_id, isDigital)
+    .first<{ lowest_ever: number | null }>()
+
+  if (!existing) {
+    await db
+      .prepare(
+        `INSERT INTO price_history (edition_id, is_digital, lowest_ever, lowest_date)
+         VALUES (?, ?, ?, CURRENT_TIMESTAMP)`
+      )
+      .bind(data.edition_id, isDigital, data.price)
+      .run()
+  } else if (existing.lowest_ever === null || data.price < existing.lowest_ever) {
+    await db
+      .prepare(
+        `UPDATE price_history SET lowest_ever = ?, lowest_date = CURRENT_TIMESTAMP
+         WHERE edition_id = ? AND is_digital = ?`
+      )
+      .bind(data.price, data.edition_id, isDigital)
+      .run()
+  }
+
+  return result
+}
+
+// ---------- 사이드바: 특가 순위 (이번 주 최저가 근접 순, 게임당 1개) ----------
+// [2026-07-08 변경] 기준을 역대최저(price_history) → 이번 주 최저(price_log 7일)로 전환.
+//   week_low = 최근 7일 price_log의 MIN(패키지 기준)
+//   근접도 ratio = 현재최저가 / week_low  (1.0이면 이번 주 바닥값 = 특가)
+//   at_week_low = 현재가 <= week_low (이번 주 최저 도달 → 🔥 배지)
 // 안전장치:
-//   - 현재가가 week_high의 55% 미만이면 이상치(중고 오염) 의심 → 제외
-//   - 한 게임은 가장 특가인(가장 많이 떨어진) 플랫폼 1개만 노출
+//   - 현재가가 week_low의 55% 미만이면 이상치(중고 오염) 의심 → 제외
+//   - 한 게임은 가장 특가인 플랫폼 1개만 노출
 //   ★ 품절 필터: 에디션별 최신 recorded_at 기준 STALE_HOURS 이내 가격만 사용
 export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
@@ -23,10 +346,8 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
            AND p.recorded_at >= datetime(el.ed_max, '-' || ? || ' hours')
          GROUP BY p.edition_id, p.is_digital
        ),
-       weekstats AS (
-         SELECT edition_id, is_digital,
-                MAX(price) AS week_high,
-                MIN(price) AS week_low
+       weeklow AS (
+         SELECT edition_id, is_digital, MIN(price) AS week_low
          FROM price_log
          WHERE log_date >= date('now', '-6 days')
          GROUP BY edition_id, is_digital
@@ -36,39 +357,54 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
                 e.id AS edition_id, e.platform,
                 l.is_digital,
                 l.cur_price AS lowest_price,
-                w.week_high, w.week_low,
-                CASE
-                  WHEN w.week_high IS NOT NULL AND w.week_high > 0 AND l.cur_price < w.week_high
-                  THEN (CAST(w.week_high - l.cur_price AS REAL) / w.week_high)
-                  ELSE 0
-                END AS drop_rate,
+                w.week_low,
+                (CAST(l.cur_price AS REAL) / w.week_low) AS ratio,
                 ROW_NUMBER() OVER (
                   PARTITION BY g.id
-                  ORDER BY
-                    CASE
-                      WHEN w.week_high IS NOT NULL AND w.week_high > 0 AND l.cur_price < w.week_high
-                      THEN (CAST(w.week_high - l.cur_price AS REAL) / w.week_high)
-                      ELSE 0
-                    END DESC,
-                    l.cur_price ASC
+                  ORDER BY (CAST(l.cur_price AS REAL) / w.week_low) ASC, l.cur_price ASC
                 ) AS rn
          FROM latest l
          JOIN editions e ON e.id = l.edition_id
          JOIN games g ON g.id = e.game_id
-         JOIN weekstats w
+         JOIN weeklow w
            ON w.edition_id = l.edition_id AND w.is_digital = l.is_digital
-         WHERE w.week_high IS NOT NULL AND w.week_high > 0
-           AND l.cur_price >= w.week_high * 0.55
+         WHERE w.week_low IS NOT NULL AND w.week_low > 0
+           AND l.cur_price >= w.week_low * 0.55
        )
        SELECT game_id, title, image_url, original_price,
-              edition_id, platform, is_digital, lowest_price,
-              week_high, week_low, drop_rate
+              edition_id, platform, is_digital, lowest_price, week_low
        FROM ranked
        WHERE rn = 1
-       ORDER BY drop_rate DESC, lowest_price ASC
+       ORDER BY ratio ASC, lowest_price ASC
        LIMIT ?`
     )
     .bind(STALE_HOURS, limit)
     .all()
   return (results ?? []) as any[]
+}
+
+// ============================================================
+// 설정(settings)
+// ============================================================
+
+export async function getAllSettings(db: D1Database): Promise<Record<string, string>> {
+  const { results } = await db.prepare('SELECT key, value FROM settings').all<{ key: string; value: string }>()
+  const map: Record<string, string> = {}
+  for (const row of results ?? []) map[row.key] = row.value ?? ''
+  return map
+}
+
+export async function getSetting(db: D1Database, key: string): Promise<string | null> {
+  const row = await db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>()
+  return row?.value ?? null
+}
+
+export async function setSetting(db: D1Database, key: string, value: string): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`
+    )
+    .bind(key, value)
+    .run()
 }
