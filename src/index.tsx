@@ -39,6 +39,14 @@ app.get('/robots.txt', (c) => {
   return c.body(body, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
 })
 
+// Google Search Console 소유권 확인용
+app.get('/google8f207302de894f94.html', (c) => {
+  return c.body('google-site-verification: google8f207302de894f94.html', 200, {
+    'Content-Type': 'text/html; charset=utf-8',
+  })
+})
+
+
 // ---------- sitemap.xml ----------
 // 메인 + deals + 모든 게임 상세(/games/:id/:platform) URL을 담아 구글 색인 유도
 //   ※ renderer(HTML 래핑)를 거치지 않도록 c.body로 XML 직접 반환
