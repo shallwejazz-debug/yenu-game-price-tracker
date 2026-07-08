@@ -1,17 +1,15 @@
 // ============================================================
 // DB 조회 헬퍼 함수 모음
 // src/db.ts
-//   구조: games → editions → prices / price_history
+//   구조: games → editions → prices / price_history / price_log
 //   + 품절 필터: 각 에디션의 최신 갱신 시각 기준 STALE_HOURS 이상
 //     오래된 source(=이번 수집에 안 잡힌 품절 샵)는 현재가에서 제외
+//   [2026-07-08] 역대최저 → 이번 주 최저(price_log 7일) 전환
+//     + getLastUpdated / getWeekLow 추가, getTopDiscounts 재작성
 // ============================================================
 
 import type { Game, Edition, Price, PriceHistory } from './types'
 
-// 품절 판정 기준(시간): 에디션의 최신 recorded_at보다 이 시간 이상
-// 오래된 source는 "이번 수집에 안 나온 = 품절"로 보고 현재가에서 제외한다.
-// cron이 하루 1회 배치로 도므로, 24시간 window면 같은 회차는 포함하고
-// 지난 회차 이후 사라진 샵은 정확히 걸러진다.
 const STALE_HOURS = 24
 
 // ---------- 게임(작품) ----------
@@ -26,7 +24,6 @@ export async function listGames(db: D1Database): Promise<Game[]> {
   return results ?? []
 }
 
-// 특정 플랫폼의 게임 목록 (메인 콘솔 탭용)
 export async function listGamesByPlatform(
   db: D1Database,
   platform: string
@@ -63,7 +60,6 @@ export async function insertGame(
     .run()
 }
 
-// 제목으로 게임 찾기 (자동 임포트 멱등성용) — 정확 일치 우선
 export async function findGameByTitle(db: D1Database, title: string): Promise<Game | null> {
   return await db
     .prepare('SELECT * FROM games WHERE title = ? COLLATE NOCASE LIMIT 1')
@@ -76,7 +72,6 @@ export async function getEditionById(db: D1Database, id: number): Promise<Editio
   return await db.prepare('SELECT * FROM editions WHERE id = ?').bind(id).first<Edition>()
 }
 
-// (게임, 플랫폼) 조합으로 에디션 찾기 (자동 임포트 멱등성용)
 export async function findEdition(
   db: D1Database,
   gameId: number,
@@ -104,7 +99,7 @@ export async function insertEdition(
     edition_name?: string | null
     search_query?: string | null
     keywords?: string | null
-    exclude_keywords?: string | null   // [2026-07-07] 추가: 자동 임포트 시 제외어 저장
+    exclude_keywords?: string | null
     steam_appid?: number | null
   }
 ) {
@@ -125,11 +120,7 @@ export async function insertEdition(
     .run()
 }
 
-
 // ---------- 가격 ----------
-// 특정 에디션의 소스별 현재가
-//   ★ 품절 필터: 이 에디션의 최신 recorded_at 기준 STALE_HOURS 이내에
-//     기록된 source만 인정. 지난 수집 이후 사라진(품절) 샵은 제외된다.
 export async function getCurrentPrices(db: D1Database, editionId: number): Promise<Price[]> {
   const { results } = await db
     .prepare(
@@ -165,7 +156,6 @@ export async function getPriceHistory(db: D1Database, editionId: number): Promis
   return results ?? []
 }
 
-// 가격 추이 (그래프용) — 최근 N일
 export async function getPriceTrend(
   db: D1Database,
   editionId: number,
@@ -186,13 +176,36 @@ export async function getPriceTrend(
   return results ?? []
 }
 
+// ★ [2026-07-08 추가] 최근 7일 최저가 (price_log 기반, UTC 날짜 기준)
+export async function getWeekLow(
+  db: D1Database,
+  editionId: number,
+  isDigital: number
+): Promise<number | null> {
+  const row = await db
+    .prepare(
+      `SELECT MIN(price) AS week_low
+       FROM price_log
+       WHERE edition_id = ? AND is_digital = ?
+         AND log_date >= date('now', '-6 days')`
+    )
+    .bind(editionId, isDigital)
+    .first<{ week_low: number | null }>()
+  return row?.week_low ?? null
+}
+
+// ★ [2026-07-08 추가] 전체 가격 마지막 업데이트 시각 (UTC 문자열)
+export async function getLastUpdated(db: D1Database): Promise<string | null> {
+  const row = await db
+    .prepare('SELECT MAX(recorded_at) AS last FROM prices')
+    .first<{ last: string | null }>()
+  return row?.last ?? null
+}
+
 // ============================================================
-// 게임 단위 일괄 조회 (N+1 방지) — /api/games/:id 성능 최적화용
-// 에디션마다 따로 부르지 않고 게임 ID 하나로 한 번에 가져온다
+// 게임 단위 일괄 조회 (N+1 방지)
 // ============================================================
 
-// 게임에 속한 모든 에디션의 "현재가"를 한 번에
-//   ★ 품절 필터: 에디션별 최신 recorded_at 기준 STALE_HOURS 이내만 인정
 export async function getCurrentPricesByGame(db: D1Database, gameId: number): Promise<Price[]> {
   const { results } = await db
     .prepare(
@@ -225,7 +238,6 @@ export async function getCurrentPricesByGame(db: D1Database, gameId: number): Pr
   return results ?? []
 }
 
-// 게임에 속한 모든 에디션의 역대최저가 이력을 한 번에
 export async function getPriceHistoryByGame(db: D1Database, gameId: number): Promise<PriceHistory[]> {
   const { results } = await db
     .prepare(
@@ -239,7 +251,6 @@ export async function getPriceHistoryByGame(db: D1Database, gameId: number): Pro
   return results ?? []
 }
 
-// 게임에 속한 모든 에디션의 가격추이(최근 N일)를 한 번에
 export async function getPriceTrendByGame(
   db: D1Database,
   gameId: number,
@@ -260,7 +271,7 @@ export async function getPriceTrendByGame(
   return results ?? []
 }
 
-// 가격 기록 추가 + 역대 최저가 자동 갱신
+// 가격 기록 추가 + 역대 최저가 자동 갱신 (기존 유지)
 export async function insertPrice(
   db: D1Database,
   data: {
@@ -284,7 +295,6 @@ export async function insertPrice(
     .bind(data.edition_id, data.source, data.price, currency, isDigital, data.product_url ?? null, data.mall_label ?? null)
     .run()
 
-  // 역대 최저가 갱신
   const existing = await db
     .prepare('SELECT lowest_ever FROM price_history WHERE edition_id = ? AND is_digital = ?')
     .bind(data.edition_id, isDigital)
@@ -311,12 +321,14 @@ export async function insertPrice(
   return result
 }
 
-// ---------- 사이드바: 특가 순위 (역대 최저가 근접 순, 게임당 1개) ----------
-// 정가 대신 price_history의 역대 최저가(lowest_ever)를 기준으로 삼는다.
-//   근접도 = 현재최저가 / 역대최저가  (1.0에 가까울수록 "지금이 바닥값 = 특가")
+// ---------- 사이드바: 특가 순위 (이번 주 최저가 근접 순, 게임당 1개) ----------
+// [2026-07-08 변경] 기준을 역대최저(price_history) → 이번 주 최저(price_log 7일)로 전환.
+//   week_low = 최근 7일 price_log의 MIN(패키지 기준)
+//   근접도 ratio = 현재최저가 / week_low  (1.0이면 이번 주 바닥값 = 특가)
+//   at_week_low = 현재가 <= week_low (이번 주 최저 도달 → 🔥 배지)
 // 안전장치:
-//   - 현재가가 역대최저가의 55% 미만이면 이상치(중고 오염) 의심 → 제외
-//   - 한 게임은 가장 특가인 플랫폼 1개만 노출 (같은 게임 도배 방지)
+//   - 현재가가 week_low의 55% 미만이면 이상치(중고 오염) 의심 → 제외
+//   - 한 게임은 가장 특가인 플랫폼 1개만 노출
 //   ★ 품절 필터: 에디션별 최신 recorded_at 기준 STALE_HOURS 이내 가격만 사용
 export async function getTopDiscounts(db: D1Database, limit = 10) {
   const { results } = await db
@@ -330,31 +342,37 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
          SELECT p.edition_id, p.is_digital, MIN(p.price) AS cur_price
          FROM prices p
          INNER JOIN ed_latest el ON el.edition_id = p.edition_id
-         WHERE p.is_digital = 0          -- 패키지만 (디지털 코드 오염 제외)
+         WHERE p.is_digital = 0
            AND p.recorded_at >= datetime(el.ed_max, '-' || ? || ' hours')
          GROUP BY p.edition_id, p.is_digital
+       ),
+       weeklow AS (
+         SELECT edition_id, is_digital, MIN(price) AS week_low
+         FROM price_log
+         WHERE log_date >= date('now', '-6 days')
+         GROUP BY edition_id, is_digital
        ),
        ranked AS (
          SELECT g.id AS game_id, g.title, g.image_url, g.original_price,
                 e.id AS edition_id, e.platform,
                 l.is_digital,
                 l.cur_price AS lowest_price,
-                ph.lowest_ever,
-                (CAST(l.cur_price AS REAL) / ph.lowest_ever) AS ratio,
+                w.week_low,
+                (CAST(l.cur_price AS REAL) / w.week_low) AS ratio,
                 ROW_NUMBER() OVER (
                   PARTITION BY g.id
-                  ORDER BY (CAST(l.cur_price AS REAL) / ph.lowest_ever) ASC, l.cur_price ASC
+                  ORDER BY (CAST(l.cur_price AS REAL) / w.week_low) ASC, l.cur_price ASC
                 ) AS rn
          FROM latest l
          JOIN editions e ON e.id = l.edition_id
          JOIN games g ON g.id = e.game_id
-         JOIN price_history ph
-           ON ph.edition_id = l.edition_id AND ph.is_digital = l.is_digital
-         WHERE ph.lowest_ever IS NOT NULL AND ph.lowest_ever > 0
-           AND l.cur_price >= ph.lowest_ever * 0.55
+         JOIN weeklow w
+           ON w.edition_id = l.edition_id AND w.is_digital = l.is_digital
+         WHERE w.week_low IS NOT NULL AND w.week_low > 0
+           AND l.cur_price >= w.week_low * 0.55
        )
        SELECT game_id, title, image_url, original_price,
-              edition_id, platform, is_digital, lowest_price, lowest_ever
+              edition_id, platform, is_digital, lowest_price, week_low
        FROM ranked
        WHERE rn = 1
        ORDER BY ratio ASC, lowest_price ASC
@@ -366,7 +384,7 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
 }
 
 // ============================================================
-// 설정(settings) - 쇼핑몰별 레퍼럴 ID 등
+// 설정(settings)
 // ============================================================
 
 export async function getAllSettings(db: D1Database): Promise<Record<string, string>> {
