@@ -6,6 +6,7 @@
 //   GET /games/:gameId            - 게임 상세 (플랫폼 탭)
 //   GET /games/:gameId/:platform  - 특정 플랫폼 가격 상세
 // [2026-07-06] 패키지 섹션에 쿠폰·배송비 안내(price-note) 추가
+// [2026-07-08] 역대최저 → 이번 주 최저 전환 + 헤더에 가격 업데이트 시각(KST) 표시
 // ============================================================
 
 import { Hono } from 'hono'
@@ -19,6 +20,7 @@ import {
   listEditionsByGame,
   getEditionById,
   getTopDiscounts,
+  getLastUpdated,
 } from '../db'
 
 const games = new Hono<{ Bindings: Bindings }>()
@@ -32,7 +34,17 @@ function discountRate(price: number, original: number | null): number | null {
   return Math.round((1 - price / original) * 100)
 }
 
-// ---------- 사이드바: 특가 순위 (역대 최저가 근접 순) ----------
+// [2026-07-08] UTC 문자열 → KST 표시 라벨
+//   prices.recorded_at 은 UTC로 저장됨. 화면에는 +9시간(KST)으로 보여준다.
+function toKstLabel(utc: string | null): string {
+  if (!utc) return ''
+  const d = new Date(utc.replace(' ', 'T') + 'Z') // UTC로 파싱
+  d.setHours(d.getHours() + 9)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+// ---------- 사이드바: 특가 순위 (이번 주 최저가 근접 순) ----------
 async function DiscountSidebar({ db }: { db: D1Database }) {
   const items = await getTopDiscounts(db, 10)
   return (
@@ -44,9 +56,9 @@ async function DiscountSidebar({ db }: { db: D1Database }) {
       ) : (
         <ol class="discount-list">
           {items.map((it) => {
-            // 현재가가 역대 최저가와 같거나 낮으면 "역대 최저" 표시
-            const atLowest =
-              it.lowest_ever != null && it.lowest_price != null && it.lowest_price <= it.lowest_ever
+            // 현재가가 이번 주 최저가와 같거나 낮으면 "이번주최저" 표시
+            const atWeekLow =
+              it.week_low != null && it.lowest_price != null && it.lowest_price <= it.week_low
             return (
               <li class="discount-item">
                 <a href={`/games/${it.game_id}/${it.platform}`}>
@@ -54,7 +66,7 @@ async function DiscountSidebar({ db }: { db: D1Database }) {
                   <span class="discount-name">{it.title}</span>
                   <span class="discount-price">
                     {won(it.lowest_price)}
-                    {atLowest && <span class="discount-rate">역대최저</span>}
+                    {atWeekLow && <span class="discount-rate">이번주최저</span>}
                   </span>
                 </a>
               </li>
@@ -65,7 +77,6 @@ async function DiscountSidebar({ db }: { db: D1Database }) {
     </aside>
   )
 }
-
 
 // ---------- 콘솔 탭 ----------
 function ConsoleTabs({ active }: { active: string }) {
@@ -84,17 +95,13 @@ function ConsoleTabs({ active }: { active: string }) {
 }
 
 // ---------- 오늘의 특가 페이지 ----------
-//   GET /games/deals  - 역대 최저가 근접 순 특가 모음 (구매 유도)
-//   ※ 주의: 이 라우트는 반드시 /:gameId 보다 "위"에 있어야 함.
-//     아래에 두면 '/deals'가 gameId로 잡혀버림. 그래서 export 직전이 아니라
-//     여기(:gameId 라우트 위)에 두는 게 안전.
 games.get('/deals', async (c) => {
   const items = await getTopDiscounts(c.env.DB, 30)
 
-  // 역대 최저가에 도달한 항목을 위로 (지금이 살 때)
+  // 이번 주 최저가에 도달한 항목을 위로 (지금이 살 때)
   const sorted = [...items].sort((a, b) => {
-    const aLow = a.lowest_ever != null && a.lowest_price != null && a.lowest_price <= a.lowest_ever
-    const bLow = b.lowest_ever != null && b.lowest_price != null && b.lowest_price <= b.lowest_ever
+    const aLow = a.week_low != null && a.lowest_price != null && a.lowest_price <= a.week_low
+    const bLow = b.week_low != null && b.lowest_price != null && b.lowest_price <= b.week_low
     if (aLow !== bLow) return aLow ? -1 : 1
     return (a.lowest_price ?? Infinity) - (b.lowest_price ?? Infinity)
   })
@@ -105,7 +112,7 @@ games.get('/deals', async (c) => {
 
       <div class="deals-head">
         <h1>🔥 오늘의 특가</h1>
-        <p class="subtitle">지금 사기 좋은 게임을 역대 최저가 근접 순으로 모았습니다.</p>
+        <p class="subtitle">지금 사기 좋은 게임을 이번 주 최저가 근접 순으로 모았습니다.</p>
       </div>
 
       {sorted.length === 0 ? (
@@ -113,11 +120,11 @@ games.get('/deals', async (c) => {
       ) : (
         <ul class="deals-list">
           {sorted.map((it) => {
-            const atLowest =
-              it.lowest_ever != null && it.lowest_price != null && it.lowest_price <= it.lowest_ever
+            const atWeekLow =
+              it.week_low != null && it.lowest_price != null && it.lowest_price <= it.week_low
             const rate = discountRate(it.lowest_price ?? Infinity, it.original_price ?? null)
             return (
-              <li class={`deal-card ${atLowest ? 'deal-hot' : ''}`}>
+              <li class={`deal-card ${atWeekLow ? 'deal-hot' : ''}`}>
                 <a href={`/games/${it.game_id}/${it.platform}`} class="deal-link">
                   <div
                     class="deal-thumb-wrap"
@@ -135,7 +142,7 @@ games.get('/deals', async (c) => {
                     <p class="deal-price">
                       최저 <strong>{won(it.lowest_price)}</strong>
                       {rate !== null && <span class="card-discount"> -{rate}%</span>}
-                      {atLowest && <span class="discount-rate">역대최저</span>}
+                      {atWeekLow && <span class="discount-rate">이번주최저</span>}
                     </p>
                   </div>
                   <span class="deal-cta">보러가기 →</span>
@@ -155,30 +162,30 @@ games.get('/deals', async (c) => {
   )
 })
 
-
-
 // ---------- 메인: 콘솔별 게임 목록 ----------
 games.get('/', async (c) => {
   const platform = c.req.query('platform') || 'pc'
   const query = (c.req.query('q') || '').trim()
   let list = await listGamesByPlatform(c.env.DB, platform)
 
-  // 검색어가 있으면 제목으로 필터 (대소문자 무시, 부분 일치)
   if (query) {
     const q = query.toLowerCase()
     list = list.filter((g) => (g.title || '').toLowerCase().includes(q))
   }
 
   const sidebar = await DiscountSidebar({ db: c.env.DB })
+  const lastUpdated = toKstLabel(await getLastUpdated(c.env.DB)) // [2026-07-08]
 
   return c.render(
     <div class="page">
-      {/* 헤더: 제목 가운데 + 검색창 우측 (전체 폭) */}
       <header class="site-header">
         <a href="/admin" class="admin-link header-admin" aria-label="게임 추가/관리">⚙️ 추가/관리</a>
         <div class="header-text">
           <h1>🎮 여누의 게임 가격 추적기</h1>
           <p class="subtitle">콘솔별 · 디지털/패키지 분리 가격 비교</p>
+          {lastUpdated && (
+            <p class="update-time">🕓 가격 업데이트: {lastUpdated} 기준</p>
+          )}
         </div>
         <form class="search-box" action="/games" method="get" role="search">
           <input type="hidden" name="platform" value={platform} />
@@ -195,7 +202,6 @@ games.get('/', async (c) => {
         </form>
       </header>
 
-      {/* 본문: 좌(탭+게임) / 우(특가순위) — 탭 라인부터 시작 */}
       <div class="layout">
         <main class="main-col">
           <ConsoleTabs active={platform} />
@@ -219,7 +225,6 @@ games.get('/', async (c) => {
                 const rate = discountRate(g.lowest_price ?? Infinity, g.original_price)
                 return (
                   <li class="game-card" data-game-id={String(g.id)} data-platform={platform}>
-                    {/* 카드: 클릭해도 모양/크기 그대로. 상세는 행 아래에 따로 펼쳐짐 */}
                     <button
                       type="button"
                       class="game-card-trigger"
@@ -305,8 +310,6 @@ function PriceSection({
   isDigital: number
 }) {
   const filtered = prices.filter((p) => p.is_digital === isDigital)
-  const hist = history.find((h) => h.is_digital === isDigital)
-  const lowestEver = hist?.lowest_ever ?? null
   const currentLowest = filtered.length > 0 ? Math.min(...filtered.map((p) => p.price)) : null
 
   return (
@@ -319,15 +322,16 @@ function PriceSection({
       ) : (
         <>
           <div class="lowest-info">
-            역대 최저가: <strong>{won(lowestEver)}</strong>
-            {hist?.lowest_date && <span class="lowest-date"> ({hist.lowest_date.slice(0, 10)})</span>}
+            현재 최저가: <strong>{won(currentLowest)}</strong>
           </div>
           <ul class="price-list">
             {filtered.map((p) => (
               <PriceRow p={p} original={original} lowest={currentLowest} />
             ))}
           </ul>
-            <p class="price-note">※ 모든 가격은 쇼핑몰 판매가 기준이며, 쿠폰·카드 즉시할인·배송비 등에 따라 실제 결제 금액과 다를 수 있습니다.</p>
+          {isDigital === 0 && (
+            <p class="price-note">ⓘ 표시가는 쇼핑몰 노출가입니다. 쿠폰·배송비에 따라 실제 결제가가 달라질 수 있어요.</p>
+          )}
         </>
       )}
     </section>
@@ -366,7 +370,6 @@ games.get('/:gameId', async (c) => {
       </main>
     )
   }
-  // 첫 번째 플랫폼으로 이동
   return c.redirect(`/games/${gameId}/${editions[0].platform}`)
 })
 
