@@ -6,7 +6,8 @@
 //   GET /games/:gameId            - 게임 상세 (플랫폼 탭)
 //   GET /games/:gameId/:platform  - 특정 플랫폼 가격 상세
 // [2026-07-06] 패키지 섹션에 쿠폰·배송비 안내(price-note) 추가
-// [2026-07-08] 역대최저 → 이번 주 최저 전환 + 헤더에 가격 업데이트 시각(KST) 표시
+// [2026-07-08] 역대최저 배지 제거 → 이번 주 최고가 대비 하락률(▼X%)만 표시
+//              + 헤더에 가격 업데이트 시각(KST) 표시
 // ============================================================
 
 import { Hono } from 'hono'
@@ -34,6 +35,14 @@ function discountRate(price: number, original: number | null): number | null {
   return Math.round((1 - price / original) * 100)
 }
 
+// [2026-07-08] 이번 주 최고가 대비 하락률(%) — drop_rate(0~1)를 정수 %로.
+//   2% 미만은 노이즈로 보고 표시 안 함(null 반환).
+function weekDropPct(dropRate: number | null | undefined): number | null {
+  if (dropRate == null || dropRate <= 0) return null
+  const pct = Math.round(dropRate * 100)
+  return pct >= 2 ? pct : null
+}
+
 // [2026-07-08] UTC 문자열 → KST 표시 라벨
 //   prices.recorded_at 은 UTC로 저장됨. 화면에는 +9시간(KST)으로 보여준다.
 function toKstLabel(utc: string | null): string {
@@ -44,21 +53,19 @@ function toKstLabel(utc: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-// ---------- 사이드바: 특가 순위 (이번 주 최저가 근접 순) ----------
+// ---------- 사이드바: 특가 순위 (이번 주 하락폭 큰 순) ----------
 async function DiscountSidebar({ db }: { db: D1Database }) {
   const items = await getTopDiscounts(db, 10)
   return (
     <aside class="sidebar">
       <h2 class="sidebar-title">🔥 특가 순위</h2>
-      <p class="sidebar-sub">지금 사기 좋은 순</p>
+      <p class="sidebar-sub">이번 주 많이 내린 순</p>
       {items.length === 0 ? (
         <p class="no-data">아직 가격 데이터가 없습니다.</p>
       ) : (
         <ol class="discount-list">
           {items.map((it) => {
-            // 현재가가 이번 주 최저가와 같거나 낮으면 "이번주최저" 표시
-            const atWeekLow =
-              it.week_low != null && it.lowest_price != null && it.lowest_price <= it.week_low
+            const drop = weekDropPct(it.drop_rate)
             return (
               <li class="discount-item">
                 <a href={`/games/${it.game_id}/${it.platform}`}>
@@ -66,7 +73,7 @@ async function DiscountSidebar({ db }: { db: D1Database }) {
                   <span class="discount-name">{it.title}</span>
                   <span class="discount-price">
                     {won(it.lowest_price)}
-                    {atWeekLow && <span class="discount-rate">이번주최저</span>}
+                    {drop !== null && <span class="discount-rate">▼{drop}%</span>}
                   </span>
                 </a>
               </li>
@@ -98,11 +105,12 @@ function ConsoleTabs({ active }: { active: string }) {
 games.get('/deals', async (c) => {
   const items = await getTopDiscounts(c.env.DB, 30)
 
-  // 이번 주 최저가에 도달한 항목을 위로 (지금이 살 때)
+  // 하락폭 큰 순 (getTopDiscounts가 이미 drop_rate DESC로 정렬해 주지만
+  // 30개 범위에서도 확실히 하락폭 우선이 되도록 한 번 더 안정 정렬)
   const sorted = [...items].sort((a, b) => {
-    const aLow = a.week_low != null && a.lowest_price != null && a.lowest_price <= a.week_low
-    const bLow = b.week_low != null && b.lowest_price != null && b.lowest_price <= b.week_low
-    if (aLow !== bLow) return aLow ? -1 : 1
+    const ad = a.drop_rate ?? 0
+    const bd = b.drop_rate ?? 0
+    if (bd !== ad) return bd - ad
     return (a.lowest_price ?? Infinity) - (b.lowest_price ?? Infinity)
   })
 
@@ -112,7 +120,7 @@ games.get('/deals', async (c) => {
 
       <div class="deals-head">
         <h1>🔥 오늘의 특가</h1>
-        <p class="subtitle">지금 사기 좋은 게임을 이번 주 최저가 근접 순으로 모았습니다.</p>
+        <p class="subtitle">이번 주 최고가 대비 가격이 많이 내린 순으로 모았습니다.</p>
       </div>
 
       {sorted.length === 0 ? (
@@ -120,11 +128,9 @@ games.get('/deals', async (c) => {
       ) : (
         <ul class="deals-list">
           {sorted.map((it) => {
-            const atWeekLow =
-              it.week_low != null && it.lowest_price != null && it.lowest_price <= it.week_low
-            const rate = discountRate(it.lowest_price ?? Infinity, it.original_price ?? null)
+            const drop = weekDropPct(it.drop_rate)
             return (
-              <li class={`deal-card ${atWeekLow ? 'deal-hot' : ''}`}>
+              <li class={`deal-card ${drop !== null && drop >= 10 ? 'deal-hot' : ''}`}>
                 <a href={`/games/${it.game_id}/${it.platform}`} class="deal-link">
                   <div
                     class="deal-thumb-wrap"
@@ -141,8 +147,7 @@ games.get('/deals', async (c) => {
                     <h3 class="deal-title">{it.title}</h3>
                     <p class="deal-price">
                       최저 <strong>{won(it.lowest_price)}</strong>
-                      {rate !== null && <span class="card-discount"> -{rate}%</span>}
-                      {atWeekLow && <span class="discount-rate">이번주최저</span>}
+                      {drop !== null && <span class="card-discount"> ▼{drop}%</span>}
                     </p>
                   </div>
                   <span class="deal-cta">보러가기 →</span>
