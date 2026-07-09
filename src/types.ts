@@ -59,11 +59,11 @@ export interface PriceHistory {
 // ---------- 플랫폼 정의 ----------
 export const PLATFORMS = [
   { code: 'pc', label: 'PC', icon: '🖥️' },
-  { code: 'ps5', label: 'PS5', icon: '🎮' },
+  { code: 'ps5', label: 'PS5', icon: '🎮🎮' },
   { code: 'ps4', label: 'PS4', icon: '🎮' },
   { code: 'xbox', label: 'XBOX', icon: '🟢' },
   { code: 'switch', label: 'SWITCH', icon: '🔴' },
-  { code: 'etc', label: 'ETC', icon: '📀' },
+  { code: 'switch2', label: 'SWITCH2', icon: '🔴🔴' },
 ] as const
 
 export const PLATFORM_LABELS: Record<string, string> = Object.fromEntries(
