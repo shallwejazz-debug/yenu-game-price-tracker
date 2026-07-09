@@ -230,7 +230,7 @@ games.get('/', async (c) => {
                 const rate = discountRate(g.lowest_price ?? Infinity, g.original_price)
                 return (
                   <li class="game-card" data-game-id={String(g.id)} data-platform={platform}>
-                    <button
+                       <button
                       type="button"
                       class="game-card-trigger"
                       aria-expanded="false"
@@ -261,6 +261,11 @@ games.get('/', async (c) => {
                       </div>
                       <span class="accordion-chevron" aria-hidden="true">▼</span>
                     </button>
+
+                    {/* [2026-07-09] 크롤러용 상세 페이지 링크 (SEO: 내부링크 확보) */}
+                    <a class="game-card-permalink" href={`/games/${g.id}/${platform}`}>
+                      {g.title} {PLATFORM_LABELS[platform] ?? platform} 최저가 상세 보기
+                    </a>
                   </li>
                 )
               })}
