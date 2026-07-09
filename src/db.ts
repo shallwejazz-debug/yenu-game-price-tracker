@@ -202,13 +202,18 @@ export async function getLastUpdated(db: D1Database): Promise<string | null> {
   return row?.last ?? null
 }
 
-// ★ [2026-07-09 추가] 전체 게임 수
-export async function getGameCount(db: D1Database): Promise<number> {
-  const row = await db
-    .prepare('SELECT COUNT(*) AS cnt FROM games')
-    .first<{ cnt: number }>()
-  return row?.cnt ?? 0
+// ★ [2026-07-09 추가] 플랫폼(에디션)별 추적 게임 수
+export async function getPlatformCounts(
+  db: D1Database
+): Promise<Record<string, number>> {
+  const { results } = await db
+    .prepare('SELECT platform, COUNT(*) AS cnt FROM editions GROUP BY platform')
+    .all<{ platform: string; cnt: number }>()
+  const map: Record<string, number> = {}
+  for (const row of results ?? []) map[row.platform] = row.cnt ?? 0
+  return map
 }
+
 
 
 // ============================================================
