@@ -22,6 +22,7 @@ import {
   getEditionById,
   getTopDiscounts,
   getLastUpdated,
+  getGameCount,
 } from '../db'
 
 const games = new Hono<{ Bindings: Bindings }>()
@@ -180,6 +181,7 @@ games.get('/', async (c) => {
 
   const sidebar = await DiscountSidebar({ db: c.env.DB })
   const lastUpdated = toKstLabel(await getLastUpdated(c.env.DB)) // [2026-07-08]
+  const gameCount = await getGameCount(c.env.DB) // [2026-07-09]
 
   return c.render(
     <div class="page">
@@ -188,9 +190,11 @@ games.get('/', async (c) => {
         <div class="header-text">
           <h1>🎮 여누의 게임 가격 추적기</h1>
           <p class="subtitle">콘솔별 · 디지털/패키지 분리 가격 비교</p>
+          <p class="update-time">🎮 총 {gameCount}개 게임 추적 중</p>
           {lastUpdated && (
             <p class="update-time">🕓 가격 업데이트: {lastUpdated} 기준</p>
           )}
+
         </div>
         <form class="search-box" action="/games" method="get" role="search">
           <input type="hidden" name="platform" value={platform} />
