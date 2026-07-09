@@ -22,7 +22,7 @@ import {
   getEditionById,
   getTopDiscounts,
   getLastUpdated,
-  getGameCount,
+  getPlatformCounts,
 } from '../db'
 
 const games = new Hono<{ Bindings: Bindings }>()
