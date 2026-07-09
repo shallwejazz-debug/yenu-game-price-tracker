@@ -189,6 +189,8 @@ const PLATFORM_RULES: Array<{code:string;patterns:RegExp[]}> = [
   {code:'ps5',patterns:[/ps5/i,/플레이스테이션\s*5/,/플스\s*5/]},
   {code:'ps4',patterns:[/ps4/i,/플레이스테이션\s*4/,/플스\s*4/]},
   {code:'xbox',patterns:[/xbox/i,/엑스박스/,/엑박/,/series\s*[xs]/i,/\bone\b/i]},
+// [2026-07-09] switch2 를 switch 보다 먼저 판정 (스위치2/Switch 2/NS2 표기)
+  {code:'switch2',patterns:[/스위치\s*2/,/switch\s*2/i,/\bns2\b/i,/닌텐도\s*스위치\s*2/]},
   {code:'switch',patterns:[/스위치/,/switch/i,/\bns\b/i,/닌텐도/]},
   {code:'pc',patterns:[/\bpc\b/i,/스팀/,/steam/i,/에픽/,/epic/i,/gog/i]}
 ];
@@ -197,6 +199,7 @@ export function detectPlatform(title: string): string | null {
   const hasPS4 = /ps4|플레이스테이션\s*4|플스\s*4/i.test(title);
   const hasPS5 = /ps5|플레이스테이션\s*5|플스\s*5/i.test(title);
   if (hasPS4 && hasPS5) return 'ps4';
+  if (/스위치\s*2|switch\s*2|\bns2\b/i.test(title)) return 'switch2';
   for (const rule of PLATFORM_RULES) { if (rule.patterns.some(re => re.test(title))) return rule.code; }
   return null;
 }
@@ -254,7 +257,7 @@ export async function searchAndClassify(clientId:string,clientSecret:string,quer
     buckets.push({platform,prices,count:filtered.length,lowest:prices.length?prices[0].price:null});
   }
 
-  const order=['pc','ps5','ps4','xbox','switch','etc'];
+  const order=['pc','ps5','ps4','xbox','switch','switch2','etc'];
   buckets.sort((a,b)=>order.indexOf(a.platform)-order.indexOf(b.platform));
   return {buckets,skipped,totalItems:data.items.length};
 }
