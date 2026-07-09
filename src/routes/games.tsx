@@ -193,8 +193,11 @@ games.get('/', async (c) => {
           <p class="subtitle">콘솔별 · 디지털/패키지 분리 가격 비교</p>
           <p class="update-time">
             🎮 총 {totalCount}개 추적 중 ·{' '}
-            {PLATFORMS.map((p) => `${p.label} ${platformCounts[p.code] ?? 0}`).join(' · ')}
+            {PLATFORMS.filter((p) => (platformCounts[p.code] ?? 0) > 0)
+              .map((p) => `${p.label} ${platformCounts[p.code]}`)
+              .join(' · ')}
           </p>
+
           {lastUpdated && (
             <p class="update-time">🕓 가격 업데이트: {lastUpdated} 기준</p>
           )}
