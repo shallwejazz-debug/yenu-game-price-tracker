@@ -428,7 +428,7 @@ admin.post('/api/auto-import', async (c) => {
         }
       }
 
-      const order = ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'etc']
+      const order = ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'switch2', 'etc']
       const mergedBuckets = Array.from(mergedByPlatform.entries())
         .map(([platform, pmap]) => {
           const prices = Array.from(pmap.values()).sort((a, b) => a.price - b.price)
