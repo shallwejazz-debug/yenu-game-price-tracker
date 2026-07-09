@@ -51,7 +51,7 @@ const BLACKLIST_REGEX = [
   /(na|aa)\s*$/i                  // 제목 맨 끝 NA/AA
 ];
 // 중고/개인거래성 판매처 차단 (네이버 API 제목엔 "중고"가 없고 상세페이지에만 있는 케이스 대응)
-const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어','게임하다','크리스랑','코드나라','GAME창고','game창고','마켓몬스터','marketmonster'];
+const BLOCKED_MALLS = ['마리오친구','메루카리','번개장터','중고나라','유나이트게임','yunitegame','메이저코드','영게임스토어','영게임즈','영게임','younggames','아이티케어스토어','아이티케어','게임하다','크리스랑','코드나라','GAME창고','game창고','마켓몬스터','marketmonster','원클릭샵','오피스토이몰','sqgame','정직한게임판매','정직한게임'];
 
 function isBlacklisted(title: string): boolean { const t = title.toLowerCase(); if (BLACKLIST_KEYWORDS.some(w => t.includes(w.toLowerCase()))) return true; if (BLACKLIST_REGEX.some(re => re.test(title))) return true; return false; }
 function isBlockedMall(mallName: string): boolean { return BLOCKED_MALLS.some(w => mallName.toLowerCase().includes(w.toLowerCase())); }
@@ -128,7 +128,7 @@ function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[], excludeK
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
   // 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (가짜 초저가의 주범)
-  const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost'];
+  const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost','특전','엽서','시나리오북','시나리오 북','게임팩x','설정집','화보','캘린더','달력','북릿','booklet','일러스트','설정집','화보','스위치호환용','호환용'];
   if (banned.some(w => title.includes(w))) return false;
   // 특수판(CE/디럭스/한정판/예약 등) 제외
   if (isSpecialEdition(title)) return false;
