@@ -83,7 +83,8 @@ function isCatalogProduct(item: NaverShopItem): boolean {
 const DIGITAL_KEYWORDS = ['스팀','steam','스팀키','cd키','cd-key','cdkey','시리얼키','시리얼번호','디지털','digital','다운로드','download','이메일발송','온라인코드','이숍','eshop','다운로드 번호','psn','플레이스테이션 스토어','닌텐도 e숍'];
 const DIGITAL_REGEX = [
   /다운로드\s*코드/i,
-  /온라인\s*코드/i,
+  /온라인\s*(게임\s*)?코드/i,
+  /게임\s*코드/i,
   /디지털\s*코드/i,
   /코드\s*발송/i,
   /이메일\s*코드/i,
