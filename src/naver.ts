@@ -42,7 +42,7 @@ function normalizeTitleForMatch(loweredTitle: string): string {
 }
 
 // ---------- 블랙리스트 & 차단몰 ----------
-const BLACKLIST_KEYWORDS = ['계정','기존계정','공유계정','신규계정','대리','대행','해외계정','지역우회','vpn','미개통','미사용계정','na버전','aa버전','na 버전','aa 버전','상점환율','상점국가','국가변경','환율변경'];
+const BLACKLIST_KEYWORDS = ['계정','기존계정','공유계정','신규계정','대리','대행','해외계정','지역우회','vpn','미개통','미사용계정','na버전','aa버전','na 버전','aa 버전','상점환율','상점국가','국가변경','환율변경','strategy guide','walkthrough','공략집','전략 가이드','tips and tricks'];
 const BLACKLIST_REGEX = [
   /\b(na|aa)\s*버전\b/i,
   /\b(na|aa)\s*계정\b/i,
@@ -129,7 +129,7 @@ function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[], excludeK
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
   // 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (가짜 초저가의 주범)
-  const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost','특전','엽서','시나리오북','시나리오 북','게임팩x','설정집','화보','캘린더','달력','북릿','booklet','일러스트','설정집','화보','스위치호환용','호환용'];
+  const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost','특전','엽서','시나리오북','시나리오 북','게임팩x','설정집','화보','캘린더','달력','북릿','booklet','일러스트','설정집','화보','스위치호환용','호환용',];
   if (banned.some(w => title.includes(w))) return false;
   // 특수판(CE/디럭스/한정판/예약 등) 제외
   if (isSpecialEdition(title)) return false;
