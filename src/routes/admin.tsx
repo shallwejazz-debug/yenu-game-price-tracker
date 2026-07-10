@@ -325,8 +325,13 @@ admin.post('/api/games', async (c) => {
 // ============================================================
 // [2026-07-07] 제외어(exclude) 즉시 반영 + 저장.
 // [2026-07-07] 키워드(keywords, 포함 조건)를 미리보기·저장 검색에 전달 + editions.keywords 저장.
-//   - groups[].keywords 를 받아 searchAndClassify(alias, keywords, excludeKeywords) 로 전달
-//   - 저장 시 insertEdition/UPDATE 에 keywords 반영 (실크송 등 시리즈 분리)
+// [2026-07-10] titles(붙여넣기 재등록/백업 복원) 경로에 5칸 양식 파서 추가.
+//   - 기존: 한 줄 전체를 통째로 name으로 넣고 keywords/exclude/image를 전부 버려서
+//           백업 복원 시 keyword·제외어·이미지가 무시되는 버그가 있었음.
+//   - 수정: '이름 | 검색어(미사용) | 이미지URL | keywords | exclude' 5칸을 파싱.
+//           폼(groups) 방식과 동일한 결과가 나오도록 통일.
+//   - 이미지: 양식에 이미지 URL이 있으면 그걸 대표 이미지로 우선 사용(신규·기존 모두),
+//             없으면 기존처럼 검색 자동수집 첫 이미지 사용.
 admin.post('/api/auto-import', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
   const clientSecret = c.env.NAVER_CLIENT_SECRET
@@ -341,8 +346,9 @@ admin.post('/api/auto-import', async (c) => {
     return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
   }
 
-  // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 단일별칭 그룹으로 변환
-  let groups: { name: string; aliases: string[]; exclude: string[]; keywords: string[] }[] = []
+  // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 5칸 양식으로 파싱
+  // [2026-07-10] image 필드 추가
+  let groups: { name: string; aliases: string[]; exclude: string[]; keywords: string[]; image?: string }[] = []
   if (Array.isArray(body.groups)) {
     groups = body.groups
       .map((g: any) => {
@@ -376,16 +382,36 @@ admin.post('/api/auto-import', async (c) => {
           new Set(rawKeywords.map((s) => s.trim()).filter(Boolean))
         )
 
-        return { name, aliases, exclude, keywords }
+        // [2026-07-10] 폼/그룹에서 이미지 지정 허용
+        const image = String(g.image ?? '').trim()
+
+        return { name, aliases, exclude, keywords, image }
       })
       .filter((g: any) => g.name && g.aliases.length)
   } else {
-    let titles: string[] = []
-    if (Array.isArray(body.titles)) titles = body.titles
-    else if (typeof body.titles === 'string') titles = body.titles.split('\n')
-    else if (typeof body.title === 'string') titles = [body.title]
-    titles = titles.map((t) => String(t).trim()).filter(Boolean)
-    groups = titles.map((t) => ({ name: t, aliases: [t], exclude: [], keywords: [] }))
+    // [2026-07-10] titles(붙여넣기/백업 복원) → 5칸 양식 파서
+    let rawLines: string[] = []
+    if (Array.isArray(body.titles)) rawLines = body.titles.map((t: any) => String(t))
+    else if (typeof body.titles === 'string') rawLines = body.titles.split('\n')
+    else if (typeof body.title === 'string') rawLines = [String(body.title)]
+
+    groups = rawLines
+      .map((line) => {
+        // 5칸 형식: 대표이름 | 검색어(미사용) | 이미지URL | keywords | exclude
+        const cols = line.split('|').map((s) => s.trim())
+        const name = cols[0] ?? ''
+        const image = cols[2] ?? ''
+        const keywordsStr = cols[3] ?? ''
+        const excludeStr = cols[4] ?? ''
+        const keywords = keywordsStr
+          ? keywordsStr.split(',').map((s) => s.trim()).filter(Boolean)
+          : []
+        const exclude = excludeStr
+          ? excludeStr.split(',').map((s) => s.trim()).filter(Boolean)
+          : []
+        return { name, aliases: name ? [name] : [], exclude, keywords, image }
+      })
+      .filter((g) => g.name && g.aliases.length)
   }
 
   if (groups.length === 0) {
@@ -451,11 +477,15 @@ admin.post('/api/auto-import', async (c) => {
         }
       }
 
+      // [2026-07-10] 양식에 이미지가 있으면 우선, 없으면 검색 자동수집 이미지
+      const chosenImage = (group.image && group.image.trim()) ? group.image.trim() : firstImage
+
       const entry: any = {
         title: name,
         aliases: group.aliases,
         keywords: includeKeywords,   // [2026-07-07] 응답에 키워드 표시(확인용)
         exclude: excludeKeywords,    // [2026-07-07] 응답에 제외어 표시(확인용)
+        image: chosenImage,          // [2026-07-10] 응답에 사용될 이미지 표시(확인용)
         platforms: platformsView,
         skipped: skippedTotal,
         totalItems,
@@ -468,8 +498,14 @@ admin.post('/api/auto-import', async (c) => {
         let gameId: number
         if (game) {
           gameId = game.id
+          // [2026-07-10] 기존 게임이라도 양식에 이미지가 있으면 덮어쓰기(백업 복원 시 이미지 유지)
+          if (group.image && group.image.trim()) {
+            await c.env.DB.prepare('UPDATE games SET image_url = ? WHERE id = ?')
+              .bind(group.image.trim(), gameId).run()
+          }
         } else {
-          const r = await insertGame(c.env.DB, { title: name, image_url: firstImage })
+          // [2026-07-10] 신규 게임은 양식 이미지 우선(chosenImage)
+          const r = await insertGame(c.env.DB, { title: name, image_url: chosenImage })
           gameId = Number(r.meta.last_row_id)
         }
 
