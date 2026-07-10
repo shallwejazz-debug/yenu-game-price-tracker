@@ -9,6 +9,9 @@
 //   DELETE /admin/api/games/:id              - 게임 삭제(연결 데이터 포함)
 //
 // 인증: X-Admin-Token 헤더
+//   [2026-07-10] switch_policy 지원: s2(스위치2 전용)/s1(스위치1 전용)/빈칸(자동).
+//     - 6칸 백업 양식: 이름 | 검색어 | 이미지 | keywords | exclude | 정책
+//     - s2면 switch 버킷을 switch2로 흡수하고 switch 에디션을 만들지 않음.
 // ============================================================
 
 import { Hono } from 'hono'
@@ -30,7 +33,6 @@ import { AdminPage } from './admin-page'
 const admin = new Hono<{ Bindings: Bindings }>()
 
 // ---------- 관리자 콘솔 HTML (인증 없이 페이지는 보여주고, API 호출 시 토큰 검사) ----------
-// 페이지 자체는 토큰 입력 폼이라 누구나 열 수 있음. 실제 데이터 변경은 토큰 필요.
 admin.get('/', (c) => {
   return c.html(AdminPage())
 })
@@ -47,7 +49,6 @@ admin.use('/api/*', async (c, next) => {
 
 // 기존 JSON 엔드포인트도 토큰 검사 (하위호환: 헤더 그대로)
 admin.use('*', async (c, next) => {
-  // /api/* 와 / (HTML) 는 위에서 이미 처리됨
   const path = c.req.path
   if (path === '/admin' || path === '/admin/' || path.startsWith('/admin/api/')) {
     return next()
@@ -198,18 +199,27 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     : []
 
   try {
-    // 에디션 단위 수집: 정제된 editions.keywords(예: '용과같이,2')를 필수 필터로 사용
-    const classified = await searchAndClassify(clientId, clientSecret, edition.search_query, keywords)
+    // [2026-07-10] 이 게임의 switch_policy를 조회해 승격에 반영
+    const gameRow = await c.env.DB
+      .prepare('SELECT switch_policy FROM games WHERE id = ?')
+      .bind(edition.game_id)
+      .first<{ switch_policy: string | null }>()
+    const switchPolicy = gameRow?.switch_policy ?? null
 
-    // 이 에디션의 플랫폼에 해당하는 버킷만 골라서 저장
-    const bucket = classified.buckets.find((b) => b.platform === edition.platform)
+    const classified = await searchAndClassify(clientId, clientSecret, edition.search_query, keywords, [], switchPolicy)
+
+    // [2026-07-10] s2 게임의 switch 에디션이면 승격된 switch2 버킷을 참조
+    let targetBucketPlatform = edition.platform
+    if (switchPolicy === 's2' && edition.platform === 'switch') targetBucketPlatform = 'switch2'
+    if (switchPolicy === 's1' && edition.platform === 'switch2') targetBucketPlatform = 'switch'
+
+    const bucket = classified.buckets.find((b) => b.platform === targetBucketPlatform)
     const prices = bucket ? bucket.prices : []
 
     if (prices.length === 0) {
       return c.json({ ok: true, found: 0, message: '게임 본품을 찾지 못했습니다. 검색어를 조정하세요.' })
     }
 
-    // 재수집 시 중복 방지: 이 에디션의 기존 가격을 먼저 삭제
     await c.env.DB.prepare('DELETE FROM prices WHERE edition_id = ?').bind(id).run()
 
     let saved = 0
@@ -243,13 +253,10 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
 // 관리자 콘솔용 간편 API (/admin/api/*)
 // ============================================================
 
-// ---------- 토큰 검증 (잠금 화면 통과용) ----------
-// 미들웨어를 이미 통과했다는 것 = 토큰이 맞다는 것. 단순 ok 반환.
 admin.post('/api/verify', (c) => {
   return c.json({ ok: true })
 })
 
-// ---------- 레퍼럴 ID 설정 조회 ----------
 admin.get('/api/settings', async (c) => {
   const s = await getAllSettings(c.env.DB)
   return c.json({
@@ -261,7 +268,6 @@ admin.get('/api/settings', async (c) => {
   })
 })
 
-// ---------- 레퍼럴 ID 설정 저장 ----------
 admin.post('/api/settings', async (c) => {
   let body: any
   try {
@@ -282,7 +288,6 @@ admin.post('/api/settings', async (c) => {
   }
 })
 
-// ---------- 게임 "제목만" 추가 (자동화 방향: 제목만 넣으면 끝) ----------
 admin.post('/api/games', async (c) => {
   let body: any
   try {
@@ -311,27 +316,14 @@ admin.post('/api/games', async (c) => {
 })
 
 // ============================================================
-// 자동 임포트: 그룹(별칭묶음) 또는 제목 배열을 받아
-//   → 대표이름 + 별칭들로 각각 검색 → 플랫폼별 결과 병합(최저가) →
-//   → 대표이름(name) 하나로 작품/에디션/가격 저장
+// 자동 임포트
 //   POST /admin/api/auto-import
-//   바디(신규): { "groups": [{ "name":"발더스 게이트 3", "aliases":["발더스 게이트 3","BG3"] }], "dryRun": true }
-//   바디(구):  { "titles": ["엘든링", ...], "dryRun": true }  ← 그대로 지원
-//
-//   ※ 필터 정책: 자동 임포트는 "검색어(별칭) 자체"가 기본 필터 역할을 한다.
-//     다만 시리즈/스핀오프 오염(할로우 나이트 vs 실크송 등)을 막기 위해
-//     그룹별 keywords(포함 조건)를 받아 searchAndClassify에 전달한다.
-//     keywords가 비어 있으면 기존과 동일하게 검색어만으로 필터한다.
+//   [2026-07-10] 6칸 양식 + switch_policy(s2/s1) 지원:
+//     - 폼(groups) 방식: g.switchPolicy 로 정책 수신.
+//     - 붙여넣기(titles) 방식: '이름 | 검색어 | 이미지 | keywords | exclude | 정책' 6칸 파싱.
+//     - s2면 searchAndClassify에 policy 전달(승격) + switch 버킷을 switch2로 흡수 + switch 에디션 미생성.
+//     - games.switch_policy 저장(신규/기존).
 // ============================================================
-// [2026-07-07] 제외어(exclude) 즉시 반영 + 저장.
-// [2026-07-07] 키워드(keywords, 포함 조건)를 미리보기·저장 검색에 전달 + editions.keywords 저장.
-// [2026-07-10] titles(붙여넣기 재등록/백업 복원) 경로에 5칸 양식 파서 추가.
-//   - 기존: 한 줄 전체를 통째로 name으로 넣고 keywords/exclude/image를 전부 버려서
-//           백업 복원 시 keyword·제외어·이미지가 무시되는 버그가 있었음.
-//   - 수정: '이름 | 검색어(미사용) | 이미지URL | keywords | exclude' 5칸을 파싱.
-//           폼(groups) 방식과 동일한 결과가 나오도록 통일.
-//   - 이미지: 양식에 이미지 URL이 있으면 그걸 대표 이미지로 우선 사용(신규·기존 모두),
-//             없으면 기존처럼 검색 자동수집 첫 이미지 사용.
 admin.post('/api/auto-import', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
   const clientSecret = c.env.NAVER_CLIENT_SECRET
@@ -346,9 +338,9 @@ admin.post('/api/auto-import', async (c) => {
     return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
   }
 
-  // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 5칸 양식으로 파싱
-  // [2026-07-10] image 필드 추가
-  let groups: { name: string; aliases: string[]; exclude: string[]; keywords: string[]; image?: string }[] = []
+  // 입력 정규화: groups(신규) 우선, 없으면 titles/title(구)를 6칸 양식으로 파싱
+  // [2026-07-10] image, switchPolicy 필드 추가
+  let groups: { name: string; aliases: string[]; exclude: string[]; keywords: string[]; image?: string; switchPolicy?: string }[] = []
   if (Array.isArray(body.groups)) {
     groups = body.groups
       .map((g: any) => {
@@ -357,7 +349,6 @@ admin.post('/api/auto-import', async (c) => {
           .filter(Boolean)
         const name = String(g.name ?? rawAliases[0] ?? '').trim()
 
-        // 대표 이름을 항상 검색어 맨 앞에 포함 + 별칭 추가 + 중복 제거(공백무시·대소문자무시)
         const seen = new Set<string>()
         const aliases: string[] = []
         for (const term of [name, ...rawAliases]) {
@@ -366,30 +357,28 @@ admin.post('/api/auto-import', async (c) => {
           if (!seen.has(k)) { seen.add(k); aliases.push(term) }
         }
 
-        // [2026-07-07] 제외어 파싱: 문자열/배열 모두 허용, 쉼표 분리·트림·중복제거
         let rawExclude: string[] = []
         if (Array.isArray(g.exclude)) rawExclude = g.exclude.map((s: any) => String(s))
         else if (typeof g.exclude === 'string') rawExclude = g.exclude.split(',')
-        const exclude = Array.from(
-          new Set(rawExclude.map((s) => s.trim()).filter(Boolean))
-        )
+        const exclude = Array.from(new Set(rawExclude.map((s) => s.trim()).filter(Boolean)))
 
-        // [2026-07-07] 키워드(포함 조건) 파싱: exclude와 동일 방식
         let rawKeywords: string[] = []
         if (Array.isArray(g.keywords)) rawKeywords = g.keywords.map((s: any) => String(s))
         else if (typeof g.keywords === 'string') rawKeywords = g.keywords.split(',')
-        const keywords = Array.from(
-          new Set(rawKeywords.map((s) => s.trim()).filter(Boolean))
-        )
+        const keywords = Array.from(new Set(rawKeywords.map((s) => s.trim()).filter(Boolean)))
 
-        // [2026-07-10] 폼/그룹에서 이미지 지정 허용
         const image = String(g.image ?? '').trim()
 
-        return { name, aliases, exclude, keywords, image }
+        // [2026-07-10] 스위치 정책: '', 's2', 's1' (그 외 값은 무시하고 자동)
+        const rawPolicy = String(g.switchPolicy ?? g.switch_policy ?? '').trim().toLowerCase()
+        const switchPolicy = (rawPolicy === 's2' || rawPolicy === 's1') ? rawPolicy : ''
+
+        return { name, aliases, exclude, keywords, image, switchPolicy }
       })
       .filter((g: any) => g.name && g.aliases.length)
   } else {
-    // [2026-07-10] titles(붙여넣기/백업 복원) → 5칸 양식 파서
+    // [2026-07-10] titles(붙여넣기/백업 복원) → 6칸 양식 파서
+    // 형식: 대표이름 | 검색어(미사용) | 이미지URL | keywords | exclude | 정책(s2/s1/빈칸)
     let rawLines: string[] = []
     if (Array.isArray(body.titles)) rawLines = body.titles.map((t: any) => String(t))
     else if (typeof body.titles === 'string') rawLines = body.titles.split('\n')
@@ -397,19 +386,16 @@ admin.post('/api/auto-import', async (c) => {
 
     groups = rawLines
       .map((line) => {
-        // 5칸 형식: 대표이름 | 검색어(미사용) | 이미지URL | keywords | exclude
         const cols = line.split('|').map((s) => s.trim())
         const name = cols[0] ?? ''
         const image = cols[2] ?? ''
         const keywordsStr = cols[3] ?? ''
         const excludeStr = cols[4] ?? ''
-        const keywords = keywordsStr
-          ? keywordsStr.split(',').map((s) => s.trim()).filter(Boolean)
-          : []
-        const exclude = excludeStr
-          ? excludeStr.split(',').map((s) => s.trim()).filter(Boolean)
-          : []
-        return { name, aliases: name ? [name] : [], exclude, keywords, image }
+        const rawPolicy = (cols[5] ?? '').toLowerCase()
+        const switchPolicy = (rawPolicy === 's2' || rawPolicy === 's1') ? rawPolicy : ''
+        const keywords = keywordsStr ? keywordsStr.split(',').map((s) => s.trim()).filter(Boolean) : []
+        const exclude = excludeStr ? excludeStr.split(',').map((s) => s.trim()).filter(Boolean) : []
+        return { name, aliases: name ? [name] : [], exclude, keywords, image, switchPolicy }
       })
       .filter((g) => g.name && g.aliases.length)
   }
@@ -424,8 +410,9 @@ admin.post('/api/auto-import', async (c) => {
   for (const group of groups) {
     try {
       const name = group.name
-      const excludeKeywords = group.exclude   // [2026-07-07] 이 그룹의 제외어
-      const includeKeywords = group.keywords  // [2026-07-07] 이 그룹의 포함 조건(키워드)
+      const excludeKeywords = group.exclude
+      const includeKeywords = group.keywords
+      const switchPolicy = group.switchPolicy || null   // [2026-07-10] 's2'|'s1'|null
 
       const mergedByPlatform = new Map<string, Map<string, any>>()
       const skippedTotal = { notGameTitle: 0, blacklisted: 0, used: 0, catalog: 0, outOfRange: 0, noPlatform: 0, excluded: 0 }
@@ -433,9 +420,8 @@ admin.post('/api/auto-import', async (c) => {
       let firstImage: string | null = null
 
       for (const alias of group.aliases) {
-        // [2026-07-07] 키워드(포함)·제외어를 함께 전달 → 미리보기·저장 모두 즉시 반영.
-        //   keywords가 빈 배열이면 기존과 동일(검색어만으로 필터).
-        const classified = await searchAndClassify(clientId, clientSecret, alias, includeKeywords, excludeKeywords)
+        // [2026-07-10] switch_policy 전달 → s2면 "SWITCH"만 적힌 상품도 switch2로 승격
+        const classified = await searchAndClassify(clientId, clientSecret, alias, includeKeywords, excludeKeywords, switchPolicy)
         totalItems += classified.totalItems
         for (const k of Object.keys(skippedTotal)) {
           if (classified.skipped && (classified.skipped as any)[k] !== undefined) {
@@ -467,8 +453,54 @@ admin.post('/api/auto-import', async (c) => {
         })
         .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
 
+      // [2026-07-10] s2 정책이면 switch 버킷을 switch2로 흡수하고 switch 버킷 제거.
+      //   (승격 로직으로 대부분 switch2로 들어오지만, 안전하게 이중 차단)
+      let effectiveBuckets = mergedBuckets
+      if (switchPolicy === 's2') {
+        const s1 = effectiveBuckets.find((b) => b.platform === 'switch')
+        if (s1) {
+          let s2 = effectiveBuckets.find((b) => b.platform === 'switch2')
+          if (!s2) {
+            s2 = { platform: 'switch2', prices: [], count: 0, lowest: null }
+            effectiveBuckets.push(s2)
+          }
+          const seenKey = new Set(s2.prices.map((p: any) => p.link || `${p.mallName}|${p.isDigital}`))
+          for (const p of s1.prices) {
+            const key = p.link || `${p.mallName}|${p.isDigital}`
+            if (!seenKey.has(key)) { seenKey.add(key); s2.prices.push(p) }
+          }
+          s2.prices.sort((a: any, b: any) => a.price - b.price)
+          s2.count = s2.prices.length
+          s2.lowest = s2.prices.length ? s2.prices[0].price : null
+        }
+        effectiveBuckets = effectiveBuckets
+          .filter((b) => b.platform !== 'switch')
+          .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
+      }
+      if (switchPolicy === 's1') {
+        const s2 = effectiveBuckets.find((b) => b.platform === 'switch2')
+        if (s2) {
+          let s1 = effectiveBuckets.find((b) => b.platform === 'switch')
+          if (!s1) {
+            s1 = { platform: 'switch', prices: [], count: 0, lowest: null }
+            effectiveBuckets.push(s1)
+          }
+          const seenKey = new Set(s1.prices.map((p: any) => p.link || `${p.mallName}|${p.isDigital}`))
+          for (const p of s2.prices) {
+            const key = p.link || `${p.mallName}|${p.isDigital}`
+            if (!seenKey.has(key)) { seenKey.add(key); s1.prices.push(p) }
+          }
+          s1.prices.sort((a: any, b: any) => a.price - b.price)
+          s1.count = s1.prices.length
+          s1.lowest = s1.prices.length ? s1.prices[0].price : null
+        }
+        effectiveBuckets = effectiveBuckets
+          .filter((b) => b.platform !== 'switch2')
+          .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
+      }
+
       const platformsView: Record<string, any> = {}
-      for (const b of mergedBuckets) {
+      for (const b of effectiveBuckets) {
         platformsView[b.platform] = {
           label: PLATFORM_LABELS[b.platform] ?? b.platform,
           count: b.count,
@@ -483,9 +515,10 @@ admin.post('/api/auto-import', async (c) => {
       const entry: any = {
         title: name,
         aliases: group.aliases,
-        keywords: includeKeywords,   // [2026-07-07] 응답에 키워드 표시(확인용)
-        exclude: excludeKeywords,    // [2026-07-07] 응답에 제외어 표시(확인용)
-        image: chosenImage,          // [2026-07-10] 응답에 사용될 이미지 표시(확인용)
+        keywords: includeKeywords,
+        exclude: excludeKeywords,
+        switchPolicy: switchPolicy ?? '',   // [2026-07-10] 응답에 정책 표시(확인용)
+        image: chosenImage,
         platforms: platformsView,
         skipped: skippedTotal,
         totalItems,
@@ -493,33 +526,36 @@ admin.post('/api/auto-import', async (c) => {
       }
 
       // 실제 저장 (dryRun=false)
-      if (!dryRun && mergedBuckets.length > 0) {
+      if (!dryRun && effectiveBuckets.length > 0) {
         let game = await findGameByTitle(c.env.DB, name)
         let gameId: number
         if (game) {
           gameId = game.id
-          // [2026-07-10] 기존 게임이라도 양식에 이미지가 있으면 덮어쓰기(백업 복원 시 이미지 유지)
           if (group.image && group.image.trim()) {
             await c.env.DB.prepare('UPDATE games SET image_url = ? WHERE id = ?')
               .bind(group.image.trim(), gameId).run()
           }
         } else {
-          // [2026-07-10] 신규 게임은 양식 이미지 우선(chosenImage)
           const r = await insertGame(c.env.DB, { title: name, image_url: chosenImage })
           gameId = Number(r.meta.last_row_id)
         }
 
-        // [2026-07-07] 키워드·제외어를 문자열로(에디션 저장용). 빈 배열이면 null.
+        // [2026-07-10] switch_policy 저장(신규/기존 모두). 빈 문자열이면 NULL(=자동).
+        {
+          const policyVal = (switchPolicy === 's2' || switchPolicy === 's1') ? switchPolicy : null
+          await c.env.DB.prepare('UPDATE games SET switch_policy = ? WHERE id = ?')
+            .bind(policyVal, gameId).run()
+        }
+
         const excludeStr = excludeKeywords.length ? excludeKeywords.join(',') : null
         const keywordsStr = includeKeywords.length ? includeKeywords.join(',') : null
 
         const savedDetail: Record<string, number> = {}
-        for (const b of mergedBuckets) {
+        for (const b of effectiveBuckets) {
           let edition = await findEdition(c.env.DB, gameId, b.platform)
           let editionId: number
           if (edition) {
             editionId = edition.id
-            // [2026-07-07] 기존 에디션이면 입력값 있을 때만 덮어씀(둘 다 null이면 스킵)
             if (excludeStr !== null || keywordsStr !== null) {
               await c.env.DB
                 .prepare(
@@ -534,8 +570,8 @@ admin.post('/api/auto-import', async (c) => {
               platform: b.platform,
               edition_name: `${label}판`,
               search_query: `${name} ${label}`,
-              keywords: keywordsStr,           // [2026-07-07] 등록 시 키워드 저장
-              exclude_keywords: excludeStr,    // [2026-07-07] 등록 시 제외어 저장
+              keywords: keywordsStr,
+              exclude_keywords: excludeStr,
             })
             editionId = Number(r.meta.last_row_id)
           }
@@ -577,16 +613,9 @@ admin.post('/api/auto-import', async (c) => {
 })
 
 // ============================================================
-// 등록안 텍스트 생성기 (B단계): 이름 리스트 → 네이버 조회 →
-//   export 5칸 양식 텍스트 + 판단용 부가정보(이미지 후보, 오염 힌트)
+// 등록안 텍스트 생성기 (B단계)
 //   POST /admin/api/generate-list
-//   바디: { "titles": ["엘든링", "고스트 오브 요테이", ...] }
-//        또는 { "titles": "엘든링\n고스트 오브 요테이" }  (줄바꿈 구분)
-//
-//   ※ 저장하지 않는다. 순수 미리보기/생성 전용.
-//   ※ keywords/exclude 칸은 항상 비워서 내보낸다(잘못된 자동값 등록 방지).
-//     대신 오염 힌트를 hints로 함께 내려 사람이 판단해 채우도록 한다.
-//   ※ 이미지는 자동 후보만 제시. PS/스위치 독점은 스팀에 없으므로 최종 교체는 사람 몫.
+//   [2026-07-10] 6칸 양식으로 출력(정책 칸 빈칸 추가)
 // ============================================================
 admin.post('/api/generate-list', async (c) => {
   const clientId = c.env.NAVER_CLIENT_ID
@@ -602,7 +631,6 @@ admin.post('/api/generate-list', async (c) => {
     return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
   }
 
-  // 입력 정규화: 배열 또는 줄바꿈 문자열
   let titles: string[] = []
   if (Array.isArray(body.titles)) titles = body.titles.map((t: any) => String(t))
   else if (typeof body.titles === 'string') titles = body.titles.split('\n')
@@ -618,10 +646,8 @@ admin.post('/api/generate-list', async (c) => {
 
   for (const title of titles) {
     try {
-      // 대표이름으로 조회 (keywords/exclude 없이: 있는 그대로 무엇이 잡히는지 본다)
       const classified = await searchAndClassify(clientId, clientSecret, title)
 
-      // ----- 플랫폼별 건수/최저가 -----
       const platforms: Record<string, any> = {}
       const sortedBuckets = [...classified.buckets].sort(
         (a, b) => order.indexOf(a.platform) - order.indexOf(b.platform)
@@ -630,7 +656,6 @@ admin.post('/api/generate-list', async (c) => {
         platforms[b.platform] = { count: b.count, lowest: b.lowest }
       }
 
-      // ----- 이미지 후보 수집 (중복 제거, 최대 6개) -----
       const imageCandidates: string[] = []
       const seenImg = new Set<string>()
       for (const b of sortedBuckets) {
@@ -645,7 +670,6 @@ admin.post('/api/generate-list', async (c) => {
       }
       const image = imageCandidates[0] ?? ''
 
-      // ----- 상품명 샘플 (대표이름 확인용, 최대 5개) -----
       const sampleTitles: string[] = []
       for (const b of sortedBuckets) {
         for (const p of b.prices) {
@@ -655,7 +679,6 @@ admin.post('/api/generate-list', async (c) => {
         if (sampleTitles.length >= 5) break
       }
 
-      // ----- 오염 힌트 (skipped 통계 기반, 약한 알림) -----
       const s = classified.skipped
       const hints: string[] = []
       if (s.blacklisted > 0) hints.push(`계정/대행/공략집 등 차단 ${s.blacklisted}건 감지`)
@@ -665,9 +688,8 @@ admin.post('/api/generate-list', async (c) => {
       if (Object.keys(platforms).length === 0) hints.push('⚠ 잡힌 상품 없음 — 검색어 확인 필요')
       if (Object.keys(platforms).length >= 6) hints.push('플랫폼 6종 이상 — 시리즈 혼입 가능성, 확인 권장')
 
-      // ----- export 5칸 양식 한 줄 (keywords/exclude는 빈칸) -----
-      // 형식: 대표이름 | 검색어(비움) | 이미지URL | keywords(비움) | exclude(비움)
-      const line = `${title} |  | ${image} |  | `
+      // [2026-07-10] 6칸 양식: 대표이름 | 검색어 | 이미지 | keywords | exclude | 정책(빈칸)
+      const line = `${title} |  | ${image} |  |  | `
       lines.push(line)
 
       results.push({
@@ -682,7 +704,8 @@ admin.post('/api/generate-list', async (c) => {
         totalItems: classified.totalItems,
       })
     } catch (err: any) {
-      const line = `${title} |  |  |  | `
+      // [2026-07-10] 6칸 양식
+      const line = `${title} |  |  |  |  | `
       lines.push(line)
       results.push({ title, line, error: err.message })
     }
@@ -691,16 +714,15 @@ admin.post('/api/generate-list', async (c) => {
   return c.json({
     ok: true,
     count: results.length,
-    text: lines.join('\n'),   // 그대로 복사해 export/auto-import 흐름에 사용
-    results,                  // 게임별 상세: 이미지 후보, 샘플명, 플랫폼 건수, 오염 힌트
+    text: lines.join('\n'),
+    results,
   })
 })
-
 
 // ---------- 등록된 게임 목록 (관리자 콘솔 표시용) ----------
 admin.get('/api/games', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT g.id, g.title, g.image_url, g.created_at,
+    `SELECT g.id, g.title, g.image_url, g.switch_policy, g.created_at,
             (SELECT COUNT(*) FROM editions e WHERE e.game_id = g.id) AS edition_count
      FROM games g ORDER BY g.id DESC`
   ).all()
@@ -731,8 +753,8 @@ admin.delete('/api/games/:id', async (c) => {
     return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
   }
 })
+
 // ---------- 게임 정보 수정 (현재는 이미지 URL) ----------
-// 바디: { "image_url": "https://..." }  (빈 문자열/null 이면 이미지 제거)
 admin.patch('/api/games/:id', async (c) => {
   const gameId = Number(c.req.param('id'))
   if (Number.isNaN(gameId)) {
@@ -746,27 +768,34 @@ admin.patch('/api/games/:id', async (c) => {
     return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
   }
 
-  if (body.image_url === undefined) {
-    return c.json({ ok: false, error: '수정할 필드(image_url)가 없습니다.' }, 400)
-  }
+  // [2026-07-10] switch_policy 수정도 허용
+  const patchImage = body.image_url !== undefined
+  const patchPolicy = body.switch_policy !== undefined
 
-  const url = body.image_url ? String(body.image_url).trim() : null
-  if (url && !/^https?:\/\//i.test(url)) {
-    return c.json({ ok: false, error: '이미지 URL은 http(s)로 시작해야 합니다.' }, 400)
+  if (!patchImage && !patchPolicy) {
+    return c.json({ ok: false, error: '수정할 필드(image_url 또는 switch_policy)가 없습니다.' }, 400)
   }
 
   try {
-    await c.env.DB.prepare('UPDATE games SET image_url = ? WHERE id = ?')
-      .bind(url, gameId)
-      .run()
-    return c.json({ ok: true, image_url: url, message: '대표 이미지를 변경했습니다.' })
+    if (patchImage) {
+      const url = body.image_url ? String(body.image_url).trim() : null
+      if (url && !/^https?:\/\//i.test(url)) {
+        return c.json({ ok: false, error: '이미지 URL은 http(s)로 시작해야 합니다.' }, 400)
+      }
+      await c.env.DB.prepare('UPDATE games SET image_url = ? WHERE id = ?').bind(url, gameId).run()
+    }
+    if (patchPolicy) {
+      const raw = String(body.switch_policy ?? '').trim().toLowerCase()
+      const policyVal = (raw === 's2' || raw === 's1') ? raw : null
+      await c.env.DB.prepare('UPDATE games SET switch_policy = ? WHERE id = ?').bind(policyVal, gameId).run()
+    }
+    return c.json({ ok: true, message: '게임 정보를 변경했습니다.' })
   } catch (err: any) {
     return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
   }
 })
 
 // ---------- 게임 여러 개 선택 삭제 (체크박스 다중 삭제) ----------
-// 바디: { "ids": [12, 15, 20] }
 admin.post('/api/games/bulk-delete', async (c) => {
   let body: any
   try {
@@ -807,8 +836,6 @@ admin.post('/api/games/bulk-delete', async (c) => {
 })
 
 // ---------- 게임의 모든 에디션에 keywords/exclude 일괄 적용 (백업 복원용) ----------
-// [2026-07-06] 복원 시 대표 keywords/exclude를 그 게임의 전체 에디션에 반영
-// 바디: { keywords: "용과같이,2" | null, exclude_keywords: "나이트레인" | null }
 admin.post('/api/games/:id/apply-filters', async (c) => {
   const gameId = Number(c.req.param('id'))
   if (Number.isNaN(gameId)) {
@@ -837,14 +864,12 @@ admin.post('/api/games/:id/apply-filters', async (c) => {
   }
 })
 
-
-// ---------- 게임 목록 내보내기 (keywords/exclude 포함, 붙여넣기 재등록용 텍스트) ----------
-// [2026-07-06] 5칸 형식: 대표이름 | 검색어(미사용) | 이미지URL | keywords | exclude
-//   keywords/exclude는 그 게임의 에디션 중 값이 있는 것을 대표로 사용(전 플랫폼 동일 정책)
+// ---------- 게임 목록 내보내기 (붙여넣기 재등록용 텍스트) ----------
+// [2026-07-10] 6칸 형식: 대표이름 | 검색어(미사용) | 이미지URL | keywords | exclude | 정책(s2/s1/빈칸)
 admin.get('/api/export', async (c) => {
   const { results: games } = await c.env.DB.prepare(
-    'SELECT id, title, image_url FROM games ORDER BY id'
-  ).all<{ id: number; title: string; image_url: string | null }>()
+    'SELECT id, title, image_url, switch_policy FROM games ORDER BY id'
+  ).all<{ id: number; title: string; image_url: string | null; switch_policy: string | null }>()
 
   const lines: string[] = []
   for (const g of games ?? []) {
@@ -853,7 +878,6 @@ admin.get('/api/export', async (c) => {
       .bind(g.id)
       .all<{ keywords: string | null; exclude_keywords: string | null }>()
 
-    // 에디션들 중 값이 있는 첫 keywords / exclude 를 대표로 채택
     let keywords = ''
     let exclude = ''
     for (const e of eds ?? []) {
@@ -862,16 +886,14 @@ admin.get('/api/export', async (c) => {
     }
 
     const img = g.image_url ?? ''
-    // 형식: 대표이름 | 검색어(비움) | 이미지URL | keywords | exclude
-    lines.push(`${g.title} |  | ${img} | ${keywords} | ${exclude}`)
+    const policy = g.switch_policy ?? ''   // [2026-07-10] 6번째 칸
+    lines.push(`${g.title} |  | ${img} | ${keywords} | ${exclude} | ${policy}`)
   }
 
   return c.json({ ok: true, count: lines.length, text: lines.join('\n') })
 })
 
-
 // ---------- DB 전체 초기화 (게임/에디션/가격/이력 삭제, settings 유지) ----------
-// 바디: { "confirm": "RESET" }
 admin.post('/api/reset-all', async (c) => {
   let body: any
   try {
@@ -892,6 +914,5 @@ admin.post('/api/reset-all', async (c) => {
     return c.json({ ok: false, error: `DB 오류: ${err.message}` }, 500)
   }
 })
-
 
 export default admin
