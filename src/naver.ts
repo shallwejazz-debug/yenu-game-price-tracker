@@ -1,3 +1,9 @@
+// [2026-07-10] switch_policy 지원 추가:
+//   - searchAndClassify에 switchPolicy 파라미터(null|'auto'|'s2'|'s1') 추가.
+//   - s2 = 스위치2 전용 게임인데 판매자가 "SWITCH"로만 표기한 상품을 switch2로 승격.
+//   - s1 = (드묾) 스위치1 전용으로 강등.
+//   - PS/XBOX/PC 등 비스위치 상품은 절대 영향받지 않음.
+//   - EDITION_REGEX에 '스페셜리스트/specialist' 추가(007 스페셜리스트 에디션 등 특수판 차단).
 // [2026-07-07] 로마자 숫자 정규화(매칭 전용) 추가: isLikelyGameTitle의 키워드 AND 매칭 시 제목의 독립 로마자(II·VII 등)를 아라비아 숫자로 변환해 비교. normalizeTitleForMatch 신설, normTitle 생성부만 교체. excludeKeywords 사전검사/화면표시/저장값은 원본 유지.
 // =============================================================
 // 네이버 쇼핑 API 연동 모듈  src/naver.ts
@@ -10,6 +16,7 @@
 //   - 필수 키워드(keywords) AND 매칭 + 공백무시 + 로마자정규화: 시리즈물 오염 차단
 //   - 제외 키워드(excludeKeywords) OR 매칭 + 공백무시: 스핀오프/파생판 차단
 //     (예: 원작 "엘든링"에서 "나이트레인/nightreign" 제외)
+//   - switch_policy(s2/s1): 스위치2 전용 게임의 "SWITCH" 표기 상품을 올바른 버킷으로 승격/강등
 // =============================================================
 
 interface NaverShopItem { title: string; link: string; image: string; lprice: string; hprice: string; mallName: string; productId: string; productType: string; category1: string; category2: string; category3: string; category4: string; }
@@ -104,6 +111,7 @@ const EDITION_REGEX = [
   /얼티밋|ultimate/i,
   /골드\s*에디션|gold\s*edition/i,
   /스페셜\s*에디션|special\s*edition/i,
+  /스페셜리스트|specialist/i,        // [2026-07-10] 007 스페셜리스트 에디션 등 특수판 차단
   /한정|리미티드|limited/i,
   /예약|예구|선주문|pre[\s-]?order/i,
 ];
@@ -208,9 +216,30 @@ export function detectPlatform(title: string): string | null {
 export interface PlatformBucket { platform:string; prices:CleanedPrice[]; count:number; lowest:number|null; }
 export interface ClassifyResult { buckets:PlatformBucket[]; skipped:{notGameTitle:number;blacklisted:number;used:number;catalog:number;outOfRange:number;noPlatform:number;excluded:number;}; totalItems:number; }
 
-export async function searchAndClassify(clientId:string,clientSecret:string,query:string,keywords:string[]=[],excludeKeywords:string[]=[]): Promise<ClassifyResult> {
+export async function searchAndClassify(
+  clientId: string,
+  clientSecret: string,
+  query: string,
+  keywords: string[] = [],
+  excludeKeywords: string[] = [],
+  switchPolicy: string | null = null   // [2026-07-10] null|'auto'|'s2'|'s1'
+): Promise<ClassifyResult> {
   // 검색어에 담긴 대상 플랫폼 추출 (예: "둠 다크에이지 switch" → switch)
-  const targetPlatform = detectPlatform(query);
+  let targetPlatform = detectPlatform(query);
+
+  // [2026-07-10] switch_policy 강제 적용 준비
+  //   s2 = 스위치2 전용 게임인데 판매자가 "SWITCH"로만 적는 경우 → switch2로 승격.
+  //   s1 = (드묾) 스위치1 전용 → switch2 표기 상품을 switch로 강등.
+  //   ※ 스위치 계열(switch/switch2)에만 관여하며 PS/XBOX/PC 상품은 절대 건드리지 않는다.
+  const forceSwitch2 = switchPolicy === 's2';
+  const forceSwitch1 = switchPolicy === 's1';
+  // 검색 대상이 스위치 계열이면 targetPlatform도 정책에 맞게 보정
+  if (forceSwitch2 && (targetPlatform === 'switch' || targetPlatform === 'switch2')) {
+    targetPlatform = 'switch2';
+  }
+  if (forceSwitch1 && (targetPlatform === 'switch' || targetPlatform === 'switch2')) {
+    targetPlatform = 'switch';
+  }
 
   // 제외 키워드 정규화용: 상품명에서 제외어가 몇 개나 걸렸는지 카운트하기 위해 미리 준비
   const normExcludes = excludeKeywords.map(k => k.toLowerCase().replace(/\s+/g, '')).filter(k => k.length > 0);
@@ -238,8 +267,15 @@ export async function searchAndClassify(clientId:string,clientSecret:string,quer
     if (isBlockedMall(item.mallName)) {skipped.used++; continue;}
     const price=parseInt(item.lprice,10);
     if (!isReasonablePrice(price)) {skipped.outOfRange++; continue;}
-    const platform=detectPlatform(title);
+    let platform=detectPlatform(title);
     if (!platform) {skipped.noPlatform++; continue;}
+
+    // [2026-07-10] switch_policy 승격/강등 (스위치 계열만, PS/XBOX/PC는 불변)
+    //   s2: "007 ... SWITCH"처럼 2 표기가 없는 스위치2 전용 상품을 switch2로 승격.
+    //   s1: switch2 표기 상품을 switch로 강등(스위치1 전용 게임인 경우).
+    if (forceSwitch2 && platform === 'switch') platform = 'switch2';
+    if (forceSwitch1 && platform === 'switch2') platform = 'switch';
+
     // 검색 대상 플랫폼과 상품 실제 플랫폼이 다르면 버림 (교차 오염 방지)
     // 예: switch로 검색했는데 제목이 "PC Steam 둠"이면 pc로 판정 → 제외
     if (targetPlatform && platform !== targetPlatform) {skipped.noPlatform++; continue;}
