@@ -540,6 +540,125 @@ admin.post('/api/auto-import', async (c) => {
   })
 })
 
+// ============================================================
+// 등록안 텍스트 생성기 (B단계): 이름 리스트 → 네이버 조회 →
+//   export 5칸 양식 텍스트 + 판단용 부가정보(이미지 후보, 오염 힌트)
+//   POST /admin/api/generate-list
+//   바디: { "titles": ["엘든링", "고스트 오브 요테이", ...] }
+//        또는 { "titles": "엘든링\n고스트 오브 요테이" }  (줄바꿈 구분)
+//
+//   ※ 저장하지 않는다. 순수 미리보기/생성 전용.
+//   ※ keywords/exclude 칸은 항상 비워서 내보낸다(잘못된 자동값 등록 방지).
+//     대신 오염 힌트를 hints로 함께 내려 사람이 판단해 채우도록 한다.
+//   ※ 이미지는 자동 후보만 제시. PS/스위치 독점은 스팀에 없으므로 최종 교체는 사람 몫.
+// ============================================================
+admin.post('/api/generate-list', async (c) => {
+  const clientId = c.env.NAVER_CLIENT_ID
+  const clientSecret = c.env.NAVER_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    return c.json({ ok: false, error: '네이버 API 키가 설정되지 않았습니다.' }, 500)
+  }
+
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
+  }
+
+  // 입력 정규화: 배열 또는 줄바꿈 문자열
+  let titles: string[] = []
+  if (Array.isArray(body.titles)) titles = body.titles.map((t: any) => String(t))
+  else if (typeof body.titles === 'string') titles = body.titles.split('\n')
+  titles = titles.map((t) => t.trim()).filter(Boolean)
+
+  if (titles.length === 0) {
+    return c.json({ ok: false, error: '게임 이름을 한 개 이상 입력하세요.' }, 400)
+  }
+
+  const order = ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'switch2', 'etc']
+  const results: any[] = []
+  const lines: string[] = []
+
+  for (const title of titles) {
+    try {
+      // 대표이름으로 조회 (keywords/exclude 없이: 있는 그대로 무엇이 잡히는지 본다)
+      const classified = await searchAndClassify(clientId, clientSecret, title)
+
+      // ----- 플랫폼별 건수/최저가 -----
+      const platforms: Record<string, any> = {}
+      const sortedBuckets = [...classified.buckets].sort(
+        (a, b) => order.indexOf(a.platform) - order.indexOf(b.platform)
+      )
+      for (const b of sortedBuckets) {
+        platforms[b.platform] = { count: b.count, lowest: b.lowest }
+      }
+
+      // ----- 이미지 후보 수집 (중복 제거, 최대 6개) -----
+      const imageCandidates: string[] = []
+      const seenImg = new Set<string>()
+      for (const b of sortedBuckets) {
+        for (const p of b.prices) {
+          if (p.image && !seenImg.has(p.image)) {
+            seenImg.add(p.image)
+            imageCandidates.push(p.image)
+            if (imageCandidates.length >= 6) break
+          }
+        }
+        if (imageCandidates.length >= 6) break
+      }
+      const image = imageCandidates[0] ?? ''
+
+      // ----- 상품명 샘플 (대표이름 확인용, 최대 5개) -----
+      const sampleTitles: string[] = []
+      for (const b of sortedBuckets) {
+        for (const p of b.prices) {
+          if (sampleTitles.length >= 5) break
+          sampleTitles.push(p.title)
+        }
+        if (sampleTitles.length >= 5) break
+      }
+
+      // ----- 오염 힌트 (skipped 통계 기반, 약한 알림) -----
+      const s = classified.skipped
+      const hints: string[] = []
+      if (s.blacklisted > 0) hints.push(`계정/대행/공략집 등 차단 ${s.blacklisted}건 감지`)
+      if (s.excluded > 0) hints.push(`제외어 매칭 ${s.excluded}건`)
+      if (s.notGameTitle > 8) hints.push(`비게임/굿즈성 ${s.notGameTitle}건 (오염 많음 — 검색어·keywords 점검 권장)`)
+      if (s.noPlatform > 8) hints.push(`플랫폼 불명 ${s.noPlatform}건`)
+      if (Object.keys(platforms).length === 0) hints.push('⚠ 잡힌 상품 없음 — 검색어 확인 필요')
+      if (Object.keys(platforms).length >= 6) hints.push('플랫폼 6종 이상 — 시리즈 혼입 가능성, 확인 권장')
+
+      // ----- export 5칸 양식 한 줄 (keywords/exclude는 빈칸) -----
+      // 형식: 대표이름 | 검색어(비움) | 이미지URL | keywords(비움) | exclude(비움)
+      const line = `${title} |  | ${image} |  | `
+      lines.push(line)
+
+      results.push({
+        title,
+        line,
+        image,
+        imageCandidates,
+        sampleTitles,
+        platforms,
+        hints,
+        skipped: s,
+        totalItems: classified.totalItems,
+      })
+    } catch (err: any) {
+      const line = `${title} |  |  |  | `
+      lines.push(line)
+      results.push({ title, line, error: err.message })
+    }
+  }
+
+  return c.json({
+    ok: true,
+    count: results.length,
+    text: lines.join('\n'),   // 그대로 복사해 export/auto-import 흐름에 사용
+    results,                  // 게임별 상세: 이미지 후보, 샘플명, 플랫폼 건수, 오염 힌트
+  })
+})
 
 
 // ---------- 등록된 게임 목록 (관리자 콘솔 표시용) ----------
