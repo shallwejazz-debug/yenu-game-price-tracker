@@ -1,10 +1,11 @@
 // [2026-07-06] 자동 가져오기 3칸화(대표이름/제외어/이미지URL): addGroupRow·getGroups 개편, doImport에서 등록 후 exclude·이미지 적용
+// [2026-07-10] 스위치 정책(switch_policy) 지원: 자동가져오기 정책 드롭다운, 6칸 붙여넣기 파싱, groups에 switchPolicy 포함
 // ============================================================
 // 관리자 콘솔 프론트엔드
 // public/static/admin.js
-//   - 자동 가져오기: 대표이름/제외어/이미지URL 3칸 입력
-//   - 게임 목록: 체크박스 선택 삭제 지원
-//   - 백업/복원: 내보내기 / 붙여넣기 재등록(1개씩 순차) / DB 초기화
+//   - 자동 가져오기: 대표이름 / 키워드 / 제외어 / 이미지URL / 정책 입력
+//   - 게임 목록: 체크박스 선택 삭제, 정책 뱃지 표시
+//   - 백업/복원: 내보내기(6칸) / 붙여넣기 재등록(1개씩 순차) / DB 초기화
 // ============================================================
 
 (function () {
@@ -150,23 +151,37 @@
   })
 
   // ============================================================
-  // 자동 임포트 (3칸: 대표이름 / 제외어 / 이미지URL)
+  // 자동 임포트 (대표이름 / 키워드 / 제외어 / 이미지URL / 정책)
   // ============================================================
-  function addGroupRow(name, keywords, exclude, image) {
+  // [2026-07-10] .ig-bottom 서브그리드 안에 제외어·이미지URL·정책(select) 배치.
+  //   admin.css의 grid-template-areas("name keywords remove" / "bottom bottom remove")와 일치.
+  function addGroupRow(name, keywords, exclude, image, policy) {
     const body = $('importGroups')
     const row = document.createElement('div')
     row.className = 'ig-row'
     row.innerHTML =
       '<input type="text" class="ig-name" placeholder="예: 엘든링" />' +
       '<input type="text" class="ig-keywords" placeholder="예: 실크송, silksong (포함 조건, 없으면 비움)" />' +
-      '<input type="text" class="ig-exclude" placeholder="예: 나이트레인 (제외, 없으면 비움)" />' +
-      '<input type="text" class="ig-image" placeholder="이미지URL (없으면 자동)" />' +
+      '<div class="ig-bottom">' +
+        '<input type="text" class="ig-exclude" placeholder="제외어 (없으면 비움)" />' +
+        '<input type="text" class="ig-image" placeholder="이미지URL (없으면 자동)" />' +
+        '<select class="ig-policy" title="스위치 정책">' +
+          '<option value="">자동</option>' +
+          '<option value="s2">스위치2 전용</option>' +
+          '<option value="s1">스위치1 전용</option>' +
+        '</select>' +
+      '</div>' +
       '<button type="button" class="ig-remove" title="이 행 삭제">−</button>'
     body.appendChild(row)
     if (name) row.querySelector('.ig-name').value = name
     if (keywords) row.querySelector('.ig-keywords').value = keywords
     if (exclude) row.querySelector('.ig-exclude').value = exclude
     if (image) row.querySelector('.ig-image').value = image
+    if (policy) {
+      const sel = row.querySelector('.ig-policy')
+      const v = String(policy).toLowerCase()
+      if (v === 's1' || v === 's2') sel.value = v
+    }
     return row
   }
 
@@ -189,21 +204,20 @@
     if (!btn) return
     const body = $('importGroups')
     const rows = body.querySelectorAll('.ig-row')
-        if (rows.length <= 1) {
+    if (rows.length <= 1) {
       const row = btn.closest('.ig-row')
       row.querySelector('.ig-name').value = ''
       row.querySelector('.ig-keywords').value = ''
       row.querySelector('.ig-exclude').value = ''
       row.querySelector('.ig-image').value = ''
+      const sel = row.querySelector('.ig-policy')
+      if (sel) sel.value = ''
     } else {
       btn.closest('.ig-row').remove()
     }
   })
 
-  // 3칸 입력을 읽어 { name, exclude, image } 목록으로 반환
-  //   - 별칭은 쓰지 않음(A방식). 검색은 대표이름 하나로.
-  //   - auto-import에는 groups[{name, aliases:[name]}]로 보내고,
-  //     exclude/image는 등록 성공 후 별도 API로 적용(doImport 참고).
+  // 입력을 읽어 { name, keywords, exclude, image, policy } 목록으로 반환
     function getRows() {
     const rows = Array.from($('importGroups').querySelectorAll('.ig-row'))
     const out = []
@@ -213,7 +227,10 @@
       const keywords = row.querySelector('.ig-keywords').value.trim()
       const exclude = row.querySelector('.ig-exclude').value.trim()
       const image = row.querySelector('.ig-image').value.trim()
-      out.push({ name: name, keywords: keywords, exclude: exclude, image: image })
+      // [2026-07-10] 정책 드롭다운 값 수집 ('' | 's2' | 's1')
+      const policySel = row.querySelector('.ig-policy')
+      const policy = policySel ? policySel.value.trim() : ''
+      out.push({ name: name, keywords: keywords, exclude: exclude, image: image, policy: policy })
     })
     return out
   }
@@ -249,9 +266,11 @@
       const skText = '제외 — 비게임 ' + (sk.notGameTitle||0) + ', 중고 ' + (sk.used||0) +
         ', 가격비교 ' + (sk.catalog||0) +
         ', 가격범위밖 ' + (sk.outOfRange||0) + ', 플랫폼불명 ' + (sk.noPlatform||0)
+      // [2026-07-10] 정책이 지정된 게임은 미리보기에 정책 표시
+      const polTag = r.switch_policy ? ' <span class="imp-gid">' + escapeHtml(String(r.switch_policy).toUpperCase()) + '</span>' : ''
       return (
         '<div class="imp-game">' +
-        '<div class="imp-title">🎮 ' + escapeHtml(r.title) + (r.game_id ? ' <span class="imp-gid">#' + r.game_id + '</span>' : '') + '</div>' +
+        '<div class="imp-title">🎮 ' + escapeHtml(r.title) + (r.game_id ? ' <span class="imp-gid">#' + r.game_id + '</span>' : '') + polTag + '</div>' +
         (plats.length ? '<ul class="imp-plats">' + rows + '</ul>' : '<p class="imp-none">분류된 플랫폼 없음</p>') +
         '<p class="imp-skip">' + skText + '</p>' +
         '</div>'
@@ -269,13 +288,20 @@
     setStatus($('importStatus'), (dryRun ? '🔍 분석' : '⬇️ 수집/저장') + ' 중… (잠시 기다려주세요)', true)
     try {
       // [2026-07-07] 검색은 대표이름 하나로 + 제외어(exclude)를 함께 전달(미리보기·저장 모두 반영)
+      // [2026-07-10] switchPolicy 함께 전달 → s2/s1 버킷 병합이 서버에서 반영됨
       const groups = rows.map(function (r) {
-        return { name: r.name, aliases: [r.name], keywords: r.keywords || '', exclude: r.exclude || '' }
+        return {
+          name: r.name,
+          aliases: [r.name],
+          keywords: r.keywords || '',
+          exclude: r.exclude || '',
+          switchPolicy: r.policy || '',
+        }
       })
 
       const data = await api('/auto-import', 'POST', { groups: groups, dryRun: dryRun })
 
-      // [2026-07-07] 실제 저장일 때 이미지만 후처리. 제외어는 서버가 저장하므로 apply-filters 불필요.
+      // [2026-07-07] 실제 저장일 때 이미지만 후처리. 제외어·정책은 서버가 저장하므로 불필요.
       if (!dryRun) {
         const byName = {}
         rows.forEach(function (r) { byName[r.name] = r })
@@ -315,8 +341,13 @@
         return
       }
           list.innerHTML = games
-        .map(
-          (g) =>
+        .map(function (g) {
+          // [2026-07-10] 정책 뱃지 (s2/s1일 때만 표시)
+          var pol = g.switch_policy ? String(g.switch_policy).toLowerCase() : ''
+          var polBadge = (pol === 's2' || pol === 's1')
+            ? '<span class="ag-policy">' + pol.toUpperCase() + '</span>'
+            : ''
+          return (
             '<li class="admin-game-item">' +
             '<input type="checkbox" class="ag-check" data-id="' + g.id + '" />' +
             '<span class="ag-thumb">' +
@@ -325,12 +356,13 @@
                 : '<span class="ag-thumb-empty">?</span>') +
             '</span>' +
             '<span class="ag-id">#' + g.id + '</span>' +
-            '<span class="ag-title">' + escapeHtml(g.title) + '</span>' +
+            '<span class="ag-title">' + escapeHtml(g.title) + polBadge + '</span>' +
             '<span class="ag-editions">' + (g.edition_count || 0) + '개 플랫폼</span>' +
             '<button class="ag-image" data-id="' + g.id + '" data-title="' + escapeHtml(g.title) + '" data-url="' + escapeHtml(g.image_url || '') + '" title="대표 이미지 변경">🖼️</button>' +
             '<button class="ag-delete" data-id="' + g.id + '" data-title="' + escapeHtml(g.title) + '" title="삭제">−</button>' +
             '</li>'
-        )
+          )
+        })
         .join('')
 
       const selAll = $('selectAllGames')
@@ -463,6 +495,7 @@
       return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
     }
 
+    // [2026-07-10] CSV 내보내기도 6칸(정책 포함)으로 확장
     function toCsv(text) {
       const esc = (s) => '"' + String(s || '').replace(/"/g, '""') + '"'
       const rows = String(text || '')
@@ -477,9 +510,10 @@
             esc(parts[2] || ''), // 이미지URL
             esc(parts[3] || ''), // keywords
             esc(parts[4] || ''), // exclude
+            esc(parts[5] || ''), // 정책
           ].join(',')
         })
-      return ['대표이름,검색어,이미지URL,keywords,exclude'].concat(rows).join('\r\n')
+      return ['대표이름,검색어,이미지URL,keywords,exclude,정책'].concat(rows).join('\r\n')
     }
 
     btn.addEventListener('click', async function () {
@@ -514,14 +548,15 @@
     }
   })()
 
-   // 붙여넣기 텍스트 → { groups, images, keywords, excludes } 로 파싱
-  // 형식: 대표이름 | 검색어 | 이미지URL | keywords | exclude_keywords
+   // 붙여넣기 텍스트 → { groups, images, keywords, excludes, policies } 로 파싱
+  // [2026-07-10] 형식: 대표이름 | 검색어 | 이미지URL | keywords | exclude | 정책(s2/s1/공란)
   function parsePasteText(text) {
     const lines = String(text || '').split('\n')
     const groups = []
     const images = {}
     const keywords = {}
     const excludes = {}
+    const policies = {}
 
     lines.forEach(function (line) {
       const raw = line.trim()
@@ -534,6 +569,9 @@
       const imgUrl = parts[2] || ''
       const kw = parts[3] || ''
       const exkw = parts[4] || ''
+      // [2026-07-10] 6번째 칸 = 스위치 정책. 소문자 정규화, s1/s2만 인정.
+      var polRaw = (parts[5] || '').toLowerCase()
+      var pol = (polRaw === 's1' || polRaw === 's2') ? polRaw : ''
 
       let searchTerms = searchRaw
         .split(',')
@@ -541,15 +579,15 @@
         .filter(Boolean)
       if (searchTerms.length === 0) searchTerms = [name]
 
-      // [2026-07-10] groups에 keywords 포함 — 미리보기·재등록 모두 keyword 필터 적용되도록 수정.
-      //   (기존: keywords가 groups에 빠져 있어 필터가 전혀 안 먹었음)
-      groups.push({ name: name, aliases: searchTerms, keywords: kw, exclude: exkw })
+      // [2026-07-10] groups에 keywords·switchPolicy 포함 — 미리보기·재등록 모두 반영되도록.
+      groups.push({ name: name, aliases: searchTerms, keywords: kw, exclude: exkw, switchPolicy: pol })
       if (imgUrl) images[name] = imgUrl
       if (kw) keywords[name] = kw
       if (exkw) excludes[name] = exkw
+      if (pol) policies[name] = pol
     })
 
-    return { groups: groups, images: images, keywords: keywords, excludes: excludes }
+    return { groups: groups, images: images, keywords: keywords, excludes: excludes, policies: policies }
   }
 
 
