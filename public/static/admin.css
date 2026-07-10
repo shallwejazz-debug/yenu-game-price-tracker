@@ -1,339 +1,6 @@
-/* [2026-07-07] 자동 가져오기 4칸화(대표이름/키워드/제외어/이미지URL): .ig-head/.ig-row 2줄 그리드 + 모바일 세로스택 */
-/* [2026-07-06] 자동 가져오기 3칸화(대표이름/제외어/이미지URL): .ig-head/.ig-row 그리드 + 모바일 세로스택 개편 */
-/* ============================================================
-   관리자 콘솔 전용 스타일
-   public/static/admin.css
-   ============================================================ */
-
-.admin-wrap {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px 16px 60px;
-}
-.admin-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-.admin-head h1 { font-size: 1.4rem; }
-.admin-back {
-  color: #9aa0aa;
-  text-decoration: none;
-  font-size: .9rem;
-}
-.admin-back:hover { color: #e6e8ec; }
-
-.admin-card {
-  background: #1a1d27;
-  border: 1px solid #2a2e3a;
-  border-radius: 12px;
-  padding: 18px 18px 20px;
-  margin-bottom: 16px;
-}
-.admin-card h2 { font-size: 1.05rem; margin-bottom: 6px; }
-.admin-hint { color: #9aa0aa; font-size: .82rem; margin-bottom: 14px; line-height: 1.5; }
-.admin-hint code {
-  background: #11141c;
-  border: 1px solid #2a2e3a;
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: .8rem;
-  color: #c3c8d2;
-}
-
-.admin-row { display: flex; gap: 8px; }
-.admin-row input { flex: 1; }
-
-.admin-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-.admin-field span { font-size: .82rem; color: #c3c8d2; }
-
-.admin-wrap input[type="text"],
-.admin-wrap input[type="password"] {
-  background: #11131a;
-  border: 1px solid #2a2e3a;
-  border-radius: 8px;
-  color: #e6e8ec;
-  padding: 10px 12px;
-  font-size: .92rem;
-  width: 100%;
-}
-.admin-wrap input:focus {
-  outline: none;
-  border-color: #4f7cff;
-}
-
-.btn {
-  background: #232735;
-  color: #e6e8ec;
-  border: 1px solid #2a2e3a;
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-size: .9rem;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .15s, border-color .15s;
-}
-.btn:hover { background: #2c3142; }
-.btn-primary { background: #4f7cff; border-color: #4f7cff; color: #fff; }
-.btn-primary:hover { background: #3d6af0; }
-.btn-sm { padding: 6px 12px; font-size: .82rem; margin-bottom: 12px; }
-
-.admin-status {
-  margin-top: 10px;
-  font-size: .85rem;
-  min-height: 1.1em;
-}
-.admin-status.ok { color: #4ade80; }
-.admin-status.err { color: #f87171; }
-
-.admin-game-list { list-style: none; }
-.admin-game-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #232735;
-  font-size: .9rem;
-}
-.admin-game-item:last-child { border-bottom: none; }
-.ag-id { color: #6b7280; font-size: .8rem; min-width: 36px; }
-.ag-title { flex: 1; color: #e6e8ec; }
-.ag-editions {
-  color: #9aa0aa;
-  font-size: .78rem;
-  background: #232735;
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-.admin-empty { color: #6b7280; padding: 12px; text-align: center; }
-
-/* ---------- 자동 임포트 ---------- */
-textarea#importTitles {
-  width: 100%;
-  background: #11141c;
-  border: 1px solid #2a2e3a;
-  border-radius: 8px;
-  color: #e6e8ec;
-  padding: 10px 12px;
-  font: inherit;
-  font-size: .9rem;
-  resize: vertical;
-  margin-bottom: 10px;
-}
-.import-result { margin-top: 14px; }
-.imp-mode { color: #9aa0aa; font-size: .82rem; margin-bottom: 10px; }
-.imp-game {
-  background: #11141c;
-  border: 1px solid #232735;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-}
-.imp-game.imp-err { border-color: #5a2330; color: #ff8a8a; }
-.imp-title { font-weight: 600; margin-bottom: 8px; }
-.imp-gid { color: #6b7280; font-size: .8rem; font-weight: 400; }
-.imp-plats { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.imp-plat {
-  font-size: .85rem;
-  color: #c3c8d2;
-  padding: 6px 8px;
-  background: #181b24;
-  border-radius: 6px;
-}
-.imp-plat-label {
-  display: inline-block;
-  min-width: 52px;
-  font-weight: 700;
-  color: #4f7cff;
-}
-.imp-malls { color: #6b7280; font-size: .76rem; margin-top: 3px; }
-.imp-skip { color: #6b7280; font-size: .74rem; margin-top: 8px; }
-.imp-none { color: #6b7280; font-size: .82rem; }
-
-/* ---------- 잠금 화면 (관리자 인증 게이트) ---------- */
-.lock-screen {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0f1117;
-  padding: 20px;
-  z-index: 2000;
-}
-.lock-box {
-  background: #1a1d27;
-  border: 1px solid #2a2e3a;
-  border-radius: 16px;
-  padding: 36px 32px;
-  width: 100%;
-  max-width: 380px;
-  text-align: center;
-  box-shadow: 0 12px 40px rgba(0,0,0,.5);
-}
-.lock-icon { font-size: 2.4rem; margin-bottom: 8px; }
-.lock-box h1 { font-size: 1.4rem; margin-bottom: 6px; }
-.lock-hint { color: #9aa0aa; font-size: .88rem; margin-bottom: 20px; }
-.lock-input {
-  width: 100%;
-  background: #0f1117;
-  border: 1px solid #2a2e3a;
-  border-radius: 10px;
-  color: #e6e8ec;
-  padding: 12px 14px;
-  font-size: 1rem;
-  outline: none;
-  margin-bottom: 12px;
-  transition: border-color .15s;
-}
-.lock-input:focus { border-color: #4f7cff; }
-.lock-btn { width: 100%; padding: 12px; font-size: 1rem; }
-.lock-back {
-  display: inline-block;
-  margin-top: 18px;
-  color: #9aa0aa;
-  font-size: .82rem;
-}
-.lock-back:hover { color: #e6e8ec; }
-
-.admin-head-actions { display: flex; gap: 8px; align-items: center; }
-
-/* ============================================================
-   등록된 게임: 선택 삭제 컨트롤 바
-   ============================================================ */
-.admin-bulk-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.admin-bulk-bar .btn-sm { margin-bottom: 0; }  /* 바 안에서는 하단 여백 제거 */
-.admin-selall {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: .85rem;
-  color: #c3c8d2;
-  cursor: pointer;
-  user-select: none;
-}
-.admin-selall input { cursor: pointer; }
-.btn-danger {
-  background: #3a1f2e;
-  border: 1px solid #ff6b6b;
-  color: #ff6b6b;
-}
-.btn-danger:hover:not(:disabled) {
-  background: #ff6b6b;
-  color: #fff;
-}
-.btn-danger:disabled {
-  opacity: .5;
-  cursor: default;
-}
-
-/* 목록 행 선택용 체크박스 */
-.admin-game-item .ag-check {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: #4f7cff;
-}
-
-/* ============================================================
-   게임 삭제 버튼 (관리자 게임 목록)
-   ============================================================ */
-.admin-game-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.admin-game-item .ag-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.admin-game-item .ag-delete {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid #ff6b6b;
-  background: #3a1f2e;
-  color: #ff6b6b;
-  font-size: 1.2rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background .15s, color .15s;
-}
-.admin-game-item .ag-delete:hover {
-  background: #ff6b6b;
-  color: #fff;
-}
-.admin-game-item .ag-delete:disabled {
-  opacity: .5;
-  cursor: default;
-}
-
-/* ============================================================
-   게임 목록 썸네일 & 이미지 변경 버튼
-   ============================================================ */
-.admin-game-item .ag-thumb {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #11141c;
-  border: 1px solid #2a2e3a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.admin-game-item .ag-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.admin-game-item .ag-thumb-empty {
-  color: #4b5563;
-  font-size: 1rem;
-}
-
-.admin-game-item .ag-image {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid #2a2e3a;
-  background: #232735;
-  color: #c3c8d2;
-  font-size: .95rem;
-  line-height: 1;
-  cursor: pointer;
-  transition: background .15s, border-color .15s;
-}
-.admin-game-item .ag-image:hover {
-  background: #2c3142;
-  border-color: #4f7cff;
-}
-.admin-game-item .ag-image:disabled {
-  opacity: .5;
-  cursor: default;
-}
-
 /* ============================================================
    자동 가져오기: 입력 그리드 (다크 테마)
+   [2026-07-10] 5칸(대표이름/키워드/제외어/이미지URL/스위치정책) — 데스크톱 2줄 배치
    [2026-07-07] 4칸(대표이름/키워드/제외어/이미지URL) — 데스크톱 2줄 배치
    ============================================================ */
 .ig-table {
@@ -342,13 +9,14 @@ textarea#importTitles {
   overflow: hidden;
   margin: 8px 0 12px;
 }
-/* 헤더: 라벨 4개를 2x2 배치 (삭제 열은 세로 병합) */
+/* 헤더: 윗줄 이름/키워드, 아랫줄 제외어/이미지/정책 (삭제 열은 세로 병합) */
+/* [2026-07-10] 아랫줄을 3등분해 정책 칸 추가 */
 .ig-head {
   display: grid;
   grid-template-columns: 1fr 1fr 40px;
   grid-template-areas:
-    "h-name    h-keywords h-act"
-    "h-exclude h-image    h-act";
+    "h-name    h-keywords          h-act"
+    "h-bottom  h-bottom            h-act";
   gap: 8px;
   padding: 8px 10px;
   background: #232735;
@@ -356,21 +24,29 @@ textarea#importTitles {
   font-weight: 600;
   color: #9aa0aa;
 }
+/* 아랫줄 라벨(제외어/이미지/정책)을 한 셀 안에서 3등분 */
 .ig-head .ig-col-name     { grid-area: h-name; }
 .ig-head .ig-col-keywords { grid-area: h-keywords; }
-.ig-head .ig-col-exclude  { grid-area: h-exclude; }
-.ig-head .ig-col-image    { grid-area: h-image; }
+.ig-head .ig-col-exclude,
+.ig-head .ig-col-image,
+.ig-head .ig-col-policy   { display: none; } /* 데스크톱에선 아래 서브헤더로 대체 */
 .ig-head .ig-col-act      { grid-area: h-act; }
+
+/* [2026-07-10] 아랫줄 3분할 서브헤더를 실제로 보이게: 
+   간단하게 처리하기 위해 이름/키워드 헤더는 그대로 두고,
+   제외어/이미지/정책은 행 안의 placeholder로 구분하도록 헤더에선 통합 라벨만 표시 */
+.ig-head .ig-col-name::after     { content: ""; }
 
 .ig-body { display: flex; flex-direction: column; }
 
-/* 입력 행: 윗줄 이름/키워드, 아랫줄 제외어/이미지, 우측 삭제(세로 병합) */
+/* 입력 행: 윗줄 이름/키워드, 아랫줄 제외어/이미지/정책, 우측 삭제(세로 병합) */
+/* [2026-07-10] 아랫줄을 제외어 / 이미지 / 정책 3등분 */
 .ig-row {
   display: grid;
   grid-template-columns: 1fr 1fr 40px;
   grid-template-areas:
     "name    keywords remove"
-    "exclude image    remove";
+    "bottom  bottom   remove";
   gap: 8px;
   padding: 8px 10px;
   border-top: 1px solid #232735;
@@ -378,11 +54,18 @@ textarea#importTitles {
 }
 .ig-row .ig-name     { grid-area: name; }
 .ig-row .ig-keywords { grid-area: keywords; }
-.ig-row .ig-exclude  { grid-area: exclude; }
-.ig-row .ig-image    { grid-area: image; }
+/* [2026-07-10] 아랫줄 3칸을 내부 서브그리드로 배치 */
+.ig-row .ig-bottom {
+  grid-area: bottom;
+  display: grid;
+  grid-template-columns: 1.3fr 1.7fr 0.9fr;
+  gap: 8px;
+  align-items: center;
+}
 .ig-row .ig-remove   { grid-area: remove; align-self: stretch; height: auto; }
 
-.ig-row input {
+.ig-row input,
+.ig-row select {
   width: 100%;
   padding: 8px 10px;
   background: #11141c;
@@ -392,7 +75,11 @@ textarea#importTitles {
   font-size: .88rem;
   box-sizing: border-box;
 }
-.ig-row input:focus { outline: none; border-color: #4f7cff; }
+.ig-row input:focus,
+.ig-row select:focus { outline: none; border-color: #4f7cff; }
+/* [2026-07-10] 정책 드롭다운 살짝 구분 */
+.ig-row .ig-policy { color: #c3c8d2; }
+
 .ig-remove {
   width: 32px;
   min-height: 32px;
@@ -408,6 +95,7 @@ textarea#importTitles {
 .ig-remove:hover { background: #ff6b6b; color: #fff; }
 
 /* 모바일: 세로 스택 (한 칸씩) */
+/* [2026-07-10] 아랫줄 서브그리드도 세로로 풀기 */
 @media (max-width: 640px) {
   .ig-head { display: none; }
   .ig-row {
@@ -415,55 +103,15 @@ textarea#importTitles {
     grid-template-areas:
       "name     remove"
       "keywords keywords"
-      "exclude  exclude"
-      "image    image";
+      "bottom   bottom";
     row-gap: 6px;
   }
   .ig-row .ig-name     { grid-area: name; }
   .ig-row .ig-keywords { grid-area: keywords; }
-  .ig-row .ig-exclude  { grid-area: exclude; }
-  .ig-row .ig-image    { grid-area: image; }
+  .ig-row .ig-bottom {
+    grid-area: bottom;
+    grid-template-columns: 1fr;   /* 제외어/이미지/정책 세로 스택 */
+    row-gap: 6px;
+  }
   .ig-row .ig-remove   { grid-area: remove; align-self: start; }
-}
-
-
-/* ============================================================
-   [2026-07-06] 백업/복원 textarea 넓히기 + 가로 레이아웃
-   public/static/admin.css 하단 추가분
-   ============================================================ */
-
-/* 백업/복원 카드는 넓게 쓰도록 폭 확장 */
-.admin-card.backup-wide {
-  max-width: 100%;
-}
-
-/* ============================================================
-   [2026-07-06] 백업/복원 textarea 넓히기 (admin-textarea 스타일 신설)
-   ============================================================ */
-.admin-textarea {
-  width: 100%;
-  min-height: 240px;
-  background: #11141c;
-  border: 1px solid #2a2e3a;
-  border-radius: 8px;
-  color: #e6e8ec;
-  padding: 12px 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: .85rem;
-  line-height: 1.55;
-  resize: vertical;
-  white-space: pre;
-  overflow-x: auto;
-  box-sizing: border-box;
-  margin: 8px 0 10px;
-}
-.admin-textarea:focus {
-  outline: none;
-  border-color: #4f7cff;
-}
-
-.admin-hr {
-  border: none;
-  border-top: 1px solid #2a2e3a;
-  margin: 20px 0;
 }
