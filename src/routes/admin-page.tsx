@@ -1,3 +1,6 @@
+// [2026-07-10] 자동 가져오기 UI에 "스위치 정책" 드롭다운 추가(4칸→5칸)
+//   - 대표이름 | 키워드 | 제외어 | 이미지URL | 스위치정책(자동/s2/s1)
+//   - 백업/복원 양식을 6칸으로 안내: 이름 | 검색어 | 이미지 | keywords | exclude | 정책
 // [2026-07-06] 자동 가져오기 UI 3칸화(대표이름/제외어/이미지URL), 별칭 입력 폐지 · 힌트 문구 정리
 // ============================================================
 // 관리자 콘솔 HTML 페이지
@@ -62,7 +65,12 @@ export function AdminPage(): string {
           한 행이 하나의 게임입니다. <b>대표 이름</b>으로 네이버를 검색해 플랫폼별 최저가를 자동 수집합니다.<br />
           <b>키워드</b>는 시리즈/스핀오프에서 특정 작품만 남길 때 씁니다. 제목에 <b>모두 포함</b>돼야 통과(예: 할로우 나이트 실크송에서 <code>실크송</code>).<br />
           <b>제외어</b>는 파생판/스핀오프를 걸러낼 때만 씁니다 (쉼표로 여러 개). 예) 엘든링에서 <code>나이트레인,nightreign</code> 제외.<br />
-          <b>이미지URL</b>은 비우면 자동 수집, 넣으면 그 이미지를 대표로 씁니다.
+          <b>이미지URL</b>은 비우면 자동 수집, 넣으면 그 이미지를 대표로 씁니다.<br />
+          <!-- [2026-07-10] 스위치 정책 설명 추가 -->
+          <b>스위치 정책</b>은 스위치2 전용 게임을 처리할 때 씁니다.
+          <code>자동</code>은 판매자 표기대로 분류(젤다·포켓몬처럼 스위치1·2 둘 다 파는 게임),
+          <code>스위치2 전용</code>은 "SWITCH"로만 적힌 상품도 스위치2로 몰아넣고 스위치1 칸을 만들지 않습니다(007·커비 등).
+          스위치 게임이 아니면 <code>자동</code>으로 두세요.
         </p>
 
 
@@ -72,6 +80,8 @@ export function AdminPage(): string {
           <span class="ig-col-keywords">키워드 (포함, 쉼표)</span>
           <span class="ig-col-exclude">제외어 (쉼표, 없으면 비움)</span>
           <span class="ig-col-image">이미지URL (없으면 자동)</span>
+          <!-- [2026-07-10] 스위치 정책 컬럼 헤더 추가 -->
+          <span class="ig-col-policy">스위치 정책</span>
           <span class="ig-col-act"></span>
         </div>
 
@@ -106,10 +116,12 @@ export function AdminPage(): string {
     <!-- ============ 백업 / 복원 ============ -->
     <section class="admin-card">
       <h2>💾 백업 / 복원</h2>
+      <!-- [2026-07-10] 6칸 양식 안내 -->
       <p class="admin-hint">
-        현재 등록된 게임을 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어</b> 형식으로 내보냅니다.
+        현재 등록된 게임을 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어 | 스위치정책</b> 형식으로 내보냅니다.
         이 텍스트를 저장해두면, 나중에 아래 붙여넣기 창으로 그대로 재등록할 수 있습니다.
-        (가격은 재등록 시 최신값으로 새로 수집됩니다.)
+        (가격은 재등록 시 최신값으로 새로 수집됩니다.)<br />
+        맨 끝 <b>스위치정책</b> 칸은 스위치2 전용 게임이면 <code>s2</code>, 그 외에는 비웁니다.
       </p>
 
       <div class="admin-row">
@@ -124,13 +136,15 @@ export function AdminPage(): string {
 
       <hr class="admin-hr" />
 
+      <!-- [2026-07-10] 6칸 양식 안내 + 예시 갱신 -->
       <p class="admin-hint">
-        아래 창에 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어</b> 형식으로 한 줄에 한 게임씩 붙여넣으세요.<br />
-        (검색어·이미지·keywords·제외어는 모두 생략 가능. 검색어 생략 시 대표이름으로 검색.
-        keywords는 시리즈물 구분용 필수조각 예:<code>용과같이,2</code>, 제외어는 예:<code>나이트레인</code>)
+        아래 창에 <b>대표이름 | 검색어 | 이미지URL | keywords | 제외어 | 스위치정책</b> 형식으로 한 줄에 한 게임씩 붙여넣으세요.<br />
+        (검색어·이미지·keywords·제외어·정책은 모두 생략 가능. 검색어 생략 시 대표이름으로 검색.
+        keywords는 시리즈물 구분용 필수조각 예:<code>용과같이,2</code>, 제외어는 예:<code>나이트레인</code>,
+        스위치2 전용이면 맨 끝에 <code>s2</code>)
       </p>
       <textarea id="importPasteArea" class="admin-textarea" rows="8"
-        placeholder="예)&#10;용과 같이 2 | 용과 같이 2 | https://.../img.jpg | 용과같이,2 | &#10;엘든링 | 엘든링 | | | 나이트레인"></textarea>
+        placeholder="예)&#10;용과 같이 2 | 용과 같이 2 | https://.../img.jpg | 용과같이,2 | | &#10;엘든링 | 엘든링 | | | 나이트레인 | &#10;007 퍼스트라이트 | | https://.../img.jpg | | | s2"></textarea>
       <div class="admin-row">
         <button id="pastePreviewBtn" class="btn">🔍 붙여넣기 미리보기</button>
         <button id="pasteImportBtn" class="btn btn-primary">⬇️ 붙여넣기로 재등록 (실제 저장)</button>
