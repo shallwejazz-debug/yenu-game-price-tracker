@@ -514,7 +514,7 @@
     }
   })()
 
-  // 붙여넣기 텍스트 → { groups, images, keywords, excludes } 로 파싱
+   // 붙여넣기 텍스트 → { groups, images, keywords, excludes } 로 파싱
   // 형식: 대표이름 | 검색어 | 이미지URL | keywords | exclude_keywords
   function parsePasteText(text) {
     const lines = String(text || '').split('\n')
@@ -541,7 +541,9 @@
         .filter(Boolean)
       if (searchTerms.length === 0) searchTerms = [name]
 
-      groups.push({ name: name, aliases: searchTerms, exclude: exkw })
+      // [2026-07-10] groups에 keywords 포함 — 미리보기·재등록 모두 keyword 필터 적용되도록 수정.
+      //   (기존: keywords가 groups에 빠져 있어 필터가 전혀 안 먹었음)
+      groups.push({ name: name, aliases: searchTerms, keywords: kw, exclude: exkw })
       if (imgUrl) images[name] = imgUrl
       if (kw) keywords[name] = kw
       if (exkw) excludes[name] = exkw
@@ -549,6 +551,7 @@
 
     return { groups: groups, images: images, keywords: keywords, excludes: excludes }
   }
+
 
   // ---------- 붙여넣기 미리보기 (게임 1개씩 순차 호출) ----------
   ;(function () {
