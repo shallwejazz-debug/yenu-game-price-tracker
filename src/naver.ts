@@ -1,3 +1,7 @@
+// [2026-07-11] rejected 배열 추가:
+//   - ClassifyResult에 rejected 필드 추가(탈락 상품의 몰/제목/category3·4/사유/플랫폼/가격 기록, 최대 40개).
+//   - searchAndClassify 상품 루프의 각 탈락 지점에서 rej()로 사유와 함께 기록.
+//   - 목적: 롯데ON 등 특정 몰이 어느 필터에서 걸리는지, 마인즈아이 등 신작의 category3 값 확인용.
 // [2026-07-10] switch_policy 지원 추가:
 //   - searchAndClassify에 switchPolicy 파라미터(null|'auto'|'s2'|'s1') 추가.
 //   - s2 = 스위치2 전용 게임인데 판매자가 "SWITCH"로만 표기한 상품을 switch2로 승격.
@@ -214,7 +218,8 @@ export function detectPlatform(title: string): string | null {
 }
 
 export interface PlatformBucket { platform:string; prices:CleanedPrice[]; count:number; lowest:number|null; }
-export interface ClassifyResult { buckets:PlatformBucket[]; skipped:{notGameTitle:number;blacklisted:number;used:number;catalog:number;outOfRange:number;noPlatform:number;excluded:number;}; totalItems:number; }
+export interface RejectedItem { reason:string; title:string; mall:string; category3:string; category4:string; platform:string|null; price:number; }
+export interface ClassifyResult { buckets:PlatformBucket[]; skipped:{notGameTitle:number;blacklisted:number;used:number;catalog:number;outOfRange:number;noPlatform:number;excluded:number;}; totalItems:number; rejected:RejectedItem[]; }
 
 export async function searchAndClassify(
   clientId: string,
@@ -241,7 +246,7 @@ export async function searchAndClassify(
     targetPlatform = 'switch';
   }
 
-  // 제외 키워드 정규화용: 상품명에서 제외어가 몇 개나 걸렸는지 카운트하기 위해 미리 준비
+  // 제외 키워드 정규화용
   const normExcludes = excludeKeywords.map(k => k.toLowerCase().replace(/\s+/g, '')).filter(k => k.length > 0);
 
   // exclude=used:rental:cbshop → 중고/렌탈/해외직구·구매대행을 네이버 단에서 원천 제외
@@ -249,36 +254,44 @@ export async function searchAndClassify(
   const res=await fetch(url,{headers:{'X-Naver-Client-Id':clientId,'X-Naver-Client-Secret':clientSecret}});
   if (!res.ok) { const txt=await res.text(); throw new Error(`네이버 API 오류 (${res.status}): ${txt}`); }
   const data=await res.json() as NaverShopResponse;
+
   const skipped={notGameTitle:0,blacklisted:0,used:0,catalog:0,outOfRange:0,noPlatform:0,excluded:0};
+  // [2026-07-11] 탈락 상품 상세 기록 (몰/제목/카테고리/사유/플랫폼/가격), 최대 40개
+  const rejected:RejectedItem[]=[];
+  const rej=(reason:string,item:NaverShopItem,title:string,platform:string|null)=>{
+    if (rejected.length<40) rejected.push({
+      reason, title, mall:item.mallName,
+      category3:item.category3||'', category4:item.category4||'',
+      platform, price:parseInt(item.lprice,10)||0
+    });
+  };
+
   const byPlatform=new Map<string,CleanedPrice[]>();
   for (const item of data.items) {
     const title=stripTags(item.title);
 
-    // 제외 키워드 우선 검사 (디버깅용 카운트 분리)
+    // 제외 키워드 우선 검사
     if (normExcludes.length > 0) {
       const normTitle = title.toLowerCase().replace(/\s+/g, '');
-      if (normExcludes.some(nk => normTitle.includes(nk))) { skipped.excluded++; continue; }
+      if (normExcludes.some(nk => normTitle.includes(nk))) { skipped.excluded++; rej('excluded',item,title,null); continue; }
     }
 
-    if (!isLikelyGameTitle(item,keywords,excludeKeywords)) {skipped.notGameTitle++; continue;}
-    if (isBlacklisted(title)) {skipped.blacklisted++; continue;}
-    if (isCatalogProduct(item)) {skipped.catalog++; continue;}
-    if (isUsedItem(title)) {skipped.used++; continue;}
-    if (isBlockedMall(item.mallName)) {skipped.used++; continue;}
+    if (!isLikelyGameTitle(item,keywords,excludeKeywords)) {skipped.notGameTitle++; rej('notGameTitle',item,title,null); continue;}
+    if (isBlacklisted(title)) {skipped.blacklisted++; rej('blacklisted',item,title,null); continue;}
+    if (isCatalogProduct(item)) {skipped.catalog++; rej('catalog',item,title,null); continue;}
+    if (isUsedItem(title)) {skipped.used++; rej('used',item,title,null); continue;}
+    if (isBlockedMall(item.mallName)) {skipped.used++; rej('blockedMall',item,title,null); continue;}
     const price=parseInt(item.lprice,10);
-    if (!isReasonablePrice(price)) {skipped.outOfRange++; continue;}
+    if (!isReasonablePrice(price)) {skipped.outOfRange++; rej('outOfRange',item,title,null); continue;}
     let platform=detectPlatform(title);
-    if (!platform) {skipped.noPlatform++; continue;}
+    if (!platform) {skipped.noPlatform++; rej('noPlatform(none)',item,title,null); continue;}
 
     // [2026-07-10] switch_policy 승격/강등 (스위치 계열만, PS/XBOX/PC는 불변)
-    //   s2: "007 ... SWITCH"처럼 2 표기가 없는 스위치2 전용 상품을 switch2로 승격.
-    //   s1: switch2 표기 상품을 switch로 강등(스위치1 전용 게임인 경우).
     if (forceSwitch2 && platform === 'switch') platform = 'switch2';
     if (forceSwitch1 && platform === 'switch2') platform = 'switch';
 
     // 검색 대상 플랫폼과 상품 실제 플랫폼이 다르면 버림 (교차 오염 방지)
-    // 예: switch로 검색했는데 제목이 "PC Steam 둠"이면 pc로 판정 → 제외
-    if (targetPlatform && platform !== targetPlatform) {skipped.noPlatform++; continue;}
+    if (targetPlatform && platform !== targetPlatform) {skipped.noPlatform++; rej('platformMismatch:'+platform,item,title,platform); continue;}
     const cleaned:CleanedPrice={mallName:mapMallToSource(item.mallName),mallLabel:item.mallName,price,link:item.link,title,image:item.image,isDigital:isDigitalKey(title)?1:0};
     const arr=byPlatform.get(platform)||[]; arr.push(cleaned); byPlatform.set(platform,arr);
   }
@@ -296,5 +309,5 @@ export async function searchAndClassify(
 
   const order=['pc','ps5','ps4','xbox','switch','switch2','etc'];
   buckets.sort((a,b)=>order.indexOf(a.platform)-order.indexOf(b.platform));
-  return {buckets,skipped,totalItems:data.items.length};
+  return {buckets,skipped,totalItems:data.items.length,rejected};
 }
