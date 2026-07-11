@@ -141,6 +141,12 @@ function appendAffiliate(
   const LINKPRICE_M: Record<string, string> = {
     gmarket: 'gmarket',
     auction: 'auction',
+    '11st': '11st',
+    yes24: 'yes24',
+    lotteon: 'lotteon',
+    hmall: 'hmall',
+    himart: 'himart',
+    woori: 'woori', // 롯데홈쇼핑
     // 11번가 승인 후 실제 m 값 확인해서 추가 (예: '11st': '11st')
   }
 
