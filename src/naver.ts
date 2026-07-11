@@ -227,7 +227,7 @@ export async function searchAndClassify(
   query: string,
   keywords: string[] = [],
   excludeKeywords: string[] = [],
-  switchPolicy: string | null = null   // [2026-07-10] null|'auto'|'s2'|'s1'
+  switchPolicy: string | null = null,   // [2026-07-10] null|'auto'|'s2'|'s1'
   startParam: number = 1                // ← 추가: 네이버 start (1, 101, 201...)
 ): Promise<ClassifyResult> {
   // 검색어에 담긴 대상 플랫폼 추출 (예: "둠 다크에이지 switch" → switch)
