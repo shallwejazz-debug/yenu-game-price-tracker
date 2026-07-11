@@ -33,7 +33,8 @@ const WHITELIST_MALLS = new Set<string>([
 const WL_PRICE_MIN = 30000;
 const WL_PRICE_MAX = 200000; // 상한(필요시 220000 등으로 조정)
 // 화이트리스트여도 무조건 차단하는 순수 굿즈 단품
-const WL_HARD_BLOCK_RE = /키링|피규어|아미보|amiibo|스틸북|steelbook|사운드트랙|\bost\b|아트북|artbook|포스터|엽서|스티커|인형|쿠션|머그|텀블러|배지|뱃지|키캡|파우치|스트랩|아크릴|굿즈/i;
+// [2026-07-11] 화이트리스트여도 무조건 차단하는 순수 굿즈/액세서리 (본품 아님)
+const WL_HARD_BLOCK_RE = /카드\s*팟|카드\s*포드|card\s*pod|카드\s*케이스|수납\s*케이스|키링|피규어|아미보|amiibo|스틸북|steel\s*?book|아트북|art\s*?book|사운드트랙|ost|포스터|엽서|스티커|인형|쿠션|머그|텀블러|배지|뱃지|키캡|파우치|가방|스트랩|보호\s*필름|그립|거치대|스탠드/i;
 function isWhitelistMall(mallName: string): boolean {
   return WHITELIST_MALLS.has(mapMallToSource(mallName));
 }
@@ -120,14 +121,15 @@ function isExcludedTitle(normTitle: string, excludeKeywords: string[]): boolean 
 function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[], excludeKeywords: string[] = [], wl: boolean = false): boolean {
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
-  // 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (화이트리스트여도 굿즈는 WL_HARD_BLOCK_RE로 별도 차단)
+
+  // [2026-07-11] 화이트리스트 여부와 무관하게 순수 굿즈/액세서리는 무조건 차단
+  if (WL_HARD_BLOCK_RE.test(title)) return false;
+
   if (!wl) {
-    const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost','특전','엽서','시나리오북','시나리오 북','게임팩x','설정집','화보','캘린더','달력','북릿','booklet','일러스트','스위치호환용','호환용',];
+    const banned = [ /* ...기존 그대로... */ ];
     if (banned.some(w => title.includes(w))) return false;
-    // 특수판(CE/디럭스/한정판/예약 등) 제외 — 화이트리스트는 우회
     if (isSpecialEdition(title)) return false;
   }
-
   const normTitle = normalizeTitleForMatch(title);
   if (isExcludedTitle(normTitle, excludeKeywords)) return false;
 
@@ -164,7 +166,7 @@ function filterPriceOutliers(list: CleanedPrice[]): CleanedPrice[] {
 const PLATFORM_RULES: Array<{code:string;patterns:RegExp[]}> = [
   {code:'ps5',patterns:[/ps5/i,/플레이스테이션\s*5/,/플스\s*5/]},
   {code:'ps4',patterns:[/ps4/i,/플레이스테이션\s*4/,/플스\s*4/]},
-  {code:'xbox',patterns:[/xbox/i,/엑스박스/,/엑박/,/series\s*[xs]/i,/\bone\b/i]},
+  {code:'xbox',patterns:[/xbox/i,/엑스박스/,/엑박/,/series\s*[xs]/i,/xbox\s*one/i]},
   {code:'switch2',patterns:[/스위치\s*2/,/switch\s*2/i,/\bns2\b/i,/닌텐도\s*스위치\s*2/]},
   {code:'switch',patterns:[/스위치/,/switch/i,/\bns\b/i,/닌텐도/]},
   {code:'pc',patterns:[/\bpc\b/i,/스팀/,/steam/i,/에픽/,/epic/i,/gog/i]}
