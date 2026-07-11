@@ -179,7 +179,7 @@ export function detectPlatform(title: string): string | null {
 }
 
 // [2026-07-11] 탈락 상품 상세 기록
-export interface RejectedItem { reason:string; mall:string; title:string; category:string; platform:string|null; price:number; }
+export interface RejectedItem { reason:string; mall:string; title:string; category:string; platform:string|null; price:number; wl:boolean; }
 export interface PlatformBucket { platform:string; prices:CleanedPrice[]; count:number; lowest:number|null; }
 export interface ClassifyResult {
   buckets:PlatformBucket[];
@@ -208,9 +208,9 @@ export async function searchAndClassify(
 
   const skipped={notGameTitle:0,blacklisted:0,used:0,catalog:0,outOfRange:0,noPlatform:0,excluded:0};
   const rejected:RejectedItem[]=[];
-  const rej=(reason:string,item:NaverShopItem,title:string,platform:string|null)=>{
-    if (rejected.length<200) rejected.push({reason,mall:item.mallName,title,category:item.category3||'',platform,price:parseInt(item.lprice,10)||0});
-  };
+const rej=(reason:string,item:NaverShopItem,title:string,platform:string|null,wl:boolean=false)=>{
+  if (rejected.length<200) rejected.push({reason,mall:item.mallName,title,category:item.category3||'',platform,price:parseInt(item.lprice,10)||0,wl});
+};
   const byPlatform=new Map<string,CleanedPrice[]>();
 
   // [2026-07-11] start=1, 101 두 페이지 병합 (롯데ON 등 100위 밖 매물 확보)
@@ -247,7 +247,8 @@ export async function searchAndClassify(
       }
 
       // 굿즈 단품은 화이트리스트여도 무조건 차단
-      if (WL_HARD_BLOCK_RE.test(title)) { skipped.notGameTitle++; rej('goodsBlock',item,title,null); continue; }
+      if (WL_HARD_BLOCK_RE.test(title)) { skipped.notGameTitle++; rej('goodsBlock',item,title,null,wl); continue; }
+      if (!isLikelyGameTitle(item,keywords,excludeKeywords,wl)) { skipped.notGameTitle++; rej('notGameTitle',item,title,null,wl); continue; }
 
       // notGameTitle(특전/예약 등): 화이트리스트 몰은 완화(wl 전달)
       if (!isLikelyGameTitle(item,keywords,excludeKeywords,wl)) { skipped.notGameTitle++; rej('notGameTitle',item,title,null); continue; }
