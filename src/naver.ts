@@ -228,6 +228,7 @@ export async function searchAndClassify(
   keywords: string[] = [],
   excludeKeywords: string[] = [],
   switchPolicy: string | null = null   // [2026-07-10] null|'auto'|'s2'|'s1'
+  startParam: number = 1                // ← 추가: 네이버 start (1, 101, 201...)
 ): Promise<ClassifyResult> {
   // 검색어에 담긴 대상 플랫폼 추출 (예: "둠 다크에이지 switch" → switch)
   let targetPlatform = detectPlatform(query);
@@ -250,7 +251,9 @@ export async function searchAndClassify(
   const normExcludes = excludeKeywords.map(k => k.toLowerCase().replace(/\s+/g, '')).filter(k => k.length > 0);
 
   // exclude=used:rental:cbshop → 중고/렌탈/해외직구·구매대행을 네이버 단에서 원천 제외
-  const url='https://openapi.naver.com/v1/search/shop.json?query=' + encodeURIComponent(query) + '&display=100&sort=sim&exclude=used:rental:cbshop';
+  // exclude=used:rental:cbshop → 중고/렌탈/해외직구·구매대행을 네이버 단에서 원천 제외
+  const safeStart = Math.min(Math.max(startParam, 1), 1000);   // 네이버 start 최대 1000
+  const url='https://openapi.naver.com/v1/search/shop.json?query=' + encodeURIComponent(query) + '&display=100&start=' + safeStart + '&sort=sim&exclude=used:rental:cbshop';
   const res=await fetch(url,{headers:{'X-Naver-Client-Id':clientId,'X-Naver-Client-Secret':clientSecret}});
   if (!res.ok) { const txt=await res.text(); throw new Error(`네이버 API 오류 (${res.status}): ${txt}`); }
   const data=await res.json() as NaverShopResponse;
