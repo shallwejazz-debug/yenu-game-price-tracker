@@ -8,6 +8,7 @@
 // [2026-07-06] 패키지 섹션에 쿠폰·배송비 안내(price-note) 추가
 // [2026-07-08] 역대최저 배지 제거 → 이번 주 최고가 대비 하락률(▼X%)만 표시
 //              + 헤더에 가격 업데이트 시각(KST) 표시
+// [2026-07-14] SEO: 상세 페이지에 게임별 동적 title/description/og 적용
 // ==============================================================
 
 import { Hono } from 'hono'
@@ -425,6 +426,20 @@ games.get('/:gameId/:platform', async (c) => {
   const prices = await getCurrentPrices(c.env.DB, edition.id)
   const history = await getPriceHistory(c.env.DB, edition.id)
 
+  // ── [2026-07-14] SEO: 이 페이지 전용 title/description/og ──────
+  const platformLabel = PLATFORM_LABELS[platform] ?? platform
+  // 이 플랫폼에서 실제로 잡힌 최저가 (디지털+패키지 통틀어)
+  const lowestPrice =
+    prices.length > 0 ? Math.min(...prices.map((p) => p.price)) : null
+
+  const pageTitle = `${game.title} 최저가 · ${platformLabel} 가격비교 | 여누딜`
+  const pageDesc = lowestPrice
+    ? `${game.title} ${platformLabel} 최저 ${won(lowestPrice)}. 쿠팡·G마켓·옥션 등 쇼핑몰별 가격을 비교하세요.`
+    : `${game.title} ${platformLabel} 가격을 쇼핑몰별로 비교하세요. 여누딜에서 최저가 확인.`
+  const ogUrl = `https://yeonudeal.com/games/${gameId}/${platform}`
+  const ogImage = game.image_url || 'https://yeonudeal.com/static/og-image.png'
+  // ──────────────────────────────────────────────────────────────
+
   return c.render(
     <main class="container">
       <a href="/games" class="back-link">← 목록으로</a>
@@ -460,7 +475,8 @@ games.get('/:gameId/:platform', async (c) => {
         ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.
       </p>
 
-    </main>
+    </main>,
+    { title: pageTitle, description: pageDesc, ogUrl, ogImage }
   )
 })
 
