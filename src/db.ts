@@ -296,6 +296,7 @@ export async function insertPrice(
     is_digital?: number
     product_url?: string | null
     mall_label?: string | null
+    title?: string | null        // ← 추가
   }
 ) {
   const currency = data.currency ?? 'KRW'
@@ -303,10 +304,10 @@ export async function insertPrice(
 
   const result = await db
     .prepare(
-      `INSERT INTO prices (edition_id, source, price, currency, is_digital, product_url, mall_label)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO prices (edition_id, source, price, currency, is_digital, product_url, mall_label, title)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(data.edition_id, data.source, data.price, currency, isDigital, data.product_url ?? null, data.mall_label ?? null)
+    .bind(data.edition_id, data.source, data.price, currency, isDigital, data.product_url ?? null, data.mall_label ?? null, data.title ?? null)
     .run()
 
   const existing = await db
