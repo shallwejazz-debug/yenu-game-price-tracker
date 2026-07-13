@@ -1,27 +1,36 @@
 import { jsxRenderer } from 'hono/jsx-renderer'
 
-export const renderer = jsxRenderer(({ children }) => {
+export const renderer = jsxRenderer(({ children, title, description, ogUrl, ogImage }) => {
+  // 기본값(홈/목록 등 title을 안 넘긴 페이지용)
+  const pageTitle = title || '여누딜 - 게임가격트래커'
+  const pageDesc =
+    description || 'PS5, 닌텐도 스위치, Xbox, PC 게임 최저가를 한눈에 비교하는 게임가격트래커'
+  const pageUrl = ogUrl || 'https://yeonudeal.com'
+  const pageImage = ogImage || 'https://yeonudeal.com/static/og-image.png'
+
   return (
     <html lang="ko">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>여누딜 - 게임가격트래커</title>
-        <meta name="description" content="PS5, 닌텐도 스위치, Xbox, PC 게임 최저가를 한눈에 비교하는 게임가격트래커" />
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDesc} />
+
+        {/* 정규 URL (중복 콘텐츠 방지) */}
+        <link rel="canonical" href={pageUrl} />
 
         {/* Open Graph (카카오톡/티스토리/페이스북 등 링크 카드용) */}
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="여누딜" />
-        <meta property="og:title" content="여누딜 - 게임가격트래커" />
-        <meta property="og:description" content="PS5, 닌텐도 스위치, Xbox, PC 게임 최저가를 한눈에 비교" />
-        <meta property="og:url" content="https://yeonudeal.com" />
-        <meta property="og:image" content="https://yeonudeal.com/static/og-image.png" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDesc} />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:image" content={pageImage} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="633" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="여누딜 - 게임가격트래커" />
-        <meta name="twitter:image" content="https://yeonudeal.com/static/og-image.png" />
-
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:image" content={pageImage} />
 
         <link
           rel="icon"
