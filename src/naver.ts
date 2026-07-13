@@ -34,7 +34,7 @@ const WL_PRICE_MIN = 30000;
 const WL_PRICE_MAX = 200000; // 상한(필요시 220000 등으로 조정)
 // 화이트리스트여도 무조건 차단하는 순수 굿즈 단품
 // [2026-07-11] 화이트리스트여도 무조건 차단하는 순수 굿즈/액세서리 (본품 아님)
-const WL_HARD_BLOCK_RE = /카드\s*팟|카드\s*포드|card\s*pod|카드\s*케이스|수납\s*케이스|트래블러|traveler|oval\s*case|조이스틱|엄지\s*스틱|로커\s*커버|교체품|클리너|실리콘|키링|피규어|아미보|amiibo|스틸북|steel\s*?book|아트북|art\s*?book|사운드트랙|ost|포스터|엽서|스티커|인형|쿠션|머그|텀블러|배지|뱃지|키캡|파우치|가방|스트랩|보호\s*필름|그립|거치대|스탠드/i;
+const WL_HARD_BLOCK_RE = /카드\s*팟|카드\s*포드|card\s*pod|카드\s*케이스|수납\s*케이스|게임\s*트래블러|game\s*traveler|oval\s*case|조이스틱|엄지\s*스틱|로커\s*커버|교체품|클리너|실리콘|키링|피규어|아미보|amiibo|스틸북|steel\s*?book|아트북|art\s*?book|사운드트랙|ost|포스터|엽서|스티커|인형|쿠션|머그|텀블러|배지|뱃지|키캡|파우치|가방|스트랩|보호\s*필름|그립|거치대|스탠드/i;
 function isWhitelistMall(mallName: string): boolean {
   return WHITELIST_MALLS.has(mapMallToSource(mallName));
 }
