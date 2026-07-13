@@ -9,6 +9,7 @@
 // [2026-07-08] 역대최저 배지 제거 → 이번 주 최고가 대비 하락률(▼X%)만 표시
 //              + 헤더에 가격 업데이트 시각(KST) 표시
 // [2026-07-14] SEO: 상세 페이지에 게임별 동적 title/description/og 적용
+// [2026-07-14] SEO: 목록/특가 페이지에도 고유 title/description 적용
 // ==============================================================
 
 import { Hono } from 'hono'
@@ -165,7 +166,12 @@ games.get('/deals', async (c) => {
         <br />
         ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.
       </p>
-    </main>
+    </main>,
+    {
+      title: '오늘의 게임 특가 · 최저가 순위 | 여누딜',
+      description: '이번 주 가격이 많이 내린 게임 특가 순위. PS5·스위치·Xbox 게임 최저가를 쇼핑몰별로 비교하세요.',
+      ogUrl: 'https://yeonudeal.com/games/deals',
+    }
   )
 })
 
@@ -184,6 +190,14 @@ games.get('/', async (c) => {
   const lastUpdated = toKstLabel(await getLastUpdated(c.env.DB)) // [2026-07-08]
   const platformCounts = await getPlatformCounts(c.env.DB) // [2026-07-09]
   const totalCount = Object.values(platformCounts).reduce((a, b) => a + b, 0)
+
+  // ── [2026-07-14] SEO: 목록 페이지 title/description ──
+  const platformLabel = PLATFORM_LABELS[platform] ?? platform
+  const listTitle = query
+    ? `'${query}' 검색결과 · 게임 최저가 | 여누딜`
+    : `${platformLabel} 게임 최저가 목록 | 여누딜`
+  const listDesc = `${platformLabel} 게임 최저가를 쇼핑몰별로 비교하세요. 쿠팡·G마켓·옥션 가격을 한눈에 확인.`
+  // ───────────────────────────────────────────────────
 
   return c.render(
     <div class="page">
@@ -287,7 +301,8 @@ games.get('/', async (c) => {
 
         {sidebar}
       </div>
-    </div>
+    </div>,
+    { title: listTitle, description: listDesc, ogUrl: `https://yeonudeal.com/games?platform=${platform}` }
   )
 })
 
