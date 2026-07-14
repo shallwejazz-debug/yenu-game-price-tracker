@@ -58,7 +58,7 @@ export async function searchGamesAllPlatforms(
     }
   >
 > {
-  const q = `%${query.trim().toLowerCase()}%`
+  const q = `%${query.trim()}%`
   const { results } = await db
     .prepare(
       `SELECT g.*,
@@ -72,7 +72,7 @@ export async function searchGamesAllPlatforms(
                  FROM editions e4 WHERE e4.game_id = g.id
                  ORDER BY e4.platform LIMIT 1) AS first_platform
          FROM games g
-        WHERE LOWER(g.title) LIKE ?
+        WHERE g.title LIKE ? COLLATE NOCASE
           AND EXISTS (SELECT 1 FROM editions e WHERE e.game_id = g.id)
         ORDER BY g.created_at DESC`
     )
