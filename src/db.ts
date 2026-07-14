@@ -42,6 +42,45 @@ export async function listGamesByPlatform(
   return (results ?? []) as any
 }
 
+// [2026-07-14] 검색 전용: 플랫폼 무시하고 전체 게임에서 제목 검색.
+//   각 게임이 어떤 플랫폼(에디션)들을 갖는지 platforms 문자열도 함께 반환
+//   → 카드에 플랫폼 뱃지 여러 개 표시용
+export async function searchGamesAllPlatforms(
+  db: D1Database,
+  query: string
+): Promise<
+  Array<
+    Game & {
+      lowest_price: number | null
+      original_price: number | null
+      platforms: string  // 'ps5,switch,xbox' 형태
+      first_platform: string
+    }
+  >
+> {
+  const q = `%${query.trim().toLowerCase()}%`
+  const { results } = await db
+    .prepare(
+      `SELECT g.*,
+              (SELECT MIN(p.price)
+                 FROM prices p
+                 INNER JOIN editions e2 ON e2.id = p.edition_id
+                WHERE e2.game_id = g.id) AS lowest_price,
+              (SELECT GROUP_CONCAT(e3.platform)
+                 FROM editions e3 WHERE e3.game_id = g.id) AS platforms,
+              (SELECT e4.platform
+                 FROM editions e4 WHERE e4.game_id = g.id
+                 ORDER BY e4.platform LIMIT 1) AS first_platform
+         FROM games g
+        WHERE LOWER(g.title) LIKE ?
+          AND EXISTS (SELECT 1 FROM editions e WHERE e.game_id = g.id)
+        ORDER BY g.created_at DESC`
+    )
+    .bind(q)
+    .all()
+  return (results ?? []) as any
+}
+
 export async function insertGame(
   db: D1Database,
   data: {
