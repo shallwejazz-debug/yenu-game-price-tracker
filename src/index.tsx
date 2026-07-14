@@ -46,6 +46,13 @@ app.get('/google8f207302de894f94.html', (c) => {
   })
 })
 
+// 네이버 서치어드바이저 소유권 확인용
+app.get('/naver1030d509d7426f4b64ec79baf14c9da5.html', (c) => {
+  return c.body('naver-site-verification: naver1030d509d7426f4b64ec79baf14c9da5.html', 200, {
+    'Content-Type': 'text/html; charset=utf-8',
+  })
+})
+
 
 // ---------- sitemap.xml ----------
 // 메인 + deals + 모든 게임 상세(/games/:id/:platform) URL을 담아 구글 색인 유도
