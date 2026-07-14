@@ -21,6 +21,7 @@ import {
   getPriceHistory,
   listGamesByPlatform,
   listEditionsByGame,
+  searchGamesAllPlatforms,   // ← 이 줄 추가
   getEditionById,
   getTopDiscounts,
   getLastUpdated,
@@ -179,12 +180,13 @@ games.get('/deals', async (c) => {
 games.get('/', async (c) => {
   const platform = c.req.query('platform') || 'pc'
   const query = (c.req.query('q') || '').trim()
-  let list = await listGamesByPlatform(c.env.DB, platform)
 
-  if (query) {
-    const q = query.toLowerCase()
-    list = list.filter((g) => (g.title || '').toLowerCase().includes(q))
-  }
+  // [2026-07-14] 검색어가 있으면 플랫폼 무시하고 전체에서 검색,
+  //   없으면 기존처럼 현재 탭 플랫폼 목록만 조회
+  const isSearch = query.length > 0
+  const list = isSearch
+    ? await searchGamesAllPlatforms(c.env.DB, query)
+    : await listGamesByPlatform(c.env.DB, platform)
 
   const sidebar = await DiscountSidebar({ db: c.env.DB })
   const lastUpdated = toKstLabel(await getLastUpdated(c.env.DB)) // [2026-07-08]
@@ -193,10 +195,12 @@ games.get('/', async (c) => {
 
   // ── [2026-07-14] SEO: 목록 페이지 title/description ──
   const platformLabel = PLATFORM_LABELS[platform] ?? platform
-  const listTitle = query
+  const listTitle = isSearch
     ? `'${query}' 검색결과 · 게임 최저가 | 여누딜`
     : `${platformLabel} 게임 최저가 목록 | 여누딜`
-  const listDesc = `${platformLabel} 게임 최저가를 쇼핑몰별로 비교하세요. 쿠팡·G마켓·옥션 가격을 한눈에 확인.`
+  const listDesc = isSearch
+    ? `'${query}' 게임 최저가를 쇼핑몰별로 비교하세요. 쿠팡·G마켓·옥션 가격을 한눈에 확인.`
+    : `${platformLabel} 게임 최저가를 쇼핑몰별로 비교하세요. 쿠팡·G마켓·옥션 가격을 한눈에 확인.`
   // ───────────────────────────────────────────────────
 
   return c.render(
@@ -235,28 +239,35 @@ games.get('/', async (c) => {
 
       <div class="layout">
         <main class="main-col">
-          <ConsoleTabs active={platform} />
-
-          {query && (
+          {/* 검색 중일 땐 탭을 '전체 검색' 안내로, 아닐 땐 콘솔 탭 */}
+          {isSearch ? (
             <p class="search-meta">
-              '<strong>{query}</strong>' 검색 결과 {list.length}건
+              '<strong>{query}</strong>' 전체 플랫폼 검색 결과 {list.length}건
               {' '}<a href={`/games?platform=${platform}`} class="search-clear">✕ 검색 해제</a>
             </p>
+          ) : (
+            <ConsoleTabs active={platform} />
           )}
 
           {list.length === 0 ? (
             <p class="no-data">
-              {query
+              {isSearch
                 ? `'${query}'에 해당하는 게임이 없습니다.`
                 : `'${PLATFORM_LABELS[platform] ?? platform}' 플랫폼에 등록된 게임이 없습니다.`}
             </p>
           ) : (
             <ul class="game-grid">
-              {list.map((g) => {
+              {list.map((g: any) => {
                 const rate = discountRate(g.lowest_price ?? Infinity, g.original_price)
+                // 검색 결과면 이 게임이 가진 모든 플랫폼 뱃지, 아니면 현재 탭 하나
+                const platformCodes: string[] = isSearch
+                  ? String(g.platforms || '').split(',').filter(Boolean)
+                  : [platform]
+                // 카드 클릭 시 이동할 곳: 검색이면 게임ID(자동 첫 에디션 리다이렉트), 아니면 현재 플랫폼
+                const detailHref = isSearch ? `/games/${g.id}` : `/games/${g.id}/${platform}`
                 return (
                   <li class="game-card" data-game-id={String(g.id)} data-platform={platform}>
-                       <button
+                    <button
                       type="button"
                       class="game-card-trigger"
                       aria-expanded="false"
@@ -272,7 +283,11 @@ games.get('/', async (c) => {
                         )}
                       </div>
                       <div class="game-card-body">
-                        <span class="platform-badge">{PLATFORM_LABELS[platform] ?? platform}</span>
+                        <div class="platform-badges">
+                          {platformCodes.map((code) => (
+                            <span class="platform-badge">{PLATFORM_LABELS[code] ?? code}</span>
+                          ))}
+                        </div>
                         <h3>{g.title}</h3>
                         <p class="game-price">
                           {g.lowest_price ? (
@@ -289,8 +304,8 @@ games.get('/', async (c) => {
                     </button>
 
                     {/* [2026-07-09] 크롤러용 상세 페이지 링크 (SEO: 내부링크 확보) */}
-                    <a class="game-card-permalink" href={`/games/${g.id}/${platform}`}>
-                      {g.title} {PLATFORM_LABELS[platform] ?? platform} 최저가 상세 보기
+                    <a class="game-card-permalink" href={detailHref}>
+                      {g.title} 최저가 상세 보기
                     </a>
                   </li>
                 )
@@ -305,6 +320,7 @@ games.get('/', async (c) => {
     { title: listTitle, description: listDesc, ogUrl: `https://yeonudeal.com/games?platform=${platform}` }
   )
 })
+
 
 // ---------- 가격 표시 컴포넌트 ----------
 function PriceRow({ p, original, lowest }: { p: Price; original: number | null; lowest: number | null }) {
