@@ -32,6 +32,13 @@ import { AdminPage } from './admin-page'
 
 const admin = new Hono<{ Bindings: Bindings }>()
 
+function parseKeywordList(value?: string | null): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 // ---------- 관리자 콘솔 HTML (인증 없이 페이지는 보여주고, API 호출 시 토큰 검사) ----------
 admin.get('/', (c) => {
   return c.html(AdminPage())
@@ -106,6 +113,7 @@ admin.post('/games/:id/editions', async (c) => {
       edition_name: body.edition_name ?? null,
       search_query: body.search_query ?? null,
       keywords: body.keywords ?? null,
+      exclude_keywords: body.exclude_keywords ?? null,
       steam_appid: body.steam_appid ?? null,
     })
     return c.json({
@@ -131,7 +139,7 @@ admin.patch('/editions/:id', async (c) => {
   }
   const fields: string[] = []
   const values: any[] = []
-  for (const key of ['platform', 'edition_name', 'search_query', 'keywords', 'steam_appid']) {
+  for (const key of ['platform', 'edition_name', 'search_query', 'keywords', 'exclude_keywords', 'steam_appid']) {
     if (body[key] !== undefined) {
       fields.push(`${key} = ?`)
       values.push(body[key])
@@ -194,9 +202,8 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
     return c.json({ ok: false, error: '이 에디션에 search_query 가 설정되지 않았습니다.' }, 400)
   }
 
-  const keywords = edition.keywords
-    ? edition.keywords.split(',').map((k) => k.trim()).filter(Boolean)
-    : []
+  const keywords = parseKeywordList(edition.keywords)
+  const excludeKeywords = parseKeywordList(edition.exclude_keywords)
 
   try {
     // [2026-07-10] 이 게임의 switch_policy를 조회해 승격에 반영
@@ -206,7 +213,14 @@ admin.post('/editions/:id/fetch-prices', async (c) => {
       .first<{ switch_policy: string | null }>()
     const switchPolicy = gameRow?.switch_policy ?? null
 
-    const classified = await searchAndClassify(clientId, clientSecret, edition.search_query, keywords, [], switchPolicy)
+    const classified = await searchAndClassify(
+      clientId,
+      clientSecret,
+      edition.search_query,
+      keywords,
+      excludeKeywords,
+      switchPolicy
+    )
 
     // [2026-07-10] s2 게임의 switch 에디션이면 승격된 switch2 버킷을 참조
     let targetBucketPlatform = edition.platform

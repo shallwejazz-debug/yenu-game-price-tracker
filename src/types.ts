@@ -33,6 +33,7 @@ export interface Edition {
   edition_name: string | null
   search_query: string | null
   keywords: string | null
+  exclude_keywords: string | null
   steam_appid: number | null
   created_at: string
 }
