@@ -1,3 +1,4 @@
+// [2026-07-15] banned 배열 복원 / 중복 isLikelyGameTitle 제거 / WL_HARD_BLOCK_RE·로마자정규화·xbox 최신 유지
 // [2026-07-10] switch_policy 지원 / [2026-07-07] 로마자 정규화 / [2026-07-11] rejected·start·화이트리스트
 // =============================================================
 // 네이버 쇼핑 API 연동 모듈  src/naver.ts
@@ -32,14 +33,13 @@ const WHITELIST_MALLS = new Set<string>([
 ]);
 const WL_PRICE_MIN = 30000;
 const WL_PRICE_MAX = 200000; // 상한(필요시 220000 등으로 조정)
-// 화이트리스트여도 무조건 차단하는 순수 굿즈 단품
-// [2026-07-11] 화이트리스트여도 무조건 차단하는 순수 굿즈/액세서리 (본품 아님)
+// [2026-07-11] 화이트리스트여도 무조건 차단하는 순수 굿즈/액세서리 (본품 아님) — 최신 강화판 유지
 const WL_HARD_BLOCK_RE = /카드\s*팟|카드\s*포드|card\s*pod|카드\s*케이스|수납\s*케이스|게임\s*트래블러|game\s*traveler|oval\s*case|조이스틱|엄지\s*스틱|로커\s*커버|교체품|클리너|실리콘|키링|피규어|아미보|amiibo|스틸북|steel\s*?book|아트북|art\s*?book|사운드트랙|ost|포스터|엽서|스티커|인형|쿠션|머그|텀블러|배지|뱃지|키캡|파우치|가방|스트랩|보호\s*필름|그립|거치대|스탠드/i;
 function isWhitelistMall(mallName: string): boolean {
   return WHITELIST_MALLS.has(mapMallToSource(mallName));
 }
 
-// ---------- 로마자 숫자 정규화 (키워드 매칭 전용) ----------
+// ---------- 로마자 숫자 정규화 (키워드 매칭 전용) — 최신 유지 ----------
 const ROMAN_MAP: Record<string, string> = {
   i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8',
   ix: '9', x: '10', xi: '11', xii: '12', xiii: '13'
@@ -115,21 +115,20 @@ function isExcludedTitle(normTitle: string, excludeKeywords: string[]): boolean 
   });
 }
 
-// [2026-07-11] 화이트리스트 몰 우회 인자(wl) 추가:
+// [2026-07-11] 화이트리스트 몰 우회 인자(wl):
 //   wl=true 이면 특수판(예약/특전) 및 banned 굿즈어 필터를 완화한다.
-//   단, 키워드 AND / 제외어 / 카테고리 검사는 그대로 유지한다.
+//   단, 키워드 AND / 제외어 / 카테고리 / WL_HARD_BLOCK 검사는 그대로 유지한다.
 function isLikelyGameTitle(item: NaverShopItem, gameKeywords: string[], excludeKeywords: string[] = [], wl: boolean = false): boolean {
   if (item.category3 !== '게임타이틀') return false;
   const title = stripTags(item.title).toLowerCase();
 
-  // [2026-07-11] 화이트리스트 여부와 무관하게 순수 굿즈/액세서리는 무조건 차단
-  if (WL_HARD_BLOCK_RE.test(title)) return false;
-
+  // [2026-07-15] banned 배열 복원 — 본품이 아닌 굿즈/주변기기/부가콘텐츠 제외 (화이트리스트는 우회, 단 WL_HARD_BLOCK_RE로 순수 굿즈는 별도 차단)
   if (!wl) {
-    const banned = [ /* ...기존 그대로... */ ];
+    const banned = ['굿즈','피규어','커버','스티커','키링','포스터','머천','인형','쿠션','악세사리','악세서리','스킨','케이스','스틸북','steelbook','스틸 북','거치대','스탠드','컨트롤러','패드','충전','거치','파우치','가방','보호필름','그립','키캡','테마','dlc','시즌패스','시즌 패스','확장팩','추가콘텐츠','아트북','사운드트랙','ost','특전','엽서','시나리오북','시나리오 북','게임팩x','설정집','화보','캘린더','달력','북릿','booklet','일러스트','스위치호환용','호환용'];
     if (banned.some(w => title.includes(w))) return false;
     if (isSpecialEdition(title)) return false;
   }
+
   const normTitle = normalizeTitleForMatch(title);
   if (isExcludedTitle(normTitle, excludeKeywords)) return false;
 
@@ -210,9 +209,9 @@ export async function searchAndClassify(
 
   const skipped={notGameTitle:0,blacklisted:0,used:0,catalog:0,outOfRange:0,noPlatform:0,excluded:0};
   const rejected:RejectedItem[]=[];
-const rej=(reason:string,item:NaverShopItem,title:string,platform:string|null,wl:boolean=false)=>{
-  if (rejected.length<200) rejected.push({reason,mall:item.mallName,title,category:item.category3||'',platform,price:parseInt(item.lprice,10)||0,wl});
-};
+  const rej=(reason:string,item:NaverShopItem,title:string,platform:string|null,wl:boolean=false)=>{
+    if (rejected.length<200) rejected.push({reason,mall:item.mallName,title,category:item.category3||'',platform,price:parseInt(item.lprice,10)||0,wl});
+  };
   const byPlatform=new Map<string,CleanedPrice[]>();
 
   // [2026-07-11] start=1, 101 두 페이지 병합 (롯데ON 등 100위 밖 매물 확보)
@@ -250,10 +249,10 @@ const rej=(reason:string,item:NaverShopItem,title:string,platform:string|null,wl
 
       // 굿즈 단품은 화이트리스트여도 무조건 차단
       if (WL_HARD_BLOCK_RE.test(title)) { skipped.notGameTitle++; rej('goodsBlock',item,title,null,wl); continue; }
+
+      // [2026-07-15] 게임타이틀 판별 (화이트리스트 몰은 특전/예약 완화) — 단일 호출로 정리
       if (!isLikelyGameTitle(item,keywords,excludeKeywords,wl)) { skipped.notGameTitle++; rej('notGameTitle',item,title,null,wl); continue; }
 
-      // notGameTitle(특전/예약 등): 화이트리스트 몰은 완화(wl 전달)
-      if (!isLikelyGameTitle(item,keywords,excludeKeywords,wl)) { skipped.notGameTitle++; rej('notGameTitle',item,title,null); continue; }
       if (isBlacklisted(title)) { skipped.blacklisted++; rej('blacklisted',item,title,null); continue; }
       if (isCatalogProduct(item)) { skipped.catalog++; rej('catalog',item,title,null); continue; }
       if (isUsedItem(title)) { skipped.used++; rej('used',item,title,null); continue; }
