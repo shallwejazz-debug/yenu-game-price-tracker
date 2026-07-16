@@ -24,7 +24,7 @@ a { color: inherit; text-decoration: none; }
 .page {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 24px 20px 64px;
+  padding: 24px 20px 36px;
 }
 
 /* ---------- 헤더: 제목 가운데, 검색창 우측, 관리링크 좌측 ---------- */
@@ -609,8 +609,18 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
 @media (max-width: 640px) {
 
   /* 페이지 좌우 여백 줄여 화면 폭 확보 */
-  .page { padding: 16px 12px 48px; }
+  .page { padding: 16px 12px 28px; }
 
+    .site-footer {
+    padding: 12px 12px 20px;
+  }
+
+  .site-footer p {
+    font-size: .72rem;
+    line-height: 1.45;
+  }
+
+   
   /* ---------- 콘솔 탭: 가로 스크롤 한 줄 (줄바꿈 방지) ---------- */
   .console-tabs {
     flex-wrap: nowrap;
@@ -705,10 +715,11 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
 .site-footer {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 24px 20px 40px;
+  padding: 14px 20px 24px;
   border-top: 1px solid #22262f;
   text-align: center;
 }
+
 .site-footer p {
   color: #6b7280;
   font-size: .78rem;
