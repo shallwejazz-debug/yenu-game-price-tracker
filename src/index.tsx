@@ -12,7 +12,7 @@ import type { Bindings, Price } from './types'
 import admin from './routes/admin'
 import games from './routes/games'
 import api from './routes/api'
-import { getAllSettings, listGames, listEditionsByGame } from './db'
+import { getAllSettings } from './db'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -55,30 +55,44 @@ app.get('/naver1030d509d7426f4b64ec79baf14c9da5.html', (c) => {
 
 
 // ---------- sitemap.xml ----------
-// 메인 + deals + 모든 게임 상세(/games/:id/:platform) URL을 담아 구글 색인 유도
-//   ※ renderer(HTML 래핑)를 거치지 않도록 c.body로 XML 직접 반환
+// 플랫폼 목록 + 특가 + 모든 게임 상세(/games/:id/:platform)
+// 게임별 반복 조회를 제거하고 editions를 한 번만 조회하여 시간 초과 방지
 app.get('/sitemap.xml', async (c) => {
   const host = new URL(c.req.url).origin
   const urls: Array<{ loc: string; priority: string }> = []
 
-  // 고정 페이지
-  urls.push({ loc: `${host}/games?platform=pc`, priority: '0.9' })
-  urls.push({ loc: `${host}/games/deals`, priority: '0.8' })
+  // 플랫폼별 목록 페이지
+  for (const platform of ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'switch2']) {
+    urls.push({
+      loc: `${host}/games?platform=${platform}`,
+      priority: '0.9',
+    })
+  }
 
-  // 게임별 상세 페이지 (에디션 = 플랫폼별 URL)
+  // 특가 페이지
+  urls.push({
+    loc: `${host}/games/deals`,
+    priority: '0.8',
+  })
+
+  // 게임 상세 페이지
+  // 기존처럼 게임마다 editions를 조회하지 않고 한 번에 모두 가져옴
   try {
-    const gameList = await listGames(c.env.DB)
-    for (const g of gameList) {
-      const editions = await listEditionsByGame(c.env.DB, g.id)
-      for (const e of editions) {
-        urls.push({
-          loc: `${host}/games/${g.id}/${e.platform}`,
-          priority: '0.7',
-        })
-      }
+    const { results } = await c.env.DB.prepare(`
+      SELECT DISTINCT game_id, platform
+      FROM editions
+      ORDER BY game_id, platform
+    `).all<{ game_id: number; platform: string }>()
+
+    for (const edition of results ?? []) {
+      urls.push({
+        loc: `${host}/games/${edition.game_id}/${edition.platform}`,
+        priority: '0.7',
+      })
     }
-  } catch {
-    // DB 조회 실패 시 고정 페이지만이라도 반환
+  } catch (error) {
+    console.error('sitemap DB query failed:', error)
+    // DB 조회에 실패해도 목록·특가 페이지 사이트맵은 반환
   }
 
   const body =
@@ -92,8 +106,12 @@ app.get('/sitemap.xml', async (c) => {
       .join('\n') +
     `\n</urlset>\n`
 
-  return c.body(body, 200, { 'Content-Type': 'application/xml; charset=utf-8' })
+  return c.body(body, 200, {
+    'Content-Type': 'application/xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=3600',
+  })
 })
+
 
 // ---------- 라우트 그룹 연결 ----------
 app.route('/admin', admin)
