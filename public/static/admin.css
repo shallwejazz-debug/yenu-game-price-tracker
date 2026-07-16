@@ -1,1613 +1,494 @@
+/* [2026-07-10] 자동 가져오기 5칸화(대표이름/키워드/제외어/이미지URL/스위치정책): .ig-head/.ig-row 2줄 그리드 + 아랫줄 3분할 서브그리드 */
+/* [2026-07-07] 자동 가져오기 4칸화(대표이름/키워드/제외어/이미지URL): .ig-head/.ig-row 2줄 그리드 + 모바일 세로스택 */
+/* [2026-07-06] 자동 가져오기 3칸화(대표이름/제외어/이미지URL): .ig-head/.ig-row 그리드 + 모바일 세로스택 개편 */
 /* ============================================================
    관리자 콘솔 전용 스타일
    public/static/admin.css
-
-   구성
-   - 관리자 인증 화면
-   - 상단 탭
-   - 현황 대시보드
-   - 후보 게임 평가
-   - 게임 자동 가져오기
-   - 게임 목록
-   - 설정 / 백업
-   - 모바일 반응형
    ============================================================ */
 
-/* ------------------------------------------------------------
-   공통
-   ------------------------------------------------------------ */
-
-[hidden] {
-  display: none !important;
-}
-
 .admin-wrap {
-  width: 100%;
-  max-width: 1180px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 24px 18px 80px;
-  box-sizing: border-box;
+  padding: 24px 16px 60px;
 }
-
 .admin-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
-
-.admin-head h1 {
-  margin: 0;
-  font-size: 1.45rem;
-  line-height: 1.3;
-}
-
-.admin-head-sub {
-  margin: 5px 0 0;
-  color: #9198a5;
-  font-size: 0.84rem;
-}
-
-.admin-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+.admin-head h1 { font-size: 1.4rem; }
 .admin-back {
-  color: #aab0bb;
+  color: #9aa0aa;
   text-decoration: none;
-  font-size: 0.88rem;
-  white-space: nowrap;
+  font-size: .9rem;
 }
-
-.admin-back:hover {
-  color: #ffffff;
-}
+.admin-back:hover { color: #e6e8ec; }
 
 .admin-card {
-  margin-bottom: 18px;
-  padding: 20px;
   background: #1a1d27;
-  border: 1px solid #2c303d;
-  border-radius: 14px;
-  box-sizing: border-box;
+  border: 1px solid #2a2e3a;
+  border-radius: 12px;
+  padding: 18px 18px 20px;
+  margin-bottom: 16px;
 }
-
-.admin-card h2 {
-  margin: 0 0 7px;
-  color: #f1f3f6;
-  font-size: 1.08rem;
-  line-height: 1.4;
-}
-
-.admin-card h3 {
-  margin: 20px 0 8px;
-  color: #e7e9ed;
-  font-size: 0.96rem;
-}
-
-.admin-section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.admin-section-head h2 {
-  margin-bottom: 5px;
-}
-
-.admin-section-head .admin-hint {
-  margin-bottom: 0;
-}
-
-.admin-hint {
-  margin: 0 0 15px;
-  color: #969daa;
-  font-size: 0.83rem;
-  line-height: 1.6;
-}
-
+.admin-card h2 { font-size: 1.05rem; margin-bottom: 6px; }
+.admin-hint { color: #9aa0aa; font-size: .82rem; margin-bottom: 14px; line-height: 1.5; }
 .admin-hint code {
-  padding: 2px 6px;
-  color: #cdd2da;
   background: #11141c;
-  border: 1px solid #303543;
-  border-radius: 5px;
-  font-size: 0.8rem;
+  border: 1px solid #2a2e3a;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: .8rem;
+  color: #c3c8d2;
 }
 
-.admin-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 12px;
-}
-
-.admin-row-wrap {
-  flex-wrap: wrap;
-}
+.admin-row { display: flex; gap: 8px; }
+.admin-row input { flex: 1; }
 
 .admin-field {
-  display: block;
-  margin-bottom: 14px;
-}
-
-.admin-field > span {
-  display: block;
-  margin-bottom: 6px;
-  color: #bec4ce;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.admin-field input,
-.admin-field textarea,
-.admin-field select,
-.candidate-sort-label select {
-  width: 100%;
-  min-height: 42px;
-  padding: 10px 11px;
-  color: #eceef2;
-  background: #11141c;
-  border: 1px solid #353a48;
-  border-radius: 8px;
-  outline: none;
-  font: inherit;
-  font-size: 0.9rem;
-  box-sizing: border-box;
-}
-
-.admin-field textarea {
-  line-height: 1.55;
-  resize: vertical;
-}
-
-.admin-field input:focus,
-.admin-field textarea:focus,
-.admin-field select:focus,
-.candidate-sort-label select:focus {
-  border-color: #6b7cff;
-  box-shadow: 0 0 0 3px rgba(107, 124, 255, 0.14);
-}
-
-.admin-field input::placeholder,
-.admin-field textarea::placeholder {
-  color: #626976;
-}
-
-.admin-textarea {
-  width: 100%;
-  padding: 11px;
-  color: #eceef2;
-  background: #11141c;
-  border: 1px solid #353a48;
-  border-radius: 8px;
-  outline: none;
-  font: inherit;
-  font-size: 0.88rem;
-  line-height: 1.55;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.admin-textarea:focus {
-  border-color: #6b7cff;
-  box-shadow: 0 0 0 3px rgba(107, 124, 255, 0.14);
-}
-
-.admin-hr {
-  height: 1px;
-  margin: 23px 0;
-  background: #303440;
-  border: 0;
-}
-
-.admin-status {
-  min-height: 20px;
-  margin: 11px 0 0;
-  color: #9da4b0;
-  font-size: 0.84rem;
-  line-height: 1.55;
-  white-space: pre-line;
-}
-
-.admin-status.ok {
-  color: #62d696;
-}
-
-.admin-status.err {
-  color: #ff8585;
-}
-
-.admin-status.info {
-  color: #8db5ff;
-}
-
-.admin-notice {
-  margin: 14px 0;
-  padding: 12px 14px;
-  color: #c3caef;
-  background: rgba(89, 108, 224, 0.1);
-  border: 1px solid rgba(113, 130, 239, 0.3);
-  border-radius: 9px;
-  font-size: 0.83rem;
-  line-height: 1.6;
-}
-
-.admin-format-box {
-  margin: 10px 0 14px;
-  padding: 10px 12px;
-  overflow-x: auto;
-  color: #bec7ff;
-  background: #10131a;
-  border: 1px solid #30384f;
-  border-radius: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.79rem;
-  white-space: nowrap;
-}
-
-.admin-step-list {
-  margin: 12px 0 4px;
-  padding-left: 24px;
-  color: #c2c7d0;
-  font-size: 0.87rem;
-  line-height: 1.8;
-}
-
-.admin-help-list {
-  margin: 0;
-  padding-left: 21px;
-  color: #b8bec8;
-  font-size: 0.84rem;
-  line-height: 1.7;
-}
-
-.admin-selection-count {
-  color: #9da4b0;
-  font-size: 0.82rem;
-}
-
-/* ------------------------------------------------------------
-   버튼
-   ------------------------------------------------------------ */
-
-.btn {
-  display: inline-flex;
-  min-height: 38px;
-  padding: 8px 14px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: #d9dde5;
-  background: #292e3a;
-  border: 1px solid #3b4251;
-  border-radius: 8px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-decoration: none;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    opacity 0.15s ease,
-    transform 0.08s ease;
-}
-
-.btn:hover:not(:disabled) {
-  background: #343b4b;
-  border-color: #4a5365;
-}
-
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.43;
-}
-
-.btn-primary {
-  color: #ffffff;
-  background: #586ae5;
-  border-color: #6576ec;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #6879ef;
-  border-color: #7786f2;
-}
-
-.btn-danger {
-  color: #ffd9d9;
-  background: #5b272d;
-  border-color: #80353d;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: #713139;
-  border-color: #a0444e;
-}
-
-.btn-sm {
-  min-height: 34px;
-  padding: 7px 11px;
-  font-size: 0.79rem;
-}
-
-/* ------------------------------------------------------------
-   잠금 화면
-   ------------------------------------------------------------ */
-
-.lock-screen {
-  position: fixed;
-  z-index: 9999;
-  inset: 0;
   display: flex;
-  padding: 20px;
-  align-items: center;
-  justify-content: center;
-  background:
-    radial-gradient(circle at top, rgba(86, 105, 229, 0.14), transparent 38%),
-    #101219;
-  box-sizing: border-box;
-}
-
-.lock-box {
-  width: 100%;
-  max-width: 370px;
-  padding: 30px 27px 26px;
-  text-align: center;
-  background: #1a1d27;
-  border: 1px solid #303543;
-  border-radius: 16px;
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.34);
-}
-
-.lock-icon {
-  margin-bottom: 8px;
-  font-size: 2.4rem;
-}
-
-.lock-box h1 {
-  margin: 0 0 8px;
-  color: #f0f2f5;
-  font-size: 1.34rem;
-}
-
-.lock-hint {
-  margin: 0 0 18px;
-  color: #969daa;
-  font-size: 0.86rem;
-}
-
-.lock-input {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  color: #ffffff;
-  background: #10131a;
-  border: 1px solid #373c49;
-  border-radius: 8px;
-  outline: none;
-  font: inherit;
-  box-sizing: border-box;
-}
-
-.lock-input:focus {
-  border-color: #6879ef;
-  box-shadow: 0 0 0 3px rgba(104, 121, 239, 0.14);
-}
-
-.lock-btn {
-  width: 100%;
-  margin-top: 10px;
-}
-
-.lock-back {
-  display: inline-block;
-  margin-top: 15px;
-  color: #858d9a;
-  font-size: 0.82rem;
-  text-decoration: none;
-}
-
-.lock-back:hover {
-  color: #d4d8df;
-}
-
-/* ------------------------------------------------------------
-   관리자 탭
-   ------------------------------------------------------------ */
-
-.admin-tabs {
-  position: sticky;
-  z-index: 30;
-  top: 0;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 19px;
-  padding: 7px;
-  background: rgba(17, 20, 28, 0.96);
-  border: 1px solid #2b303c;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-}
-
-.admin-tab {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  min-height: 43px;
-  padding: 8px 9px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  overflow: hidden;
-  color: #9ca3af;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.83rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.admin-tab:hover {
-  color: #d9dde5;
-  background: #222631;
-}
-
-.admin-tab.is-active {
-  color: #ffffff;
-  background: #343b58;
-  border-color: #5363a5;
-}
-
-.admin-tab-icon {
-  flex: 0 0 auto;
-}
-
-.admin-tab-badge {
-  min-width: 19px;
-  height: 19px;
-  padding: 0 5px;
-  color: #ffffff;
-  background: #6779ed;
-  border-radius: 999px;
-  font-size: 0.69rem;
-  line-height: 19px;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.admin-panel {
-  display: none;
-}
-
-.admin-panel.is-active {
-  display: block;
-  animation: adminPanelIn 0.15s ease-out;
-}
-
-@keyframes adminPanelIn {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ------------------------------------------------------------
-   현황 대시보드
-   ------------------------------------------------------------ */
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 11px;
-}
-
-.dashboard-stat {
-  min-width: 0;
-  padding: 16px;
-  background: #12151d;
-  border: 1px solid #2b303d;
-  border-radius: 11px;
-}
-
-.dashboard-stat-label {
-  display: block;
-  margin-bottom: 8px;
-  color: #929aa7;
-  font-size: 0.77rem;
-}
-
-.dashboard-stat-value {
-  display: block;
-  margin-bottom: 5px;
-  color: #f4f5f7;
-  font-size: 1.75rem;
-  line-height: 1.1;
-}
-
-.dashboard-stat-sub {
-  display: block;
-  overflow: hidden;
-  color: #707886;
-  font-size: 0.73rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-actions {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.dashboard-actions .btn {
-  min-height: 45px;
-}
-
-/* ------------------------------------------------------------
-   후보 입력
-   ------------------------------------------------------------ */
-
-.candidate-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 240px));
-  gap: 12px;
-}
-
-.candidate-option {
-  margin-bottom: 5px;
-}
-
-.candidate-textarea {
-  min-height: 230px;
-}
-
-.candidate-input-summary {
-  display: flex;
-  margin: -5px 0 11px;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  color: #858d99;
-  font-size: 0.79rem;
-}
-
-.candidate-input-summary b {
-  color: #d8dce4;
-}
-
-.candidate-progress-wrap {
-  margin-top: 16px;
-  padding: 13px 14px;
-  background: #11141c;
-  border: 1px solid #303543;
-  border-radius: 9px;
-}
-
-.candidate-progress-head {
-  display: flex;
-  margin-bottom: 8px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  color: #bfc5cf;
-  font-size: 0.81rem;
-}
-
-.candidate-progress {
-  width: 100%;
-  height: 10px;
-  overflow: hidden;
-  background: #252a36;
-  border-radius: 999px;
-}
-
-.candidate-progress-bar {
-  width: 0%;
-  height: 100%;
-  background: linear-gradient(90deg, #586ae5, #7e8df4);
-  border-radius: 999px;
-  transition: width 0.2s ease;
-}
-
-.candidate-current-title {
-  margin: 9px 0 0;
-  overflow: hidden;
-  color: #818996;
-  font-size: 0.76rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ------------------------------------------------------------
-   후보 결과 요약
-   ------------------------------------------------------------ */
-
-.candidate-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.candidate-summary {
-  display: flex;
-  min-height: 62px;
-  padding: 9px;
-  align-items: center;
-  justify-content: center;
   flex-direction: column;
   gap: 4px;
-  color: #aab0ba;
-  background: #12151d;
-  border: 1px solid #2d323e;
-  border-radius: 9px;
+  margin-bottom: 12px;
+}
+.admin-field span { font-size: .82rem; color: #c3c8d2; }
+
+.admin-wrap input[type="text"],
+.admin-wrap input[type="password"] {
+  background: #11131a;
+  border: 1px solid #2a2e3a;
+  border-radius: 8px;
+  color: #e6e8ec;
+  padding: 10px 12px;
+  font-size: .92rem;
+  width: 100%;
+}
+.admin-wrap input:focus {
+  outline: none;
+  border-color: #4f7cff;
+}
+
+.btn {
+  background: #232735;
+  color: #e6e8ec;
+  border: 1px solid #2a2e3a;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: .9rem;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s;
+}
+.btn:hover { background: #2c3142; }
+.btn-primary { background: #4f7cff; border-color: #4f7cff; color: #fff; }
+.btn-primary:hover { background: #3d6af0; }
+.btn-sm { padding: 6px 12px; font-size: .82rem; margin-bottom: 12px; }
+
+.admin-status {
+  margin-top: 10px;
+  font-size: .85rem;
+  min-height: 1.1em;
+}
+.admin-status.ok { color: #4ade80; }
+.admin-status.err { color: #f87171; }
+
+.admin-game-list { list-style: none; }
+.admin-game-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #232735;
+  font-size: .9rem;
+}
+.admin-game-item:last-child { border-bottom: none; }
+.ag-id { color: #6b7280; font-size: .8rem; min-width: 36px; }
+.ag-title { flex: 1; color: #e6e8ec; }
+.ag-editions {
+  color: #9aa0aa;
+  font-size: .78rem;
+  background: #232735;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.admin-empty { color: #6b7280; padding: 12px; text-align: center; }
+
+/* [2026-07-10] 정책 뱃지 (s2/s1 표시) */
+.ag-policy {
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: #3a4a2a;
+  color: #b8e070;
+  vertical-align: middle;
+}
+
+/* ---------- 자동 임포트 ---------- */
+textarea#importTitles {
+  width: 100%;
+  background: #11141c;
+  border: 1px solid #2a2e3a;
+  border-radius: 8px;
+  color: #e6e8ec;
+  padding: 10px 12px;
   font: inherit;
-  font-size: 0.73rem;
+  font-size: .9rem;
+  resize: vertical;
+  margin-bottom: 10px;
 }
-
-.candidate-summary strong {
-  color: #e7eaf0;
-  font-size: 1.12rem;
-}
-
-.candidate-summary:hover,
-.candidate-summary.is-active {
-  background: #202532;
-  border-color: #566175;
-}
-
-.candidate-summary-recommend.is-active {
-  background: rgba(46, 156, 101, 0.13);
-  border-color: #3b9d70;
-}
-
-.candidate-summary-review.is-active {
-  background: rgba(211, 161, 48, 0.13);
-  border-color: #a9802e;
-}
-
-.candidate-summary-exclude.is-active {
-  background: rgba(191, 75, 81, 0.13);
-  border-color: #a64c53;
-}
-
-.candidate-summary-existing.is-active {
-  background: rgba(116, 126, 145, 0.15);
-  border-color: #6d7789;
-}
-
-.candidate-summary-error.is-active {
-  background: rgba(181, 71, 105, 0.13);
-  border-color: #9f4563;
-}
-
-.candidate-toolbar {
-  display: flex;
-  margin-bottom: 11px;
-  padding: 10px 11px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: #13161e;
-  border: 1px solid #2b303c;
-  border-radius: 9px;
-}
-
-.candidate-toolbar-left,
-.candidate-toolbar-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-selall {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 7px;
-  color: #b4bac4;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.admin-selall input {
-  width: 16px;
-  height: 16px;
-  accent-color: #6678ed;
-}
-
-.candidate-sort-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #9097a3;
-  font-size: 0.78rem;
-}
-
-.candidate-sort-label select {
-  width: auto;
-  min-width: 140px;
-  min-height: 34px;
-  padding: 6px 9px;
-  font-size: 0.78rem;
-}
-
-/* ------------------------------------------------------------
-   후보 결과 행
-   ------------------------------------------------------------ */
-
-.candidate-result-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.candidate-item {
-  display: grid;
-  grid-template-columns: 28px minmax(160px, 1.25fr) minmax(260px, 1.75fr) auto;
-  gap: 12px;
-  padding: 13px;
-  align-items: center;
-  background: #12151d;
-  border: 1px solid #2d323e;
+.import-result { margin-top: 14px; }
+.imp-mode { color: #9aa0aa; font-size: .82rem; margin-bottom: 10px; }
+.imp-game {
+  background: #11141c;
+  border: 1px solid #232735;
   border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
 }
-
-.candidate-item:hover {
-  border-color: #414958;
+.imp-game.imp-err { border-color: #5a2330; color: #ff8a8a; }
+.imp-title { font-weight: 600; margin-bottom: 8px; }
+.imp-gid { color: #6b7280; font-size: .8rem; font-weight: 400; }
+.imp-plats { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.imp-plat {
+  font-size: .85rem;
+  color: #c3c8d2;
+  padding: 6px 8px;
+  background: #181b24;
+  border-radius: 6px;
 }
-
-.candidate-item.is-selected {
-  background: rgba(89, 106, 229, 0.08);
-  border-color: #5868bb;
+.imp-plat-label {
+  display: inline-block;
+  min-width: 52px;
+  font-weight: 700;
+  color: #4f7cff;
 }
+.imp-malls { color: #6b7280; font-size: .76rem; margin-top: 3px; }
+.imp-skip { color: #6b7280; font-size: .74rem; margin-top: 8px; }
+.imp-none { color: #6b7280; font-size: .82rem; }
 
-.candidate-item.is-existing {
-  opacity: 0.7;
-}
-
-.candidate-item.is-hidden {
-  display: none;
-}
-
-.candidate-check {
+/* ---------- 잠금 화면 (관리자 인증 게이트) ---------- */
+.lock-screen {
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #0f1117;
+  padding: 20px;
+  z-index: 2000;
+}
+.lock-box {
+  background: #1a1d27;
+  border: 1px solid #2a2e3a;
+  border-radius: 16px;
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+.lock-icon { font-size: 2.4rem; margin-bottom: 8px; }
+.lock-box h1 { font-size: 1.4rem; margin-bottom: 6px; }
+.lock-hint { color: #9aa0aa; font-size: .88rem; margin-bottom: 20px; }
+.lock-input {
+  width: 100%;
+  background: #0f1117;
+  border: 1px solid #2a2e3a;
+  border-radius: 10px;
+  color: #e6e8ec;
+  padding: 12px 14px;
+  font-size: 1rem;
+  outline: none;
+  margin-bottom: 12px;
+  transition: border-color .15s;
+}
+.lock-input:focus { border-color: #4f7cff; }
+.lock-btn { width: 100%; padding: 12px; font-size: 1rem; }
+.lock-back {
+  display: inline-block;
+  margin-top: 18px;
+  color: #9aa0aa;
+  font-size: .82rem;
+}
+.lock-back:hover { color: #e6e8ec; }
+
+.admin-head-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ============================================================
+   등록된 게임: 선택 삭제 컨트롤 바
+   ============================================================ */
+.admin-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.admin-bulk-bar .btn-sm { margin-bottom: 0; }  /* 바 안에서는 하단 여백 제거 */
+.admin-selall {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .85rem;
+  color: #c3c8d2;
+  cursor: pointer;
+  user-select: none;
+}
+.admin-selall input { cursor: pointer; }
+.btn-danger {
+  background: #3a1f2e;
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #ff6b6b;
+  color: #fff;
+}
+.btn-danger:disabled {
+  opacity: .5;
+  cursor: default;
 }
 
-.candidate-check input {
-  width: 17px;
-  height: 17px;
-  accent-color: #6879ef;
+/* 목록 행 선택용 체크박스 */
+.admin-game-item .ag-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #4f7cff;
 }
 
-.candidate-main {
+/* ============================================================
+   게임 삭제 버튼 (관리자 게임 목록)
+   ============================================================ */
+.admin-game-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-game-item .ag-title {
+  flex: 1;
   min-width: 0;
-}
-
-.candidate-name {
-  display: block;
-  margin-bottom: 5px;
   overflow: hidden;
-  color: #eef0f4;
-  font-size: 0.93rem;
-  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.candidate-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.candidate-platform-badge,
-.candidate-year-badge,
-.candidate-existing-badge {
-  display: inline-flex;
-  padding: 3px 7px;
-  align-items: center;
-  color: #aeb5c0;
-  background: #252a35;
-  border: 1px solid #373d4a;
-  border-radius: 999px;
-  font-size: 0.67rem;
-  line-height: 1.2;
-}
-
-.candidate-existing-badge {
-  color: #d2d5da;
-  background: #3a3e48;
-}
-
-.candidate-detail {
-  min-width: 0;
-}
-
-.candidate-reason {
-  margin: 0 0 7px;
-  color: #abb2bd;
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-
-.candidate-metrics {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  color: #7f8794;
-  font-size: 0.72rem;
-}
-
-.candidate-metrics b {
-  color: #c8cdd5;
-  font-weight: 700;
-}
-
-.candidate-score-area {
-  display: flex;
-  min-width: 88px;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.candidate-score {
-  color: #f1f3f6;
+.admin-game-item .ag-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #ff6b6b;
+  background: #3a1f2e;
+  color: #ff6b6b;
   font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.candidate-score small {
-  color: #858d99;
-  font-size: 0.7rem;
-  font-weight: 400;
-}
-
-.candidate-verdict {
-  display: inline-flex;
-  min-width: 64px;
-  padding: 5px 9px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.candidate-verdict-recommend {
-  color: #8ce2b5;
-  background: rgba(47, 157, 101, 0.16);
-  border: 1px solid rgba(64, 182, 121, 0.43);
-}
-
-.candidate-verdict-review {
-  color: #f2ca6a;
-  background: rgba(200, 151, 40, 0.15);
-  border: 1px solid rgba(205, 158, 52, 0.42);
-}
-
-.candidate-verdict-exclude {
-  color: #f29a9e;
-  background: rgba(190, 74, 81, 0.15);
-  border: 1px solid rgba(202, 87, 94, 0.42);
-}
-
-.candidate-verdict-existing {
-  color: #b9c0ca;
-  background: rgba(116, 126, 145, 0.16);
-  border: 1px solid rgba(129, 139, 158, 0.42);
-}
-
-.candidate-verdict-error {
-  color: #f29abb;
-  background: rgba(174, 66, 103, 0.15);
-  border: 1px solid rgba(190, 78, 116, 0.42);
-}
-
-.candidate-bottom-bar {
-  position: sticky;
-  z-index: 20;
-  bottom: 10px;
-  display: flex;
-  margin-top: 14px;
-  padding: 11px 13px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: rgba(24, 28, 38, 0.96);
-  border: 1px solid #3a4150;
-  border-radius: 10px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(10px);
-}
-
-.candidate-selected-info {
-  color: #aeb5bf;
-  font-size: 0.83rem;
-}
-
-.candidate-selected-info b {
-  color: #ffffff;
-}
-
-/* ------------------------------------------------------------
-   자동 가져오기 입력 행
-   ------------------------------------------------------------ */
-
-.admin-details {
-  margin: 12px 0 15px;
-  background: #13161e;
-  border: 1px solid #2d323e;
-  border-radius: 9px;
-}
-
-.admin-details summary {
-  padding: 11px 13px;
-  color: #aeb5c0;
+  line-height: 1;
   cursor: pointer;
-  font-size: 0.81rem;
-  font-weight: 700;
+  transition: background .15s, color .15s;
+}
+.admin-game-item .ag-delete:hover {
+  background: #ff6b6b;
+  color: #fff;
+}
+.admin-game-item .ag-delete:disabled {
+  opacity: .5;
+  cursor: default;
 }
 
-.admin-details-body {
-  padding: 0 13px 13px;
-}
-
-.ig-table {
-  margin-top: 13px;
+/* ============================================================
+   게임 목록 썸네일 & 이미지 변경 버튼
+   ============================================================ */
+.admin-game-item .ag-thumb {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
   overflow: hidden;
   background: #11141c;
-  border: 1px solid #303542;
-  border-radius: 10px;
+  border: 1px solid #2a2e3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-game-item .ag-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.admin-game-item .ag-thumb-empty {
+  color: #4b5563;
+  font-size: 1rem;
 }
 
+.admin-game-item .ag-image {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #2a2e3a;
+  background: #232735;
+  color: #c3c8d2;
+  font-size: .95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.admin-game-item .ag-image:hover {
+  background: #2c3142;
+  border-color: #4f7cff;
+}
+.admin-game-item .ag-image:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+/* ============================================================
+   자동 가져오기: 입력 그리드 (다크 테마)
+   [2026-07-10] 5칸(대표이름/키워드/제외어/이미지URL/스위치정책) — 데스크톱 2줄 배치
+   ============================================================ */
+.ig-table {
+  border: 1px solid #2a2e3a;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 8px 0 12px;
+}
+/* 헤더: 윗줄 이름/키워드, 아랫줄은 제외어/이미지/정책 통합 라벨 (삭제 열 세로 병합) */
 .ig-head {
   display: grid;
   grid-template-columns: 1fr 1fr 40px;
   grid-template-areas:
-    "h-name h-keywords h-act"
-    "h-bottom h-bottom h-act";
-  gap: 6px 9px;
-  padding: 9px 10px;
-  color: #8d95a2;
-  background: #181b24;
-  border-bottom: 1px solid #303542;
-  font-size: 0.71rem;
-  font-weight: 700;
+    "h-name   h-keywords h-act"
+    "h-bottom h-bottom   h-act";
+  gap: 8px;
+  padding: 8px 10px;
+  background: #232735;
+  font-size: .78rem;
+  font-weight: 600;
+  color: #9aa0aa;
 }
-
-.ig-head .ig-col-name {
-  grid-area: h-name;
-}
-
-.ig-head .ig-col-keywords {
-  grid-area: h-keywords;
-}
-
-.ig-head .ig-col-bottom {
-  grid-area: h-bottom;
-}
-
-.ig-head .ig-col-act {
-  grid-area: h-act;
-}
-
+.ig-head .ig-col-name     { grid-area: h-name; }
+.ig-head .ig-col-keywords { grid-area: h-keywords; }
+.ig-head .ig-col-bottom   { grid-area: h-bottom; }
+/* 예전 4칸 헤더 라벨들은 데스크톱에서 숨김(있어도 무해) */
 .ig-head .ig-col-exclude,
 .ig-head .ig-col-image,
-.ig-head .ig-col-policy {
-  display: none;
-}
+.ig-head .ig-col-policy    { display: none; }
+.ig-head .ig-col-act      { grid-area: h-act; }
 
-.ig-body {
-  display: flex;
-  flex-direction: column;
-}
+.ig-body { display: flex; flex-direction: column; }
 
+/* 입력 행: 윗줄 이름/키워드, 아랫줄 제외어/이미지/정책(서브그리드), 우측 삭제(세로 병합) */
 .ig-row {
   display: grid;
   grid-template-columns: 1fr 1fr 40px;
   grid-template-areas:
-    "name keywords remove"
-    "bottom bottom remove";
-  gap: 7px 9px;
-  padding: 10px;
-  border-bottom: 1px solid #292e39;
+    "name    keywords remove"
+    "bottom  bottom   remove";
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #232735;
+  align-items: center;
 }
+.ig-row .ig-name     { grid-area: name; }
+.ig-row .ig-keywords { grid-area: keywords; }
 
-.ig-row:last-child {
-  border-bottom: 0;
-}
-
-.ig-row.is-new-from-candidate {
-  background: rgba(87, 105, 225, 0.07);
-  box-shadow: inset 3px 0 #6475e8;
-}
-
-.ig-name {
-  grid-area: name;
-}
-
-.ig-keywords {
-  grid-area: keywords;
-}
-
-.ig-bottom {
+/* 아랫줄 3칸(제외어/이미지/정책)을 내부 서브그리드로 배치 */
+.ig-row .ig-bottom {
   grid-area: bottom;
   display: grid;
-  grid-template-columns: 0.9fr 1.5fr 0.75fr;
-  gap: 7px;
-}
-
-.ig-exclude {
+  grid-template-columns: 1.3fr 1.7fr 0.9fr;
+  gap: 8px;
+  align-items: center;
   min-width: 0;
 }
+.ig-row .ig-bottom > input,
+.ig-row .ig-bottom > select { min-width: 0; }
 
-.ig-image {
-  min-width: 0;
-}
-
-.ig-policy {
-  min-width: 0;
-}
-
-.ig-remove {
-  grid-area: remove;
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-  align-self: stretch;
-  color: #d69393;
-  background: transparent;
-  border: 1px solid #3b3036;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.ig-remove:hover {
-  color: #ffffff;
-  background: #5d2b32;
-  border-color: #7d3942;
-}
+.ig-row .ig-remove   { grid-area: remove; align-self: stretch; height: auto; }
 
 .ig-row input,
 .ig-row select {
   width: 100%;
-  min-width: 0;
-  height: 38px;
-  padding: 8px 9px;
-  color: #e6e9ee;
-  background: #171a23;
-  border: 1px solid #363c49;
-  border-radius: 7px;
-  outline: none;
-  font: inherit;
-  font-size: 0.8rem;
+  padding: 8px 10px;
+  background: #11141c;
+  border: 1px solid #2a2e3a;
+  border-radius: 6px;
+  color: #e6e8ec;
+  font-size: .88rem;
   box-sizing: border-box;
 }
-
 .ig-row input:focus,
-.ig-row select:focus {
-  border-color: #6879ef;
-}
+.ig-row select:focus { outline: none; border-color: #4f7cff; }
+.ig-row .ig-policy { color: #c3c8d2; }
 
-.import-action-row {
-  margin-top: 16px;
-}
-
-.import-result {
-  display: flex;
-  margin-top: 14px;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.imp-card {
-  display: flex;
-  gap: 12px;
-  padding: 13px;
-  background: #12151d;
-  border: 1px solid #2e3440;
-  border-radius: 10px;
-}
-
-.imp-card.imp-error,
-.imp-card.error {
-  border-color: #713b45;
-}
-
-.imp-img {
-  width: 72px;
-  height: 92px;
-  flex: 0 0 auto;
-  object-fit: cover;
-  background: #242833;
-  border-radius: 7px;
-}
-
-.imp-body {
-  min-width: 0;
-  flex: 1;
-}
-
-.imp-title {
-  margin: 0 0 7px;
-  color: #edf0f4;
-  font-size: 0.92rem;
-}
-
-.imp-platforms {
-  margin: 0;
-  padding-left: 18px;
-  color: #aab1bc;
-  font-size: 0.78rem;
-  line-height: 1.65;
-}
-
-.imp-plat-label {
-  color: #d3d7de;
-  font-weight: 700;
-}
-
-/* ------------------------------------------------------------
-   게임 목록
-   ------------------------------------------------------------ */
-
-.admin-bulk-bar {
-  display: flex;
-  margin: 8px 0 12px;
-  padding: 9px 11px;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px 13px;
-  background: #13161e;
-  border: 1px solid #2c313d;
-  border-radius: 9px;
-}
-
-.admin-game-list {
-  display: flex;
-  margin: 0;
-  padding: 0;
-  flex-direction: column;
-  gap: 8px;
-  list-style: none;
-}
-
-.admin-game-item,
-.game-item {
-  display: flex;
-  padding: 11px 12px;
-  align-items: center;
-  gap: 10px;
-  background: #12151d;
-  border: 1px solid #2d323e;
-  border-radius: 9px;
-}
-
-.admin-game-item:hover,
-.game-item:hover {
-  border-color: #424a59;
-}
-
-.admin-game-check,
-.game-check {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 auto;
-  accent-color: #6879ef;
-}
-
-.admin-game-info,
-.game-info {
-  min-width: 0;
-  flex: 1;
-}
-
-.admin-game-title,
-.game-title {
-  display: block;
-  margin-bottom: 4px;
-  overflow: hidden;
-  color: #e8ebef;
-  font-size: 0.87rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-game-meta,
-.game-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  color: #858d99;
-  font-size: 0.72rem;
-}
-
-.admin-badge,
-.game-badge,
-.policy-badge {
-  display: inline-flex;
-  padding: 3px 7px;
-  align-items: center;
-  color: #afb6c1;
-  background: #252a35;
-  border: 1px solid #373d4a;
-  border-radius: 999px;
-  font-size: 0.66rem;
-}
-
-.game-delete,
-.admin-game-delete {
+.ig-remove {
+  width: 32px;
   min-height: 32px;
-  padding: 6px 9px;
-  color: #efa2a6;
-  background: transparent;
-  border: 1px solid #50343a;
-  border-radius: 7px;
+  border: 1px solid #ff6b6b;
+  background: #3a1f2e;
+  color: #ff6b6b;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  line-height: 1;
   cursor: pointer;
-  font-size: 0.74rem;
+  transition: background .15s, color .15s;
 }
+.ig-remove:hover { background: #ff6b6b; color: #fff; }
 
-.game-delete:hover,
-.admin-game-delete:hover {
-  color: #ffffff;
-  background: #662e35;
-}
-
-/* ------------------------------------------------------------
-   설정 및 위험 구역
-   ------------------------------------------------------------ */
-
-.admin-danger-zone {
-  background: rgba(93, 35, 42, 0.12);
-  border-color: #66343b;
-}
-
-.admin-danger-zone h2 {
-  color: #ffc5c7;
-}
-
-/* ------------------------------------------------------------
-   토스트
-   ------------------------------------------------------------ */
-
-.admin-toast {
-  position: fixed;
-  z-index: 10000;
-  right: 22px;
-  bottom: 22px;
-  max-width: min(390px, calc(100vw - 32px));
-  padding: 12px 15px;
-  color: #eff1f5;
-  background: #252a36;
-  border: 1px solid #4a5365;
-  border-radius: 10px;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.36);
-  font-size: 0.84rem;
-  line-height: 1.5;
-}
-
-.admin-toast.ok {
-  background: #173b2a;
-  border-color: #347854;
-}
-
-.admin-toast.err {
-  background: #4c242a;
-  border-color: #8a3f49;
-}
-
-/* ------------------------------------------------------------
-   빈 결과
-   ------------------------------------------------------------ */
-
-.admin-empty {
-  padding: 28px 15px;
-  color: #7f8793;
-  background: #12151d;
-  border: 1px dashed #373d49;
-  border-radius: 9px;
-  font-size: 0.84rem;
-  line-height: 1.6;
-  text-align: center;
-}
-
-/* ------------------------------------------------------------
-   태블릿
-   ------------------------------------------------------------ */
-
-@media (max-width: 900px) {
-  .admin-wrap {
-    max-width: 820px;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .candidate-summary-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .candidate-item {
-    grid-template-columns: 28px minmax(150px, 1fr) minmax(210px, 1.3fr);
-  }
-
-  .candidate-score-area {
-    grid-column: 2 / -1;
-    min-width: 0;
-    align-items: center;
-    flex-direction: row;
-    justify-content: flex-end;
-  }
-}
-
-/* ------------------------------------------------------------
-   모바일
-   ------------------------------------------------------------ */
-
-@media (max-width: 680px) {
-  .admin-wrap {
-    padding: 14px 10px 65px;
-  }
-
-  .admin-head {
-    align-items: flex-start;
-  }
-
-  .admin-head h1 {
-    font-size: 1.18rem;
-  }
-
-  .admin-head-sub {
-    font-size: 0.75rem;
-  }
-
-  .admin-head-actions {
-    flex-direction: column;
-    align-items: flex-end;
-  }
-
-  .admin-card {
-    padding: 15px 13px;
-    border-radius: 11px;
-  }
-
-  .admin-section-head {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .admin-section-head > .btn {
-    align-self: flex-start;
-  }
-
-  .admin-tabs {
-    top: 0;
-    grid-template-columns: repeat(5, minmax(62px, 1fr));
-    gap: 3px;
-    margin-right: -10px;
-    margin-left: -10px;
-    padding: 6px 8px;
-    overflow-x: auto;
-    border-right: 0;
-    border-left: 0;
-    border-radius: 0;
-  }
-
-  .admin-tab {
-    min-width: 66px;
-    min-height: 50px;
-    padding: 6px 4px;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 0.66rem;
-  }
-
-  .admin-tab-icon {
-    font-size: 0.95rem;
-  }
-
-  .admin-tab-badge {
-    position: absolute;
-    top: 2px;
-    right: 3px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    font-size: 0.61rem;
-    line-height: 16px;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .dashboard-stat {
-    padding: 13px 11px;
-  }
-
-  .dashboard-stat-value {
-    font-size: 1.45rem;
-  }
-
-  .dashboard-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .candidate-options {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  .candidate-textarea {
-    min-height: 200px;
-  }
-
-  .candidate-summary-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .candidate-summary {
-    min-height: 55px;
-    padding: 7px 4px;
-  }
-
-  .candidate-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .candidate-toolbar-left,
-  .candidate-toolbar-right {
-    width: 100%;
-  }
-
-  .candidate-sort-label {
-    width: 100%;
-  }
-
-  .candidate-sort-label select {
-    flex: 1;
-  }
-
-  .candidate-item {
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 8px 9px;
-    padding: 11px 10px;
-  }
-
-  .candidate-main {
-    grid-column: 2;
-  }
-
-  .candidate-detail {
-    grid-column: 2;
-  }
-
-  .candidate-score-area {
-    grid-column: 2;
-    align-items: center;
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .candidate-name {
-    white-space: normal;
-  }
-
-  .candidate-bottom-bar {
-    bottom: 6px;
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .candidate-bottom-bar .btn {
-    width: 100%;
-  }
-
-  .ig-head {
-    display: none;
-  }
-
+/* 모바일: 세로 스택 (한 칸씩) */
+@media (max-width: 640px) {
+  .ig-head { display: none; }
   .ig-row {
-    grid-template-columns: 1fr 36px;
+    grid-template-columns: 1fr 40px;
     grid-template-areas:
-      "name remove"
-      "keywords remove"
-      "bottom remove";
+      "name     remove"
+      "keywords keywords"
+      "bottom   bottom";
+    row-gap: 6px;
   }
-
-  .ig-bottom {
-    grid-template-columns: 1fr;
+  .ig-row .ig-name     { grid-area: name; }
+  .ig-row .ig-keywords { grid-area: keywords; }
+  .ig-row .ig-bottom {
+    grid-area: bottom;
+    grid-template-columns: 1fr;   /* 제외어/이미지/정책 세로 스택 */
+    row-gap: 6px;
   }
-
-  .imp-card {
-    align-items: flex-start;
-  }
-
-  .imp-img {
-    width: 58px;
-    height: 76px;
-  }
-
-  .admin-bulk-bar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .admin-game-item,
-  .game-item {
-    align-items: flex-start;
-  }
-
-  .admin-toast {
-    right: 16px;
-    bottom: 16px;
-    left: 16px;
-    max-width: none;
-  }
+  .ig-row .ig-remove   { grid-area: remove; align-self: start; }
 }
 
-/* ------------------------------------------------------------
-   초소형 화면
-   ------------------------------------------------------------ */
+/* ============================================================
+   [2026-07-06] 백업/복원 textarea 넓히기 + 가로 레이아웃
+   ============================================================ */
+.admin-card.backup-wide {
+  max-width: 100%;
+}
 
-@media (max-width: 390px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
+.admin-textarea {
+  width: 100%;
+  min-height: 240px;
+  background: #11141c;
+  border: 1px solid #2a2e3a;
+  border-radius: 8px;
+  color: #e6e8ec;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .85rem;
+  line-height: 1.55;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+  box-sizing: border-box;
+  margin: 8px 0 10px;
+}
+.admin-textarea:focus {
+  outline: none;
+  border-color: #4f7cff;
+}
 
-  .candidate-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-row > .btn {
-    width: 100%;
-  }
-
-  .admin-head-actions .btn {
-    width: auto;
-  }
-
-  .lock-box {
-    padding: 25px 20px 22px;
-  }
+.admin-hr {
+  border: none;
+  border-top: 1px solid #2a2e3a;
+  margin: 20px 0;
 }
