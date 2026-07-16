@@ -128,27 +128,63 @@
     document.addEventListener(ev, touch, true)
   })
 
-  // ---------- 레퍼럴 설정 ----------
+  // ---------- 관리자 설정 ----------
+  // [2026-07-16] 레퍼럴 ID + DB 사용자 블랙리스트·차단몰
   async function loadSettings() {
     try {
       const data = await api('/settings')
       const s = data.settings || {}
-      $('coupang_partners_id').value = s.coupang_partners_id || ''
-      $('linkprice_id').value = s.linkprice_id || ''
-    } catch (e) {}
+
+      $('coupang_partners_id').value =
+        s.coupang_partners_id || ''
+
+      $('linkprice_id').value =
+        s.linkprice_id || ''
+
+      $('custom_blacklist_keywords').value =
+        s.custom_blacklist_keywords || ''
+
+      $('custom_blocked_malls').value =
+        s.custom_blocked_malls || ''
+    } catch (e) {
+      setStatus(
+        $('settingsStatus'),
+        '❌ 설정을 불러오지 못했습니다: ' + e.message,
+        false
+      )
+    }
   }
 
   $('saveSettings').addEventListener('click', async () => {
     try {
       await api('/settings', 'POST', {
-        coupang_partners_id: $('coupang_partners_id').value.trim(),
-        linkprice_id: $('linkprice_id').value.trim(),
+        coupang_partners_id:
+          $('coupang_partners_id').value.trim(),
+
+        linkprice_id:
+          $('linkprice_id').value.trim(),
+
+        custom_blacklist_keywords:
+          $('custom_blacklist_keywords').value.trim(),
+
+        custom_blocked_malls:
+          $('custom_blocked_malls').value.trim(),
       })
-      setStatus($('settingsStatus'), '✅ 레퍼럴 ID 저장 완료', true)
+
+      setStatus(
+        $('settingsStatus'),
+        '✅ 관리자 설정 저장 완료',
+        true
+      )
     } catch (e) {
-      setStatus($('settingsStatus'), '❌ ' + e.message, false)
+      setStatus(
+        $('settingsStatus'),
+        '❌ ' + e.message,
+        false
+      )
     }
   })
+
 
   // ============================================================
   // 자동 임포트 (대표이름 / 키워드 / 제외어 / 이미지URL / 정책)
