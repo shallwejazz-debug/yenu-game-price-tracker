@@ -1269,7 +1269,7 @@ admin.post(
           platform,
           year,
           yearIsReference: true,
-          existing: true,
+          existing: false,
           score: assessment.score,
           verdict: assessment.verdict,
           reasons: assessment.reasons,
