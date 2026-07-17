@@ -1,6 +1,33 @@
 // ============================================================
 // 관리자 API 라우트
 // src/routes/admin.tsx
+//
+// 관리자 콘솔
+//   GET    /admin
+//
+// 신규 관리자 API
+//   GET    /admin/api/verify
+//   GET    /admin/api/dashboard
+//   GET    /admin/api/settings
+//   POST   /admin/api/settings
+//   POST   /admin/api/candidates/evaluate
+//   POST   /admin/api/import/preview
+//   POST   /admin/api/import/run
+//   GET    /admin/api/games
+//   DELETE /admin/api/games/:id
+//   POST   /admin/api/reset
+//
+// 기존 호환 API
+//   POST   /admin/api/verify
+//   POST   /admin/api/auto-import
+//   POST   /admin/games
+//   POST   /admin/games/:id/editions
+//   PATCH  /admin/editions/:id
+//   POST   /admin/editions/:id/prices
+//   POST   /admin/editions/:id/fetch-prices
+//
+// 인증
+//   X-Admin-Token 헤더 사용
 // ============================================================
 
 import { Hono } from 'hono'
@@ -51,21 +78,11 @@ type GameListRow = {
   exclude_keywords: string | null
 }
 
-type CandidateOtherPlatform = {
-  platform: string
-  label: string
-  stores: number
-  products: number
-  lowest: number | null
-}
-
 // ============================================================
 // 공통 유틸리티
 // ============================================================
 
-function parseKeywordList(
-  value?: string | null
-): string[] {
+function parseKeywordList(value?: string | null): string[] {
   return Array.from(
     new Set(
       String(value ?? '')
@@ -76,9 +93,7 @@ function parseKeywordList(
   )
 }
 
-function parseSettingList(
-  value?: string | null
-): string[] {
+function parseSettingList(value?: string | null): string[] {
   return Array.from(
     new Set(
       String(value ?? '')
@@ -89,9 +104,7 @@ function parseSettingList(
   )
 }
 
-function normalizeTitle(
-  value?: string | null
-): string {
+function normalizeTitle(value?: string | null): string {
   return String(value ?? '')
     .toLowerCase()
     .replace(/<[^>]*>/g, '')
@@ -103,6 +116,11 @@ function normalizeTitle(
 
 // ============================================================
 // 후보 게임명과 네이버 상품명 비교
+//
+// 목적
+// - 스파이더맨 2 후보에 스파이더맨 1·3·4 등이 포함되는 문제 방지
+// - PS5, PS4, Switch 2 등에 포함된 플랫폼 숫자는 작품 번호에서 제외
+// - 연도는 후보 판정에 사용하지 않음
 // ============================================================
 
 const ROMAN_NUMBER_MAP: Record<string, string> = {
@@ -129,27 +147,11 @@ function normalizeCandidateMatchText(
     .replace(/<[^>]*>/g, ' ')
     .replace(/[™®©]/g, ' ')
 
-  // 주요 영문·한글 제목 표기 통합
+  // 영문·한글 표기를 같은 제목으로 비교
   text = text
     .replace(
       /spider[\s\-–—_]*man/g,
       '스파이더맨'
-    )
-    .replace(
-      /rise[\s\-–—_]*of[\s\-–—_]*the[\s\-–—_]*tomb[\s\-–—_]*raider/g,
-      '라이즈오브더툼레이더'
-    )
-    .replace(
-      /shadow[\s\-–—_]*of[\s\-–—_]*the[\s\-–—_]*tomb[\s\-–—_]*raider/g,
-      '섀도우오브더툼레이더'
-    )
-    .replace(
-      /tomb[\s\-–—_]*raider/g,
-      '툼레이더'
-    )
-    .replace(
-      /definitive[\s\-–—_]*edition/g,
-      '디피니티브에디션'
     )
 
   // 로마 숫자를 일반 숫자로 변환
@@ -159,7 +161,10 @@ function normalizeCandidateMatchText(
       ROMAN_NUMBER_MAP[matched] ?? matched
   )
 
-  // 플랫폼명에 포함된 숫자를 작품 번호에서 제외
+  // 이하 기존 코드 그대로
+
+
+  // 플랫폼명에 포함된 숫자가 작품 번호로 인식되지 않도록 제거
   text = text
     .replace(
       /\bplaystation\s*5\b|\bps\s*5\b|\bps5\b/g,
@@ -177,16 +182,10 @@ function normalizeCandidateMatchText(
       /닌텐도\s*스위치|스위치|nintendo\s*switch|switch/g,
       ' '
     )
-    .replace(
-      /\bxbox(?:\s*series\s*[xs])?\b/g,
-      ' '
-    )
-    .replace(
-      /\bwindows\b|\bsteam\b|\bpc\b/g,
-      ' '
-    )
+    .replace(/\bxbox(?:\s*series\s*[xs])?\b/g, ' ')
+    .replace(/\bwindows\b|\bsteam\b|\bpc\b/g, ' ')
 
-  // 제목 비교에 의미가 적은 표기 제거
+  // 제목 비교에 의미가 적은 일반 표기 제거
   text = text
     .replace(/\bmarvel'?s?\b/g, ' ')
     .replace(/마블/g, ' ')
@@ -233,13 +232,14 @@ function isCandidateTitleMatch(
   const productNumbers =
     extractTitleNumbers(productTitle)
 
-  // 후보 작품 번호가 상품명에도 반드시 있어야 함
+  // 후보에 작품 번호가 있으면 상품명에도 같은 번호가 반드시 있어야 함
   for (const number of candidateNumbers) {
     if (!productNumbers.includes(number)) {
       return false
     }
   }
 
+  // 숫자를 제외한 핵심 제목 비교
   const candidateCore =
     candidate.replace(/\d+/g, '')
 
@@ -253,10 +253,12 @@ function isCandidateTitleMatch(
     return false
   }
 
+  // 완전 정규화 제목 포함
   if (product.includes(candidate)) {
     return true
   }
 
+  // 작품 번호는 위에서 별도 검사했으므로 핵심 제목 포함으로 한 번 더 검사
   return productCore.includes(candidateCore)
 }
 
@@ -291,9 +293,9 @@ function uniqueProductTitles(
   return result
 }
 
-function normalizeSwitchPolicy(
-  value?: string | null
-): string {
+
+
+function normalizeSwitchPolicy(value?: string | null): string {
   const policy = String(value ?? '')
     .trim()
     .toLowerCase()
@@ -305,9 +307,7 @@ function normalizeSwitchPolicy(
   return ''
 }
 
-function normalizePlatform(
-  value?: string | null
-): string {
+function normalizePlatform(value?: string | null): string {
   const platform = String(value ?? '')
     .trim()
     .toLowerCase()
@@ -327,9 +327,7 @@ function normalizePlatform(
     : 'switch'
 }
 
-function platformSearchWord(
-  platform: string
-): string {
+function platformSearchWord(platform: string): string {
   const words: Record<string, string> = {
     pc: 'PC',
     ps5: 'PS5',
@@ -343,104 +341,8 @@ function platformSearchWord(
   return words[platform] ?? ''
 }
 
-function formatCandidatePrice(
-  value: number | null
-): string {
-  if (
-    value === null ||
-    !Number.isFinite(value) ||
-    value <= 0
-  ) {
-    return '가격 없음'
-  }
-
-  return (
-    value.toLocaleString('ko-KR') +
-    '원'
-  )
-}
-
-function collectOtherPlatformResults(
-  buckets: PlatformBucket[],
-  requestedPlatform: string
-): CandidateOtherPlatform[] {
-  const order = [
-    'pc',
-    'ps5',
-    'ps4',
-    'xbox',
-    'switch',
-    'switch2',
-    'etc',
-  ]
-
-  return buckets
-    .filter((bucket) => {
-      if (
-        bucket.platform ===
-        requestedPlatform
-      ) {
-        return false
-      }
-
-      return (
-        bucket.prices?.length ?? 0
-      ) > 0
-    })
-    .map((bucket) => {
-      const prices =
-        bucket.prices ?? []
-
-      const stores = new Set(
-        prices.map(
-          (price) =>
-            `${price.mallName}|${price.isDigital}`
-        )
-      ).size
-
-      const numericPrices = prices
-        .map((price) =>
-          Number(price.price)
-        )
-        .filter(
-          (price) =>
-            Number.isFinite(price) &&
-            price > 0
-        )
-
-      const lowest =
-        numericPrices.length > 0
-          ? Math.min(...numericPrices)
-          : null
-
-      return {
-        platform: bucket.platform,
-        label:
-          PLATFORM_LABELS[
-            bucket.platform
-          ] ??
-          bucket.platform.toUpperCase(),
-        stores,
-        products: prices.length,
-        lowest,
-      }
-    })
-    .sort(
-      (a, b) =>
-        order.indexOf(a.platform) -
-        order.indexOf(b.platform)
-    )
-}
-
-function parseImportGroup(
-  raw: any
-): ImportGroup | null {
-  const name =
-    String(
-      raw?.name ??
-      raw?.title ??
-      ''
-    ).trim()
+function parseImportGroup(raw: any): ImportGroup | null {
+  const name = String(raw?.name ?? raw?.title ?? '').trim()
 
   if (!name) {
     return null
@@ -458,23 +360,18 @@ function parseImportGroup(
     Array.isArray(raw?.aliases) &&
     raw.aliases.length
   ) {
-    searchQuery =
-      String(raw.aliases[0] ?? '').trim()
+    searchQuery = String(raw.aliases[0] ?? '').trim()
   }
 
-  const keywords =
-    Array.isArray(raw?.keywords)
-      ? Array.from(
-          new Set(
-            raw.keywords
-              .map(
-                (item: any) =>
-                  String(item).trim()
-              )
-              .filter(Boolean)
-          )
+  const keywords = Array.isArray(raw?.keywords)
+    ? Array.from(
+        new Set(
+          raw.keywords
+            .map((item: any) => String(item).trim())
+            .filter(Boolean)
         )
-      : parseKeywordList(raw?.keywords)
+      )
+    : parseKeywordList(raw?.keywords)
 
   const rawExclude =
     raw?.exclude ??
@@ -482,19 +379,15 @@ function parseImportGroup(
     raw?.exclude_keywords ??
     ''
 
-  const exclude =
-    Array.isArray(rawExclude)
-      ? Array.from(
-          new Set(
-            rawExclude
-              .map(
-                (item: any) =>
-                  String(item).trim()
-              )
-              .filter(Boolean)
-          )
+  const exclude = Array.isArray(rawExclude)
+    ? Array.from(
+        new Set(
+          rawExclude
+            .map((item: any) => String(item).trim())
+            .filter(Boolean)
         )
-      : parseKeywordList(rawExclude)
+      )
+    : parseKeywordList(rawExclude)
 
   const imageUrl = String(
     raw?.imageUrl ??
@@ -503,16 +396,14 @@ function parseImportGroup(
     ''
   ).trim()
 
-  const switchPolicy =
-    normalizeSwitchPolicy(
-      raw?.switchPolicy ??
-      raw?.switch_policy
-    )
+  const switchPolicy = normalizeSwitchPolicy(
+    raw?.switchPolicy ??
+    raw?.switch_policy
+  )
 
   return {
     name,
-    searchQuery:
-      searchQuery || name,
+    searchQuery: searchQuery || name,
     keywords,
     exclude,
     imageUrl,
@@ -535,42 +426,32 @@ function mergeLowestByMall(
 
   return buckets
     .map((bucket) => {
-      const byMall =
-        new Map<string, any>()
+      const byMall = new Map<string, any>()
 
-      for (
-        const price of
-          bucket.prices ?? []
-      ) {
+      for (const price of bucket.prices ?? []) {
         const key =
           `${price.mallName}|${price.isDigital}`
 
-        const existing =
-          byMall.get(key)
+        const existing = byMall.get(key)
 
         if (
           !existing ||
-          Number(price.price) <
-          Number(existing.price)
+          Number(price.price) < Number(existing.price)
         ) {
           byMall.set(key, price)
         }
       }
 
-      const prices =
-        Array.from(byMall.values())
-          .sort(
-            (a, b) =>
-              Number(a.price) -
-              Number(b.price)
-          )
+      const prices = Array.from(byMall.values())
+        .sort(
+          (a, b) =>
+            Number(a.price) - Number(b.price)
+        )
 
       return {
         platform: bucket.platform,
         prices,
-        count:
-          bucket.count ??
-          prices.length,
+        count: bucket.count ?? prices.length,
         lowest:
           prices.length > 0
             ? Number(prices[0].price)
@@ -588,8 +469,7 @@ function applySwitchPolicy(
   buckets: PlatformBucket[],
   switchPolicy: string
 ): PlatformBucket[] {
-  const result =
-    mergeLowestByMall(buckets)
+  const result = mergeLowestByMall(buckets)
 
   if (
     switchPolicy !== 's1' &&
@@ -610,21 +490,18 @@ function applySwitchPolicy(
 
   const source = result.find(
     (bucket) =>
-      bucket.platform ===
-      sourcePlatform
+      bucket.platform === sourcePlatform
   )
 
   let target = result.find(
     (bucket) =>
-      bucket.platform ===
-      targetPlatform
+      bucket.platform === targetPlatform
   )
 
   if (source) {
     if (!target) {
       target = {
-        platform:
-          targetPlatform,
+        platform: targetPlatform,
         prices: [],
         count: 0,
         lowest: null,
@@ -633,63 +510,46 @@ function applySwitchPolicy(
       result.push(target)
     }
 
-    const priceMap =
-      new Map<string, any>()
+    const priceMap = new Map<string, any>()
 
-    for (
-      const price of
-        target.prices ?? []
-    ) {
+    for (const price of target.prices ?? []) {
       const key =
         `${price.mallName}|${price.isDigital}`
 
       priceMap.set(key, price)
     }
 
-    for (
-      const price of
-        source.prices ?? []
-    ) {
+    for (const price of source.prices ?? []) {
       const key =
         `${price.mallName}|${price.isDigital}`
 
-      const existing =
-        priceMap.get(key)
+      const existing = priceMap.get(key)
 
       if (
         !existing ||
-        Number(price.price) <
-        Number(existing.price)
+        Number(price.price) < Number(existing.price)
       ) {
         priceMap.set(key, price)
       }
     }
 
-    target.prices =
-      Array.from(
-        priceMap.values()
-      ).sort(
+    target.prices = Array.from(priceMap.values())
+      .sort(
         (a, b) =>
-          Number(a.price) -
-          Number(b.price)
+          Number(a.price) - Number(b.price)
       )
 
-    target.count =
-      target.prices.length
-
+    target.count = target.prices.length
     target.lowest =
       target.prices.length > 0
-        ? Number(
-            target.prices[0].price
-          )
+        ? Number(target.prices[0].price)
         : null
   }
 
   return mergeLowestByMall(
     result.filter(
       (bucket) =>
-        bucket.platform !==
-        sourcePlatform
+        bucket.platform !== sourcePlatform
     )
   )
 }
@@ -698,20 +558,15 @@ async function loadCustomFilters(
   db: D1Database
 ): Promise<CustomFilters> {
   try {
-    const settings =
-      await getAllSettings(db)
+    const settings = await getAllSettings(db)
 
     return {
-      blacklistKeywords:
-        parseSettingList(
-          settings
-            .custom_blacklist_keywords
-        ),
-      blockedMalls:
-        parseSettingList(
-          settings
-            .custom_blocked_malls
-        ),
+      blacklistKeywords: parseSettingList(
+        settings.custom_blacklist_keywords
+      ),
+      blockedMalls: parseSettingList(
+        settings.custom_blocked_malls
+      ),
     }
   } catch (error) {
     console.error(
@@ -729,29 +584,20 @@ async function loadCustomFilters(
 function buildPlatformView(
   buckets: PlatformBucket[]
 ): Record<string, any> {
-  const platforms:
-    Record<string, any> = {}
+  const platforms: Record<string, any> = {}
 
   for (const bucket of buckets) {
     platforms[bucket.platform] = {
       label:
-        PLATFORM_LABELS[
-          bucket.platform
-        ] ??
+        PLATFORM_LABELS[bucket.platform] ??
         bucket.platform,
       count: bucket.count,
       lowest: bucket.lowest,
-      malls:
-        bucket.prices.map(
-          (price) => ({
-            source:
-              price.mallName,
-            label:
-              price.mallLabel,
-            price:
-              price.price,
-          })
-        ),
+      malls: bucket.prices.map((price) => ({
+        source: price.mallName,
+        label: price.mallLabel,
+        price: price.price,
+      })),
     }
   }
 
@@ -762,10 +608,7 @@ function firstImage(
   buckets: PlatformBucket[]
 ): string | null {
   for (const bucket of buckets) {
-    for (
-      const price of
-        bucket.prices ?? []
-    ) {
+    for (const price of bucket.prices ?? []) {
       if (price.image) {
         return price.image
       }
@@ -778,15 +621,8 @@ function firstImage(
 async function findExistingGame(
   db: D1Database,
   title: string
-): Promise<{
-  id: number
-  title: string
-} | null> {
-  const exact =
-    await findGameByTitle(
-      db,
-      title
-    )
+): Promise<{ id: number; title: string } | null> {
+  const exact = await findGameByTitle(db, title)
 
   if (exact) {
     return {
@@ -795,32 +631,23 @@ async function findExistingGame(
     }
   }
 
-  const normalized =
-    normalizeTitle(title)
+  const normalized = normalizeTitle(title)
 
   if (!normalized) {
     return null
   }
 
-  const { results } =
-    await db
-      .prepare(
-        `SELECT id, title
-         FROM games
-         ORDER BY id DESC`
-      )
-      .all<{
-        id: number
-        title: string
-      }>()
+  const { results } = await db
+    .prepare(
+      `SELECT id, title
+       FROM games
+       ORDER BY id DESC`
+    )
+    .all<{ id: number; title: string }>()
 
-  for (
-    const game of
-      results ?? []
-  ) {
+  for (const game of results ?? []) {
     if (
-      normalizeTitle(game.title) ===
-      normalized
+      normalizeTitle(game.title) === normalized
     ) {
       return game
     }
@@ -844,9 +671,7 @@ function scoreCandidate(
     return {
       score: 0,
       verdict: 'existing',
-      reasons: [
-        '이미 여누딜에 등록된 게임입니다.',
-      ],
+      reasons: ['이미 여누딜에 등록된 게임입니다.'],
     }
   }
 
@@ -855,64 +680,42 @@ function scoreCandidate(
 
   if (stores >= 7) {
     score += 4
-    reasons.push(
-      `정상 판매처 ${stores}곳 +4`
-    )
+    reasons.push(`정상 판매처 ${stores}곳 +4`)
   } else if (stores >= 4) {
     score += 3
-    reasons.push(
-      `정상 판매처 ${stores}곳 +3`
-    )
+    reasons.push(`정상 판매처 ${stores}곳 +3`)
   } else if (stores >= 2) {
     score += 2
-    reasons.push(
-      `정상 판매처 ${stores}곳 +2`
-    )
+    reasons.push(`정상 판매처 ${stores}곳 +2`)
   } else if (stores === 1) {
     score += 1
-    reasons.push(
-      '정상 판매처 1곳 +1'
-    )
+    reasons.push('정상 판매처 1곳 +1')
   } else {
-    reasons.push(
-      '정상 판매처를 찾지 못함'
-    )
+    reasons.push('정상 판매처를 찾지 못함')
   }
 
   if (totalProducts >= 8) {
     score += 2
-    reasons.push(
-      `정상 상품 ${totalProducts}개 +2`
-    )
+    reasons.push(`정상 상품 ${totalProducts}개 +2`)
   } else if (totalProducts >= 3) {
     score += 1
-    reasons.push(
-      `정상 상품 ${totalProducts}개 +1`
-    )
+    reasons.push(`정상 상품 ${totalProducts}개 +1`)
   }
 
   if (spread >= 20000) {
     score += 2
-    reasons.push(
-      `가격 차이 ${spread.toLocaleString('ko-KR')}원 +2`
-    )
+    reasons.push(`가격 차이 ${spread.toLocaleString('ko-KR')}원 +2`)
   } else if (spread >= 8000) {
     score += 1
-    reasons.push(
-      `가격 차이 ${spread.toLocaleString('ko-KR')}원 +1`
-    )
+    reasons.push(`가격 차이 ${spread.toLocaleString('ko-KR')}원 +1`)
   }
 
   const franchisePattern =
     /마리오|젤다|포켓몬|피크민|커비|동물의\s*숲|스플래툰|몬스터\s*헌터|파이널\s*판타지|드래곤\s*퀘스트|용과\s*같이|페르소나|바이오하자드|소닉|메트로이드|파이어\s*엠블렘|제노블레이드|다크\s*소울|엘든\s*링|콜\s*오브\s*듀티|어쌔신\s*크리드|스타워즈/i
 
-  if (
-    franchisePattern.test(title)
-  ) {
+  if (franchisePattern.test(title)) {
     score += 1
-    reasons.push(
-      '주요 프랜차이즈 +1'
-    )
+    reasons.push('주요 프랜차이즈 +1')
   }
 
   score = Math.min(10, score)
@@ -931,22 +734,12 @@ function scoreCandidate(
     verdict = 'review'
   }
 
-  if (
-    verdict === 'recommend'
-  ) {
-    reasons.push(
-      '등록 추천 기준 충족'
-    )
-  } else if (
-    verdict === 'review'
-  ) {
-    reasons.push(
-      '사람의 추가 확인 권장'
-    )
+  if (verdict === 'recommend') {
+    reasons.push('등록 추천 기준 충족')
+  } else if (verdict === 'review') {
+    reasons.push('사람의 추가 확인 권장')
   } else {
-    reasons.push(
-      '현재 검색 결과로는 등록 우선순위가 낮음'
-    )
+    reasons.push('현재 검색 결과로는 등록 우선순위가 낮음')
   }
 
   return {
@@ -968,250 +761,196 @@ admin.get('/', (c) => {
 // 인증 미들웨어
 // ============================================================
 
-admin.use(
-  '/api/*',
-  async (c, next) => {
-    const expected =
-      c.env.ADMIN_TOKEN ??
-      'dev-token'
+admin.use('/api/*', async (c, next) => {
+  const expected =
+    c.env.ADMIN_TOKEN ?? 'dev-token'
 
-    const provided =
-      c.req.header(
-        'X-Admin-Token'
-      ) ?? ''
+  const provided =
+    c.req.header('X-Admin-Token') ?? ''
 
-    if (provided !== expected) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '인증 실패: 올바른 관리자 토큰이 필요합니다.',
-        },
-        401
-      )
-    }
-
-    await next()
+  if (provided !== expected) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          '인증 실패: 올바른 관리자 토큰이 필요합니다.',
+      },
+      401
+    )
   }
-)
 
-admin.use(
-  '*',
-  async (c, next) => {
-    const path = c.req.path
+  await next()
+})
 
-    if (
-      path === '/admin' ||
-      path === '/admin/' ||
-      path.startsWith(
-        '/admin/api/'
-      )
-    ) {
-      return next()
-    }
+// 기존 /admin/games, /admin/editions API 인증
+admin.use('*', async (c, next) => {
+  const path = c.req.path
 
-    const expected =
-      c.env.ADMIN_TOKEN ??
-      'dev-token'
-
-    const provided =
-      c.req.header(
-        'X-Admin-Token'
-      ) ?? ''
-
-    if (provided !== expected) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '인증 실패: 올바른 X-Admin-Token 헤더가 필요합니다.',
-        },
-        401
-      )
-    }
-
-    await next()
+  if (
+    path === '/admin' ||
+    path === '/admin/' ||
+    path.startsWith('/admin/api/')
+  ) {
+    return next()
   }
-)
+
+  const expected =
+    c.env.ADMIN_TOKEN ?? 'dev-token'
+
+  const provided =
+    c.req.header('X-Admin-Token') ?? ''
+
+  if (provided !== expected) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          '인증 실패: 올바른 X-Admin-Token 헤더가 필요합니다.',
+      },
+      401
+    )
+  }
+
+  await next()
+})
 
 // ============================================================
 // 인증 확인
 // ============================================================
 
-admin.get(
-  '/api/verify',
-  (c) => {
-    return c.json({
-      ok: true,
-    })
-  }
-)
+admin.get('/api/verify', (c) => {
+  return c.json({
+    ok: true,
+  })
+})
 
-admin.post(
-  '/api/verify',
-  (c) => {
-    return c.json({
-      ok: true,
-    })
-  }
-)
+admin.post('/api/verify', (c) => {
+  return c.json({
+    ok: true,
+  })
+})
 
 // ============================================================
 // 현황
 // ============================================================
 
-admin.get(
-  '/api/dashboard',
-  async (c) => {
-    try {
-      const gameRow =
-        await c.env.DB
-          .prepare(
-            `SELECT COUNT(*) AS count
-             FROM games`
-          )
-          .first<{
-            count: number
-          }>()
-
-      const editionRow =
-        await c.env.DB
-          .prepare(
-            `SELECT COUNT(*) AS count
-             FROM editions`
-          )
-          .first<{
-            count: number
-          }>()
-
-      return c.json({
-        ok: true,
-        gameCount:
-          Number(
-            gameRow?.count ?? 0
-          ),
-        editionCount:
-          Number(
-            editionRow?.count ?? 0
-          ),
-      })
-    } catch (error: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            `현황 조회 실패: ${error.message}`,
-        },
-        500
+admin.get('/api/dashboard', async (c) => {
+  try {
+    const gameRow = await c.env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM games`
       )
-    }
+      .first<{ count: number }>()
+
+    const editionRow = await c.env.DB
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM editions`
+      )
+      .first<{ count: number }>()
+
+    return c.json({
+      ok: true,
+      gameCount:
+        Number(gameRow?.count ?? 0),
+      editionCount:
+        Number(editionRow?.count ?? 0),
+    })
+  } catch (error: any) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          `현황 조회 실패: ${error.message}`,
+      },
+      500
+    )
   }
-)
+})
 
 // ============================================================
 // 관리자 설정
 // ============================================================
 
-admin.get(
-  '/api/settings',
-  async (c) => {
-    try {
-      const settings =
-        await getAllSettings(
-          c.env.DB
+admin.get('/api/settings', async (c) => {
+  try {
+    const settings =
+      await getAllSettings(c.env.DB)
+
+    return c.json({
+      ok: true,
+      settings: {
+        coupang_partners_id:
+          settings.coupang_partners_id ?? '',
+        linkprice_id:
+          settings.linkprice_id ?? '',
+        custom_blacklist_keywords:
+          settings.custom_blacklist_keywords ?? '',
+        custom_blocked_malls:
+          settings.custom_blocked_malls ?? '',
+      },
+    })
+  } catch (error: any) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          `설정 조회 실패: ${error.message}`,
+      },
+      500
+    )
+  }
+})
+
+admin.post('/api/settings', async (c) => {
+  let body: any
+
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json(
+      {
+        ok: false,
+        error: '올바른 JSON이 아닙니다.',
+      },
+      400
+    )
+  }
+
+  const allowed = [
+    'coupang_partners_id',
+    'linkprice_id',
+    'custom_blacklist_keywords',
+    'custom_blocked_malls',
+  ]
+
+  try {
+    for (const key of allowed) {
+      if (body[key] !== undefined) {
+        await setSetting(
+          c.env.DB,
+          key,
+          String(body[key] ?? '').trim()
         )
-
-      return c.json({
-        ok: true,
-        settings: {
-          coupang_partners_id:
-            settings
-              .coupang_partners_id ??
-            '',
-          linkprice_id:
-            settings.linkprice_id ??
-            '',
-          custom_blacklist_keywords:
-            settings
-              .custom_blacklist_keywords ??
-            '',
-          custom_blocked_malls:
-            settings
-              .custom_blocked_malls ??
-            '',
-        },
-      })
-    } catch (error: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            `설정 조회 실패: ${error.message}`,
-        },
-        500
-      )
-    }
-  }
-)
-
-admin.post(
-  '/api/settings',
-  async (c) => {
-    let body: any
-
-    try {
-      body =
-        await c.req.json()
-    } catch {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
-        },
-        400
-      )
-    }
-
-    const allowed = [
-      'coupang_partners_id',
-      'linkprice_id',
-      'custom_blacklist_keywords',
-      'custom_blocked_malls',
-    ]
-
-    try {
-      for (const key of allowed) {
-        if (
-          body[key] !== undefined
-        ) {
-          await setSetting(
-            c.env.DB,
-            key,
-            String(
-              body[key] ?? ''
-            ).trim()
-          )
-        }
       }
-
-      return c.json({
-        ok: true,
-        message:
-          '관리자 설정을 저장했습니다.',
-      })
-    } catch (error: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            `설정 저장 실패: ${error.message}`,
-        },
-        500
-      )
     }
+
+    return c.json({
+      ok: true,
+      message: '관리자 설정을 저장했습니다.',
+    })
+  } catch (error: any) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          `설정 저장 실패: ${error.message}`,
+      },
+      500
+    )
   }
-)
+})
 
 // ============================================================
 // 후보 평가
@@ -1226,10 +965,7 @@ admin.post(
     const clientSecret =
       c.env.NAVER_CLIENT_SECRET
 
-    if (
-      !clientId ||
-      !clientSecret
-    ) {
+    if (!clientId || !clientSecret) {
       return c.json(
         {
           ok: false,
@@ -1243,50 +979,39 @@ admin.post(
     let body: any
 
     try {
-      body =
-        await c.req.json()
+      body = await c.req.json()
     } catch {
       return c.json(
         {
           ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
+          error: '올바른 JSON이 아닙니다.',
         },
         400
       )
     }
 
     const title =
-      String(
-        body.title ?? ''
-      ).trim()
+      String(body.title ?? '').trim()
 
     const platform =
-      normalizePlatform(
-        body.platform
-      )
+      normalizePlatform(body.platform)
 
     const year =
       body.year
-        ? String(
-            body.year
-          ).trim()
+        ? String(body.year).trim()
         : ''
 
     if (!title) {
       return c.json(
         {
           ok: false,
-          error:
-            '후보 게임명이 필요합니다.',
+          error: '후보 게임명이 필요합니다.',
         },
         400
       )
     }
 
-    if (
-      title.length > 150
-    ) {
+    if (title.length > 150) {
       return c.json(
         {
           ok: false,
@@ -1311,38 +1036,26 @@ admin.post(
             title,
             platform,
             year,
-            yearIsReference: true,
             existing: true,
-            existingGameId:
-              existing.id,
-            existingTitle:
-              existing.title,
-            otherPlatforms: [],
+            existingGameId: existing.id,
+            existingTitle: existing.title,
             score: 0,
             verdict: 'existing',
             reasons: [
               `이미 등록됨: ${existing.title}`,
-              '기준연도는 참고값이며 판정에 사용하지 않음',
             ],
             stores: 0,
             lowest: null,
             highest: null,
             spread: null,
             totalProducts: 0,
-            matchedProducts: 0,
-            mismatchedProducts: 0,
-            totalPlatformProducts: 0,
-            matchRate: 0,
-            matchedProductTitles: [],
-            mismatchedProductTitles: [],
             imageUrl: '',
             keywords: '',
             excludeKeywords: '',
             switchPolicy:
               platform === 'switch2'
                 ? 's2'
-                : platform ===
-                    'switch'
+                : platform === 'switch'
                   ? 's1'
                   : '',
           },
@@ -1350,23 +1063,15 @@ admin.post(
       }
 
       const customFilters =
-        await loadCustomFilters(
-          c.env.DB
-        )
+        await loadCustomFilters(c.env.DB)
 
       const platformWord =
-        platformSearchWord(
-          platform
-        )
+        platformSearchWord(platform)
 
       const query =
         platformWord &&
-        !normalizeTitle(
-          title
-        ).includes(
-          normalizeTitle(
-            platformWord
-          )
+        !normalizeTitle(title).includes(
+          normalizeTitle(platformWord)
         )
           ? `${title} ${platformWord}`
           : title
@@ -1374,8 +1079,7 @@ admin.post(
       const switchPolicy =
         platform === 'switch2'
           ? 's2'
-          : platform ===
-              'switch'
+          : platform === 'switch'
             ? 's1'
             : ''
 
@@ -1400,27 +1104,19 @@ admin.post(
       const bucket =
         buckets.find(
           (item) =>
-            item.platform ===
-            platform
+            item.platform === platform
         ) ?? null
 
-      const platformPrices =
+            const platformPrices =
         bucket?.prices ?? []
 
-      const otherPlatforms =
-        collectOtherPlatformResults(
-          buckets,
-          platform
-        )
-
+      // 요청한 작품명과 작품 번호가 일치하는 상품만 점수 계산에 사용
       const matchedPrices =
         platformPrices.filter(
           (price) =>
             isCandidateTitleMatch(
               title,
-              String(
-                price.title ?? ''
-              )
+              String(price.title ?? '')
             )
         )
 
@@ -1429,40 +1125,29 @@ admin.post(
           (price) =>
             !isCandidateTitleMatch(
               title,
-              String(
-                price.title ?? ''
-              )
+              String(price.title ?? '')
             )
         )
 
       const numericPrices =
         matchedPrices
-          .map(
-            (price) =>
-              Number(
-                price.price
-              )
+          .map((price) =>
+            Number(price.price)
           )
           .filter(
             (price) =>
-              Number.isFinite(
-                price
-              ) &&
+              Number.isFinite(price) &&
               price > 0
           )
 
       const lowest =
         numericPrices.length > 0
-          ? Math.min(
-              ...numericPrices
-            )
+          ? Math.min(...numericPrices)
           : null
 
       const highest =
         numericPrices.length > 0
-          ? Math.max(
-              ...numericPrices
-            )
+          ? Math.max(...numericPrices)
           : null
 
       const spread =
@@ -1501,15 +1186,14 @@ admin.post(
             )
           : 0
 
-      let assessment: {
-        score: number
-        verdict: string
-        reasons: string[]
-      }
+      let assessment:
+        {
+          score: number
+          verdict: string
+          reasons: string[]
+        }
 
-      if (
-        matchedProducts === 0
-      ) {
+      if (matchedProducts === 0) {
         assessment = {
           score: 0,
           verdict: 'exclude',
@@ -1535,9 +1219,7 @@ admin.post(
           `제목·숫자 일치 상품 ${matchedProducts}개`
         )
 
-        if (
-          mismatchedProducts > 0
-        ) {
+        if (mismatchedProducts > 0) {
           assessment.reasons.push(
             `다른 작품 또는 오검색 상품 ${mismatchedProducts}개 제외`
           )
@@ -1551,14 +1233,12 @@ admin.post(
           '기준연도는 참고값이며 판정에 사용하지 않음'
         )
 
+        // 일치 비율이 지나치게 낮으면 자동 추천하지 않고 검토로 낮춤
         if (
-          assessment.verdict ===
-            'recommend' &&
+          assessment.verdict === 'recommend' &&
           matchRate < 50
         ) {
-          assessment.verdict =
-            'review'
-
+          assessment.verdict = 'review'
           assessment.score =
             Math.min(
               assessment.score,
@@ -1571,51 +1251,16 @@ admin.post(
         }
       }
 
-      if (
-        otherPlatforms.length > 0
-      ) {
-        assessment.reasons.push(
-          '다른 플랫폼 검색 결과: ' +
-          otherPlatforms
-            .map((item) => {
-              return (
-                item.label +
-                ' 상품 ' +
-                item.products +
-                '개·판매처 ' +
-                item.stores +
-                '곳·최저 ' +
-                formatCandidatePrice(
-                  item.lowest
-                )
-              )
-            })
-            .join(' / ')
-        )
-
-        assessment.reasons.push(
-          '다른 플랫폼 결과는 참고 정보이며 현재 ' +
-          (
-            platformSearchWord(
-              platform
-            ) ||
-            platform.toUpperCase()
-          ) +
-          ' 후보 점수에는 반영하지 않음'
-        )
-      }
-
       const image =
         matchedPrices.find(
-          (price) =>
-            price.image
+          (price) => price.image
         )?.image ??
         platformPrices.find(
-          (price) =>
-            price.image
+          (price) => price.image
         )?.image ??
-        firstImage(buckets) ??
         ''
+
+     
 
       return c.json({
         ok: true,
@@ -1625,31 +1270,34 @@ admin.post(
           year,
           yearIsReference: true,
           existing: false,
-          otherPlatforms,
-          score:
-            assessment.score,
-          verdict:
-            assessment.verdict,
-          reasons:
-            assessment.reasons,
+          score: assessment.score,
+          verdict: assessment.verdict,
+          reasons: assessment.reasons,
           stores,
           lowest,
           highest,
           spread,
+          // 점수 계산에 실제 사용한 제목 일치 상품 수
           totalProducts:
             matchedProducts,
+
           matchedProducts,
           mismatchedProducts,
           totalPlatformProducts,
           matchRate,
+
           matchedProductTitles:
             uniqueProductTitles(
               matchedPrices
             ),
+
           mismatchedProductTitles:
             uniqueProductTitles(
               mismatchedPrices
             ),
+
+          totalSearchItems:
+            classified.totalItems,
           totalSearchItems:
             classified.totalItems,
           skipped:
@@ -1688,10 +1336,7 @@ async function processImport(
   const clientSecret =
     c.env.NAVER_CLIENT_SECRET
 
-  if (
-    !clientId ||
-    !clientSecret
-  ) {
+  if (!clientId || !clientSecret) {
     return c.json(
       {
         ok: false,
@@ -1705,35 +1350,30 @@ async function processImport(
   let body: any
 
   try {
-    body =
-      await c.req.json()
+    body = await c.req.json()
   } catch {
     return c.json(
       {
         ok: false,
-        error:
-          '올바른 JSON이 아닙니다.',
+        error: '올바른 JSON이 아닙니다.',
       },
       400
     )
   }
 
   const rawGroups =
-    Array.isArray(
-      body.groups
-    )
+    Array.isArray(body.groups)
       ? body.groups
       : []
 
-  const groups =
-    rawGroups
-      .map(parseImportGroup)
-      .filter(
-        (
-          group
-        ): group is ImportGroup =>
-          group !== null
-      )
+  const groups = rawGroups
+    .map(parseImportGroup)
+    .filter(
+      (
+        group
+      ): group is ImportGroup =>
+        group !== null
+    )
 
   if (!groups.length) {
     return c.json(
@@ -1747,9 +1387,7 @@ async function processImport(
   }
 
   const customFilters =
-    await loadCustomFilters(
-      c.env.DB
-    )
+    await loadCustomFilters(c.env.DB)
 
   const results: any[] = []
 
@@ -1762,8 +1400,7 @@ async function processImport(
           group.searchQuery,
           group.keywords,
           group.exclude,
-          group.switchPolicy ||
-            null,
+          group.switchPolicy || null,
           1,
           customFilters
         )
@@ -1786,15 +1423,11 @@ async function processImport(
 
       const resultEntry: any = {
         title: group.name,
-        query:
-          group.searchQuery,
+        query: group.searchQuery,
         image: chosenImage,
-        existing:
-          Boolean(existing),
+        existing: Boolean(existing),
         platforms:
-          buildPlatformView(
-            buckets
-          ),
+          buildPlatformView(buckets),
         totalItems:
           classified.totalItems,
         skipped:
@@ -1803,9 +1436,7 @@ async function processImport(
       }
 
       if (dryRun) {
-        results.push(
-          resultEntry
-        )
+        results.push(resultEntry)
         continue
       }
 
@@ -1822,8 +1453,7 @@ async function processImport(
       let gameId: number
 
       if (existing) {
-        gameId =
-          existing.id
+        gameId = existing.id
 
         if (group.imageUrl) {
           await c.env.DB
@@ -1843,19 +1473,20 @@ async function processImport(
           await insertGame(
             c.env.DB,
             {
-              title:
-                group.name,
+              title: group.name,
               image_url:
-                chosenImage ||
-                null,
+                chosenImage || null,
             }
           )
 
         gameId = Number(
-          inserted.meta
-            .last_row_id
+          inserted.meta.last_row_id
         )
       }
+
+      const policyValue =
+        group.switchPolicy ||
+        null
 
       await c.env.DB
         .prepare(
@@ -1864,8 +1495,7 @@ async function processImport(
            WHERE id = ?`
         )
         .bind(
-          group.switchPolicy ||
-            null,
+          policyValue,
           gameId
         )
         .run()
@@ -1883,9 +1513,7 @@ async function processImport(
       const saved:
         Record<string, number> = {}
 
-      for (
-        const bucket of buckets
-      ) {
+      for (const bucket of buckets) {
         let edition =
           await findEdition(
             c.env.DB,
@@ -1896,15 +1524,11 @@ async function processImport(
         let editionId: number
 
         const platformLabel =
-          PLATFORM_LABELS[
-            bucket.platform
-          ] ??
-          bucket.platform
-            .toUpperCase()
+          PLATFORM_LABELS[bucket.platform] ??
+          bucket.platform.toUpperCase()
 
         if (edition) {
-          editionId =
-            edition.id
+          editionId = edition.id
 
           await c.env.DB
             .prepare(
@@ -1926,8 +1550,7 @@ async function processImport(
             await insertEdition(
               c.env.DB,
               {
-                game_id:
-                  gameId,
+                game_id: gameId,
                 platform:
                   bucket.platform,
                 edition_name:
@@ -1941,12 +1564,9 @@ async function processImport(
               }
             )
 
-          editionId =
-            Number(
-              insertedEdition
-                .meta
-                .last_row_id
-            )
+          editionId = Number(
+            insertedEdition.meta.last_row_id
+          )
         }
 
         await c.env.DB
@@ -1959,61 +1579,40 @@ async function processImport(
 
         let savedCount = 0
 
-        for (
-          const price of
-            bucket.prices
-        ) {
+        for (const price of bucket.prices) {
           await insertPrice(
             c.env.DB,
             {
-              edition_id:
-                editionId,
-              source:
-                price.mallName,
-              price:
-                Number(
-                  price.price
-                ),
+              edition_id: editionId,
+              source: price.mallName,
+              price: Number(price.price),
               currency: 'KRW',
               is_digital:
-                Number(
-                  price.isDigital ??
-                  0
-                ),
+                Number(price.isDigital ?? 0),
               product_url:
-                price.link ||
-                null,
+                price.link || null,
               mall_label:
-                price.mallLabel ||
-                null,
+                price.mallLabel || null,
               title:
-                price.title ||
-                null,
+                price.title || null,
             }
           )
 
           savedCount += 1
         }
 
-        saved[
-          bucket.platform
-        ] = savedCount
+        saved[bucket.platform] =
+          savedCount
       }
 
-      resultEntry.game_id =
-        gameId
+      resultEntry.game_id = gameId
+      resultEntry.saved = saved
 
-      resultEntry.saved =
-        saved
-
-      results.push(
-        resultEntry
-      )
+      results.push(resultEntry)
     } catch (error: any) {
       results.push({
         title: group.name,
-        error:
-          error.message,
+        error: error.message,
       })
     }
   }
@@ -2021,8 +1620,7 @@ async function processImport(
   return c.json({
     ok: true,
     dryRun,
-    count:
-      results.length,
+    count: results.length,
     results,
   })
 }
@@ -2030,49 +1628,37 @@ async function processImport(
 admin.post(
   '/api/import/preview',
   async (c) => {
-    return processImport(
-      c,
-      true
-    )
+    return processImport(c, true)
   }
 )
 
 admin.post(
   '/api/import/run',
   async (c) => {
-    return processImport(
-      c,
-      false
-    )
+    return processImport(c, false)
   }
 )
 
-// ============================================================
 // 기존 자동 가져오기 API 호환
-// ============================================================
-
 admin.post(
   '/api/auto-import',
   async (c) => {
     let clonedBody: any
 
     try {
-      clonedBody =
-        await c.req.json()
+      clonedBody = await c.req.json()
     } catch {
       return c.json(
         {
           ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
+          error: '올바른 JSON이 아닙니다.',
         },
         400
       )
     }
 
     const dryRun =
-      clonedBody.dryRun !==
-      false
+      clonedBody.dryRun !== false
 
     const clientId =
       c.env.NAVER_CLIENT_ID
@@ -2080,10 +1666,7 @@ admin.post(
     const clientSecret =
       c.env.NAVER_CLIENT_SECRET
 
-    if (
-      !clientId ||
-      !clientSecret
-    ) {
+    if (!clientId || !clientSecret) {
       return c.json(
         {
           ok: false,
@@ -2095,38 +1678,29 @@ admin.post(
     }
 
     const rawGroups =
-      Array.isArray(
-        clonedBody.groups
-      )
+      Array.isArray(clonedBody.groups)
         ? clonedBody.groups
         : []
 
-    const groups =
-      rawGroups
-        .map((raw: any) => {
-          if (
-            !raw.searchQuery &&
-            Array.isArray(
-              raw.aliases
-            ) &&
-            raw.aliases.length
-          ) {
-            raw.searchQuery =
-              raw.aliases[0]
-          }
+    const groups = rawGroups
+      .map((raw: any) => {
+        if (
+          !raw.searchQuery &&
+          Array.isArray(raw.aliases) &&
+          raw.aliases.length
+        ) {
+          raw.searchQuery =
+            raw.aliases[0]
+        }
 
-          return parseImportGroup(
-            raw
-          )
-        })
-        .filter(
-          (
-            group:
-              ImportGroup |
-              null
-          ): group is ImportGroup =>
-            group !== null
-        )
+        return parseImportGroup(raw)
+      })
+      .filter(
+        (
+          group: ImportGroup | null
+        ): group is ImportGroup =>
+          group !== null
+      )
 
     if (!groups.length) {
       return c.json(
@@ -2140,15 +1714,11 @@ admin.post(
     }
 
     const customFilters =
-      await loadCustomFilters(
-        c.env.DB
-      )
+      await loadCustomFilters(c.env.DB)
 
     const results: any[] = []
 
-    for (
-      const group of groups
-    ) {
+    for (const group of groups) {
       try {
         const classified =
           await searchAndClassify(
@@ -2157,8 +1727,7 @@ admin.post(
             group.searchQuery,
             group.keywords,
             group.exclude,
-            group.switchPolicy ||
-              null,
+            group.switchPolicy || null,
             1,
             customFilters
           )
@@ -2174,13 +1743,10 @@ admin.post(
           firstImage(buckets)
 
         const entry: any = {
-          title:
-            group.name,
+          title: group.name,
           image,
           platforms:
-            buildPlatformView(
-              buckets
-            ),
+            buildPlatformView(buckets),
           skipped:
             classified.skipped,
           totalItems:
@@ -2201,26 +1767,21 @@ admin.post(
           let gameId: number
 
           if (game) {
-            gameId =
-              game.id
+            gameId = game.id
           } else {
             const inserted =
               await insertGame(
                 c.env.DB,
                 {
-                  title:
-                    group.name,
+                  title: group.name,
                   image_url:
-                    image ||
-                    null,
+                    image || null,
                 }
               )
 
-            gameId =
-              Number(
-                inserted.meta
-                  .last_row_id
-              )
+            gameId = Number(
+              inserted.meta.last_row_id
+            )
           }
 
           await c.env.DB
@@ -2230,22 +1791,15 @@ admin.post(
                WHERE id = ?`
             )
             .bind(
-              group.switchPolicy ||
-                null,
+              group.switchPolicy || null,
               gameId
             )
             .run()
 
           const saved:
-            Record<
-              string,
-              number
-            > = {}
+            Record<string, number> = {}
 
-          for (
-            const bucket of
-              buckets
-          ) {
+          for (const bucket of buckets) {
             let edition =
               await findEdition(
                 c.env.DB,
@@ -2256,22 +1810,19 @@ admin.post(
             let editionId: number
 
             if (edition) {
-              editionId =
-                edition.id
+              editionId = edition.id
             } else {
               const label =
                 PLATFORM_LABELS[
                   bucket.platform
                 ] ??
-                bucket.platform
-                  .toUpperCase()
+                bucket.platform.toUpperCase()
 
               const inserted =
                 await insertEdition(
                   c.env.DB,
                   {
-                    game_id:
-                      gameId,
+                    game_id: gameId,
                     platform:
                       bucket.platform,
                     edition_name:
@@ -2279,21 +1830,17 @@ admin.post(
                     search_query:
                       `${group.name} ${label}`,
                     keywords:
-                      group.keywords
-                        .join(',') ||
+                      group.keywords.join(',') ||
                       null,
                     exclude_keywords:
-                      group.exclude
-                        .join(',') ||
+                      group.exclude.join(',') ||
                       null,
                   }
                 )
 
-              editionId =
-                Number(
-                  inserted.meta
-                    .last_row_id
-                )
+              editionId = Number(
+                inserted.meta.last_row_id
+              )
             }
 
             await c.env.DB
@@ -2301,70 +1848,50 @@ admin.post(
                 `DELETE FROM prices
                  WHERE edition_id = ?`
               )
-              .bind(
-                editionId
-              )
+              .bind(editionId)
               .run()
 
             let count = 0
 
-            for (
-              const price of
-                bucket.prices
-            ) {
+            for (const price of bucket.prices) {
               await insertPrice(
                 c.env.DB,
                 {
-                  edition_id:
-                    editionId,
+                  edition_id: editionId,
                   source:
                     price.mallName,
                   price:
-                    Number(
-                      price.price
-                    ),
-                  currency:
-                    'KRW',
+                    Number(price.price),
+                  currency: 'KRW',
                   is_digital:
                     Number(
-                      price
-                        .isDigital ??
-                      0
+                      price.isDigital ?? 0
                     ),
                   product_url:
-                    price.link ||
-                    null,
+                    price.link || null,
                   mall_label:
-                    price.mallLabel ||
-                    null,
+                    price.mallLabel || null,
                   title:
-                    price.title ||
-                    null,
+                    price.title || null,
                 }
               )
 
               count += 1
             }
 
-            saved[
-              bucket.platform
-            ] = count
+            saved[bucket.platform] =
+              count
           }
 
-          entry.game_id =
-            gameId
-
-          entry.saved =
-            saved
+          entry.game_id = gameId
+          entry.saved = saved
         }
 
         results.push(entry)
       } catch (error: any) {
         results.push({
-          title:
-            group.name,
-          error:
-            error.message,
+          title: group.name,
+          error: error.message,
         })
       }
     }
@@ -2372,8 +1899,7 @@ admin.post(
     return c.json({
       ok: true,
       dryRun,
-      count:
-        results.length,
+      count: results.length,
       results,
     })
   }
@@ -2383,132 +1909,108 @@ admin.post(
 // 등록 게임 목록
 // ============================================================
 
-admin.get(
-  '/api/games',
-  async (c) => {
-    try {
-      const { results } =
-        await c.env.DB
-          .prepare(
-            `SELECT
-               g.id,
-               g.title,
-               g.image_url,
-               g.switch_policy,
-               g.created_at,
-               (
-                 SELECT COUNT(*)
-                 FROM editions ec
-                 WHERE ec.game_id = g.id
-               ) AS edition_count,
-               (
-                 SELECT GROUP_CONCAT(platform)
-                 FROM (
-                   SELECT DISTINCT e2.platform AS platform
-                   FROM editions e2
-                   WHERE e2.game_id = g.id
-                   ORDER BY e2.platform
-                 )
-               ) AS platforms,
-               (
-                 SELECT e3.search_query
-                 FROM editions e3
-                 WHERE e3.game_id = g.id
-                 ORDER BY e3.id
-                 LIMIT 1
-               ) AS search_query,
-               (
-                 SELECT e4.keywords
-                 FROM editions e4
-                 WHERE e4.game_id = g.id
-                   AND e4.keywords IS NOT NULL
-                   AND e4.keywords != ''
-                 ORDER BY e4.id
-                 LIMIT 1
-               ) AS keywords,
-               (
-                 SELECT e5.exclude_keywords
-                 FROM editions e5
-                 WHERE e5.game_id = g.id
-                   AND e5.exclude_keywords IS NOT NULL
-                   AND e5.exclude_keywords != ''
-                 ORDER BY e5.id
-                 LIMIT 1
-               ) AS exclude_keywords
-             FROM games g
-             ORDER BY g.id DESC`
-          )
-          .all<GameListRow>()
-
-      const games =
-        (results ?? [])
-          .map((game) => ({
-            id: game.id,
-            title:
-              game.title,
-            imageUrl:
-              game.image_url ??
-              '',
-            image_url:
-              game.image_url ??
-              '',
-            switchPolicy:
-              game.switch_policy ??
-              '',
-            switch_policy:
-              game.switch_policy ??
-              '',
-            createdAt:
-              game.created_at,
-            editionCount:
-              Number(
-                game.edition_count ??
-                0
-              ),
-            platforms:
-              String(
-                game.platforms ??
-                ''
-              )
-                .split(',')
-                .map(
-                  (item) =>
-                    item.trim()
-                )
-                .filter(Boolean),
-            searchQuery:
-              game.search_query ??
-              '',
-            search_query:
-              game.search_query ??
-              '',
-            keywords:
-              game.keywords ??
-              '',
-            excludeKeywords:
-              game.exclude_keywords ??
-              '',
-            exclude_keywords:
-              game.exclude_keywords ??
-              '',
-          }))
-
-      return c.json({
-        ok: true,
-        games,
-      })
-    } catch (error: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            `게임 목록 조회 실패: ${error.message}`,
-        },
-        500
+admin.get('/api/games', async (c) => {
+  try {
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT
+           g.id,
+           g.title,
+           g.image_url,
+           g.switch_policy,
+           g.created_at,
+           (
+             SELECT COUNT(*)
+             FROM editions ec
+             WHERE ec.game_id = g.id
+           ) AS edition_count,
+           (
+             SELECT GROUP_CONCAT(platform)
+             FROM (
+               SELECT DISTINCT e2.platform AS platform
+               FROM editions e2
+               WHERE e2.game_id = g.id
+               ORDER BY e2.platform
+             )
+           ) AS platforms,
+           (
+             SELECT e3.search_query
+             FROM editions e3
+             WHERE e3.game_id = g.id
+             ORDER BY e3.id
+             LIMIT 1
+           ) AS search_query,
+           (
+             SELECT e4.keywords
+             FROM editions e4
+             WHERE e4.game_id = g.id
+               AND e4.keywords IS NOT NULL
+               AND e4.keywords != ''
+             ORDER BY e4.id
+             LIMIT 1
+           ) AS keywords,
+           (
+             SELECT e5.exclude_keywords
+             FROM editions e5
+             WHERE e5.game_id = g.id
+               AND e5.exclude_keywords IS NOT NULL
+               AND e5.exclude_keywords != ''
+             ORDER BY e5.id
+             LIMIT 1
+           ) AS exclude_keywords
+         FROM games g
+         ORDER BY g.id DESC`
       )
-    }
+      .all<GameListRow>()
+
+    const games =
+      (results ?? []).map((game) => ({
+        id: game.id,
+        title: game.title,
+        imageUrl:
+          game.image_url ?? '',
+        image_url:
+          game.image_url ?? '',
+        switchPolicy:
+          game.switch_policy ?? '',
+        switch_policy:
+          game.switch_policy ?? '',
+        createdAt:
+          game.created_at,
+        editionCount:
+          Number(game.edition_count ?? 0),
+        platforms:
+          String(game.platforms ?? '')
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean),
+        searchQuery:
+          game.search_query ?? '',
+        search_query:
+          game.search_query ?? '',
+        keywords:
+          game.keywords ?? '',
+        excludeKeywords:
+          game.exclude_keywords ?? '',
+        exclude_keywords:
+          game.exclude_keywords ?? '',
+      }))
+
+    return c.json({
+      ok: true,
+      games,
+    })
+  } catch (error: any) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          `게임 목록 조회 실패: ${error.message}`,
+      },
+      500
+    )
   }
-)
+})
 
 // ============================================================
 // 게임 삭제
@@ -2518,21 +2020,16 @@ admin.delete(
   '/api/games/:id',
   async (c) => {
     const gameId =
-      Number(
-        c.req.param('id')
-      )
+      Number(c.req.param('id'))
 
     if (
-      !Number.isInteger(
-        gameId
-      ) ||
+      !Number.isInteger(gameId) ||
       gameId <= 0
     ) {
       return c.json(
         {
           ok: false,
-          error:
-            '잘못된 게임 ID입니다.',
+          error: '잘못된 게임 ID입니다.',
         },
         400
       )
@@ -2547,9 +2044,7 @@ admin.delete(
              WHERE game_id = ?`
           )
           .bind(gameId)
-          .all<{
-            id: number
-          }>()
+          .all<{ id: number }>()
 
       for (
         const edition of
@@ -2560,9 +2055,7 @@ admin.delete(
             `DELETE FROM price_log
              WHERE edition_id = ?`
           )
-          .bind(
-            edition.id
-          )
+          .bind(edition.id)
           .run()
 
         await c.env.DB
@@ -2570,9 +2063,7 @@ admin.delete(
             `DELETE FROM price_history
              WHERE edition_id = ?`
           )
-          .bind(
-            edition.id
-          )
+          .bind(edition.id)
           .run()
 
         await c.env.DB
@@ -2580,9 +2071,7 @@ admin.delete(
             `DELETE FROM prices
              WHERE edition_id = ?`
           )
-          .bind(
-            edition.id
-          )
+          .bind(edition.id)
           .run()
       }
 
@@ -2624,182 +2113,155 @@ admin.delete(
 // 전체 데이터 초기화
 // ============================================================
 
-admin.post(
-  '/api/reset',
-  async (c) => {
-    let body: any
+admin.post('/api/reset', async (c) => {
+  let body: any
 
-    try {
-      body =
-        await c.req.json()
-    } catch {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
-        },
-        400
-      )
-    }
-
-    if (
-      body.confirmation !==
-      '전체 데이터 삭제'
-    ) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '초기화 확인 문장이 일치하지 않습니다.',
-        },
-        400
-      )
-    }
-
-    try {
-      await c.env.DB
-        .prepare(
-          'DELETE FROM price_log'
-        )
-        .run()
-
-      await c.env.DB
-        .prepare(
-          'DELETE FROM price_history'
-        )
-        .run()
-
-      await c.env.DB
-        .prepare(
-          'DELETE FROM prices'
-        )
-        .run()
-
-      await c.env.DB
-        .prepare(
-          'DELETE FROM editions'
-        )
-        .run()
-
-      await c.env.DB
-        .prepare(
-          'DELETE FROM games'
-        )
-        .run()
-
-      return c.json({
-        ok: true,
-        message:
-          '모든 게임 데이터를 초기화했습니다.',
-      })
-    } catch (error: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            `데이터 초기화 실패: ${error.message}`,
-        },
-        500
-      )
-    }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json(
+      {
+        ok: false,
+        error: '올바른 JSON이 아닙니다.',
+      },
+      400
+    )
   }
-)
+
+  if (
+    body.confirmation !==
+    '전체 데이터 삭제'
+  ) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          '초기화 확인 문장이 일치하지 않습니다.',
+      },
+      400
+    )
+  }
+
+  try {
+    await c.env.DB
+      .prepare('DELETE FROM price_log')
+      .run()
+
+    await c.env.DB
+      .prepare('DELETE FROM price_history')
+      .run()
+
+    await c.env.DB
+      .prepare('DELETE FROM prices')
+      .run()
+
+    await c.env.DB
+      .prepare('DELETE FROM editions')
+      .run()
+
+    await c.env.DB
+      .prepare('DELETE FROM games')
+      .run()
+
+    return c.json({
+      ok: true,
+      message:
+        '모든 게임 데이터를 초기화했습니다.',
+    })
+  } catch (error: any) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          `데이터 초기화 실패: ${error.message}`,
+      },
+      500
+    )
+  }
+})
 
 // ============================================================
 // 기존 수동 게임 등록 API
 // ============================================================
 
-admin.post(
-  '/games',
-  async (c) => {
-    let body: any
+admin.post('/games', async (c) => {
+  let body: any
 
-    try {
-      body =
-        await c.req.json()
-    } catch {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
-        },
-        400
-      )
-    }
-
-    const title =
-      String(
-        body.title ?? ''
-      ).trim()
-
-    if (!title) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '게임 제목은 필수입니다.',
-        },
-        400
-      )
-    }
-
-    try {
-      const existing =
-        await findGameByTitle(
-          c.env.DB,
-          title
-        )
-
-      if (existing) {
-        return c.json(
-          {
-            ok: false,
-            error:
-              '이미 같은 제목의 게임이 등록되어 있습니다.',
-          },
-          409
-        )
-      }
-
-      const result =
-        await insertGame(
-          c.env.DB,
-          {
-            title,
-            image_url:
-              body.image_url ??
-              null,
-            release_date:
-              body.release_date ??
-              null,
-            original_price:
-              body.original_price ??
-              null,
-          }
-        )
-
-      return c.json({
-        ok: true,
-        game_id:
-          result.meta
-            .last_row_id,
-        message:
-          `'${title}' 게임을 등록했습니다.`,
-      })
-    } catch (error: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            `게임 등록 실패: ${error.message}`,
-        },
-        500
-      )
-    }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json(
+      {
+        ok: false,
+        error: '올바른 JSON이 아닙니다.',
+      },
+      400
+    )
   }
-)
+
+  const title =
+    String(body.title ?? '').trim()
+
+  if (!title) {
+    return c.json(
+      {
+        ok: false,
+        error: '게임 제목은 필수입니다.',
+      },
+      400
+    )
+  }
+
+  try {
+    const existing =
+      await findGameByTitle(
+        c.env.DB,
+        title
+      )
+
+    if (existing) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미 같은 제목의 게임이 등록되어 있습니다.',
+        },
+        409
+      )
+    }
+
+    const result =
+      await insertGame(
+        c.env.DB,
+        {
+          title,
+          image_url:
+            body.image_url ?? null,
+          release_date:
+            body.release_date ?? null,
+          original_price:
+            body.original_price ?? null,
+        }
+      )
+
+    return c.json({
+      ok: true,
+      game_id:
+        result.meta.last_row_id,
+      message:
+        `'${title}' 게임을 등록했습니다.`,
+    })
+  } catch (error: any) {
+    return c.json(
+      {
+        ok: false,
+        error:
+          `게임 등록 실패: ${error.message}`,
+      },
+      500
+    )
+  }
+})
 
 // ============================================================
 // 기존 에디션 등록 API
@@ -2809,21 +2271,16 @@ admin.post(
   '/games/:id/editions',
   async (c) => {
     const gameId =
-      Number(
-        c.req.param('id')
-      )
+      Number(c.req.param('id'))
 
     if (
-      !Number.isInteger(
-        gameId
-      ) ||
+      !Number.isInteger(gameId) ||
       gameId <= 0
     ) {
       return c.json(
         {
           ok: false,
-          error:
-            '잘못된 게임 ID입니다.',
+          error: '잘못된 게임 ID입니다.',
         },
         400
       )
@@ -2832,23 +2289,19 @@ admin.post(
     let body: any
 
     try {
-      body =
-        await c.req.json()
+      body = await c.req.json()
     } catch {
       return c.json(
         {
           ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
+          error: '올바른 JSON이 아닙니다.',
         },
         400
       )
     }
 
     const platform =
-      normalizePlatform(
-        body.platform
-      )
+      normalizePlatform(body.platform)
 
     try {
       const existing =
@@ -2873,32 +2326,25 @@ admin.post(
         await insertEdition(
           c.env.DB,
           {
-            game_id:
-              gameId,
+            game_id: gameId,
             platform,
             edition_name:
-              body.edition_name ??
-              null,
+              body.edition_name ?? null,
             search_query:
-              body.search_query ??
-              null,
+              body.search_query ?? null,
             keywords:
-              body.keywords ??
-              null,
+              body.keywords ?? null,
             exclude_keywords:
-              body.exclude_keywords ??
-              null,
+              body.exclude_keywords ?? null,
             steam_appid:
-              body.steam_appid ??
-              null,
+              body.steam_appid ?? null,
           }
         )
 
       return c.json({
         ok: true,
         edition_id:
-          result.meta
-            .last_row_id,
+          result.meta.last_row_id,
         message:
           '에디션을 추가했습니다.',
       })
@@ -2923,14 +2369,10 @@ admin.patch(
   '/editions/:id',
   async (c) => {
     const editionId =
-      Number(
-        c.req.param('id')
-      )
+      Number(c.req.param('id'))
 
     if (
-      !Number.isInteger(
-        editionId
-      ) ||
+      !Number.isInteger(editionId) ||
       editionId <= 0
     ) {
       return c.json(
@@ -2946,14 +2388,12 @@ admin.patch(
     let body: any
 
     try {
-      body =
-        await c.req.json()
+      body = await c.req.json()
     } catch {
       return c.json(
         {
           ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
+          error: '올바른 JSON이 아닙니다.',
         },
         400
       )
@@ -2968,22 +2408,13 @@ admin.patch(
       'steam_appid',
     ]
 
-    const fields:
-      string[] = []
-
-    const values:
-      any[] = []
+    const fields: string[] = []
+    const values: any[] = []
 
     for (const key of allowed) {
-      if (
-        body[key] !== undefined
-      ) {
-        fields.push(
-          `${key} = ?`
-        )
-        values.push(
-          body[key]
-        )
+      if (body[key] !== undefined) {
+        fields.push(`${key} = ?`)
+        values.push(body[key])
       }
     }
 
@@ -2991,16 +2422,13 @@ admin.patch(
       return c.json(
         {
           ok: false,
-          error:
-            '수정할 값이 없습니다.',
+          error: '수정할 값이 없습니다.',
         },
         400
       )
     }
 
-    values.push(
-      editionId
-    )
+    values.push(editionId)
 
     try {
       await c.env.DB
@@ -3038,14 +2466,10 @@ admin.post(
   '/editions/:id/prices',
   async (c) => {
     const editionId =
-      Number(
-        c.req.param('id')
-      )
+      Number(c.req.param('id'))
 
     if (
-      !Number.isInteger(
-        editionId
-      ) ||
+      !Number.isInteger(editionId) ||
       editionId <= 0
     ) {
       return c.json(
@@ -3061,14 +2485,12 @@ admin.post(
     let body: any
 
     try {
-      body =
-        await c.req.json()
+      body = await c.req.json()
     } catch {
       return c.json(
         {
           ok: false,
-          error:
-            '올바른 JSON이 아닙니다.',
+          error: '올바른 JSON이 아닙니다.',
         },
         400
       )
@@ -3076,8 +2498,7 @@ admin.post(
 
     if (
       !body.source ||
-      body.price ===
-        undefined
+      body.price === undefined
     ) {
       return c.json(
         {
@@ -3094,41 +2515,30 @@ admin.post(
         await insertPrice(
           c.env.DB,
           {
-            edition_id:
-              editionId,
+            edition_id: editionId,
             source:
-              String(
-                body.source
-              ),
+              String(body.source),
             price:
-              Number(
-                body.price
-              ),
+              Number(body.price),
             currency:
-              body.currency ??
-              'KRW',
+              body.currency ?? 'KRW',
             is_digital:
               Number(
-                body.is_digital ??
-                1
+                body.is_digital ?? 1
               ),
             product_url:
-              body.product_url ??
-              null,
+              body.product_url ?? null,
             mall_label:
-              body.mall_label ??
-              null,
+              body.mall_label ?? null,
             title:
-              body.title ??
-              null,
+              body.title ?? null,
           }
         )
 
       return c.json({
         ok: true,
         price_id:
-          result.meta
-            .last_row_id,
+          result.meta.last_row_id,
         message:
           '가격을 추가했습니다.',
       })
@@ -3153,14 +2563,10 @@ admin.post(
   '/editions/:id/fetch-prices',
   async (c) => {
     const editionId =
-      Number(
-        c.req.param('id')
-      )
+      Number(c.req.param('id'))
 
     if (
-      !Number.isInteger(
-        editionId
-      ) ||
+      !Number.isInteger(editionId) ||
       editionId <= 0
     ) {
       return c.json(
@@ -3179,10 +2585,7 @@ admin.post(
     const clientSecret =
       c.env.NAVER_CLIENT_SECRET
 
-    if (
-      !clientId ||
-      !clientSecret
-    ) {
+    if (!clientId || !clientSecret) {
       return c.json(
         {
           ok: false,
@@ -3210,9 +2613,7 @@ admin.post(
       )
     }
 
-    if (
-      !edition.search_query
-    ) {
+    if (!edition.search_query) {
       return c.json(
         {
           ok: false,
@@ -3231,18 +2632,14 @@ admin.post(
              FROM games
              WHERE id = ?`
           )
-          .bind(
-            edition.game_id
-          )
+          .bind(edition.game_id)
           .first<{
             switch_policy:
               string | null
           }>()
 
       const customFilters =
-        await loadCustomFilters(
-          c.env.DB
-        )
+        await loadCustomFilters(c.env.DB)
 
       const classified =
         await searchAndClassify(
@@ -3253,11 +2650,9 @@ admin.post(
             edition.keywords
           ),
           parseKeywordList(
-            edition
-              .exclude_keywords
+            edition.exclude_keywords
           ),
-          game?.switch_policy ??
-            null,
+          game?.switch_policy ?? null,
           1,
           customFilters
         )
@@ -3265,8 +2660,7 @@ admin.post(
       const buckets =
         applySwitchPolicy(
           classified.buckets,
-          game?.switch_policy ??
-            ''
+          game?.switch_policy ?? ''
         )
 
       const bucket =
@@ -3294,43 +2688,31 @@ admin.post(
           `DELETE FROM prices
            WHERE edition_id = ?`
         )
-        .bind(
-          editionId
-        )
+        .bind(editionId)
         .run()
 
       let saved = 0
 
-      for (
-        const price of prices
-      ) {
+      for (const price of prices) {
         await insertPrice(
           c.env.DB,
           {
-            edition_id:
-              editionId,
+            edition_id: editionId,
             source:
               price.mallName,
             price:
-              Number(
-                price.price
-              ),
-            currency:
-              'KRW',
+              Number(price.price),
+            currency: 'KRW',
             is_digital:
               Number(
-                price.isDigital ??
-                0
+                price.isDigital ?? 0
               ),
             product_url:
-              price.link ||
-              null,
+              price.link || null,
             mall_label:
-              price.mallLabel ||
-              null,
+              price.mallLabel || null,
             title:
-              price.title ||
-              null,
+              price.title || null,
           }
         )
 
