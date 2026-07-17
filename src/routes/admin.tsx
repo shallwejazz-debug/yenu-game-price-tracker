@@ -114,6 +114,177 @@ function normalizeTitle(value?: string | null): string {
     .trim()
 }
 
+// ============================================================
+// 후보 게임명과 네이버 상품명 비교
+//
+// 목적
+// - 스파이더맨 2 후보에 스파이더맨 1·3·4 등이 포함되는 문제 방지
+// - PS5, PS4, Switch 2 등에 포함된 플랫폼 숫자는 작품 번호에서 제외
+// - 연도는 후보 판정에 사용하지 않음
+// ============================================================
+
+const ROMAN_NUMBER_MAP: Record<string, string> = {
+  i: '1',
+  ii: '2',
+  iii: '3',
+  iv: '4',
+  v: '5',
+  vi: '6',
+  vii: '7',
+  viii: '8',
+  ix: '9',
+  x: '10',
+  xi: '11',
+  xii: '12',
+  xiii: '13',
+}
+
+function normalizeCandidateMatchText(
+  value?: string | null
+): string {
+  let text = String(value ?? '')
+    .toLowerCase()
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[™®©]/g, ' ')
+
+  // 로마 숫자를 일반 숫자로 변환
+  text = text.replace(
+    /\b(xiii|xii|xi|viii|vii|vi|iv|ix|iii|ii|x|v|i)\b/g,
+    (matched) =>
+      ROMAN_NUMBER_MAP[matched] ?? matched
+  )
+
+  // 플랫폼명에 포함된 숫자가 작품 번호로 인식되지 않도록 제거
+  text = text
+    .replace(
+      /\bplaystation\s*5\b|\bps\s*5\b|\bps5\b/g,
+      ' '
+    )
+    .replace(
+      /\bplaystation\s*4\b|\bps\s*4\b|\bps4\b/g,
+      ' '
+    )
+    .replace(
+      /닌텐도\s*스위치\s*2|스위치\s*2|switch\s*2/g,
+      ' '
+    )
+    .replace(
+      /닌텐도\s*스위치|스위치|nintendo\s*switch|switch/g,
+      ' '
+    )
+    .replace(/\bxbox(?:\s*series\s*[xs])?\b/g, ' ')
+    .replace(/\bwindows\b|\bsteam\b|\bpc\b/g, ' ')
+
+  // 제목 비교에 의미가 적은 일반 표기 제거
+  text = text
+    .replace(/\bmarvel'?s?\b/g, ' ')
+    .replace(/마블/g, ' ')
+    .replace(
+      /한글판|한국어판|정식발매|정발|국내판|패키지판|패키지|게임타이틀/g,
+      ' '
+    )
+
+  return text
+    .replace(/[^0-9a-z가-힣]+/g, '')
+    .trim()
+}
+
+function extractTitleNumbers(
+  value?: string | null
+): string[] {
+  const normalized =
+    normalizeCandidateMatchText(value)
+
+  return Array.from(
+    new Set(
+      normalized.match(/\d+/g) ?? []
+    )
+  )
+}
+
+function isCandidateTitleMatch(
+  candidateTitle: string,
+  productTitle: string
+): boolean {
+  const candidate =
+    normalizeCandidateMatchText(candidateTitle)
+
+  const product =
+    normalizeCandidateMatchText(productTitle)
+
+  if (!candidate || !product) {
+    return false
+  }
+
+  const candidateNumbers =
+    extractTitleNumbers(candidateTitle)
+
+  const productNumbers =
+    extractTitleNumbers(productTitle)
+
+  // 후보에 작품 번호가 있으면 상품명에도 같은 번호가 반드시 있어야 함
+  for (const number of candidateNumbers) {
+    if (!productNumbers.includes(number)) {
+      return false
+    }
+  }
+
+  // 숫자를 제외한 핵심 제목 비교
+  const candidateCore =
+    candidate.replace(/\d+/g, '')
+
+  const productCore =
+    product.replace(/\d+/g, '')
+
+  if (
+    candidateCore.length < 2 ||
+    productCore.length < 2
+  ) {
+    return false
+  }
+
+  // 완전 정규화 제목 포함
+  if (product.includes(candidate)) {
+    return true
+  }
+
+  // 작품 번호는 위에서 별도 검사했으므로 핵심 제목 포함으로 한 번 더 검사
+  return productCore.includes(candidateCore)
+}
+
+function uniqueProductTitles(
+  prices: any[],
+  limit = 5
+): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const price of prices) {
+    const title =
+      String(price?.title ?? '').trim()
+
+    if (!title) continue
+
+    const key =
+      normalizeCandidateMatchText(title)
+
+    if (!key || seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    result.push(title)
+
+    if (result.length >= limit) {
+      break
+    }
+  }
+
+  return result
+}
+
+
+
 function normalizeSwitchPolicy(value?: string | null): string {
   const policy = String(value ?? '')
     .trim()
@@ -926,11 +1097,30 @@ admin.post(
             item.platform === platform
         ) ?? null
 
-      const prices =
+            const platformPrices =
         bucket?.prices ?? []
 
+      // 요청한 작품명과 작품 번호가 일치하는 상품만 점수 계산에 사용
+      const matchedPrices =
+        platformPrices.filter(
+          (price) =>
+            isCandidateTitleMatch(
+              title,
+              String(price.title ?? '')
+            )
+        )
+
+      const mismatchedPrices =
+        platformPrices.filter(
+          (price) =>
+            !isCandidateTitleMatch(
+              title,
+              String(price.title ?? '')
+            )
+        )
+
       const numericPrices =
-        prices
+        matchedPrices
           .map((price) =>
             Number(price.price)
           )
@@ -953,33 +1143,114 @@ admin.post(
       const spread =
         lowest !== null &&
         highest !== null
-          ? Math.max(0, highest - lowest)
+          ? Math.max(
+              0,
+              highest - lowest
+            )
           : 0
 
       const stores =
         new Set(
-          prices.map(
+          matchedPrices.map(
             (price) =>
               `${price.mallName}|${price.isDigital}`
           )
         ).size
 
-      const totalProducts =
-        Number(bucket?.count ?? 0)
+      const matchedProducts =
+        matchedPrices.length
 
-      const assessment =
-        scoreCandidate(
-          stores,
-          totalProducts,
-          spread,
-          title,
-          false
+      const mismatchedProducts =
+        mismatchedPrices.length
+
+      const totalPlatformProducts =
+        platformPrices.length
+
+      const matchRate =
+        totalPlatformProducts > 0
+          ? Math.round(
+              (
+                matchedProducts /
+                totalPlatformProducts
+              ) * 100
+            )
+          : 0
+
+      let assessment:
+        {
+          score: number
+          verdict: string
+          reasons: string[]
+        }
+
+      if (matchedProducts === 0) {
+        assessment = {
+          score: 0,
+          verdict: 'exclude',
+          reasons: [
+            '요청한 게임명과 작품 번호가 일치하는 상품을 찾지 못함',
+            mismatchedProducts > 0
+              ? `다른 작품 또는 오검색 상품 ${mismatchedProducts}개 제외`
+              : '요청 플랫폼의 정상 상품을 찾지 못함',
+            '기준연도는 참고값이며 이 판정에 사용하지 않음',
+          ],
+        }
+      } else {
+        assessment =
+          scoreCandidate(
+            stores,
+            matchedProducts,
+            spread,
+            title,
+            false
+          )
+
+        assessment.reasons.unshift(
+          `제목·숫자 일치 상품 ${matchedProducts}개`
         )
 
+        if (mismatchedProducts > 0) {
+          assessment.reasons.push(
+            `다른 작품 또는 오검색 상품 ${mismatchedProducts}개 제외`
+          )
+        }
+
+        assessment.reasons.push(
+          `제목 일치 비율 ${matchRate}%`
+        )
+
+        assessment.reasons.push(
+          '기준연도는 참고값이며 판정에 사용하지 않음'
+        )
+
+        // 일치 비율이 지나치게 낮으면 자동 추천하지 않고 검토로 낮춤
+        if (
+          assessment.verdict === 'recommend' &&
+          matchRate < 50
+        ) {
+          assessment.verdict = 'review'
+          assessment.score =
+            Math.min(
+              assessment.score,
+              5
+            )
+
+          assessment.reasons.push(
+            '오검색 비율이 높아 자동 추천 대신 검토로 변경'
+          )
+        }
+      }
+
       const image =
-        prices.find(
+        matchedPrices.find(
           (price) => price.image
-        )?.image ?? ''
+        )?.image ??
+        platformPrices.find(
+          (price) => price.image
+        )?.image ??
+        ''
+
+     
 
       return c.json({
         ok: true,
@@ -987,7 +1258,8 @@ admin.post(
           title,
           platform,
           year,
-          existing: false,
+          yearIsReference: true,
+          existing: true,
           score: assessment.score,
           verdict: assessment.verdict,
           reasons: assessment.reasons,
@@ -995,7 +1267,27 @@ admin.post(
           lowest,
           highest,
           spread,
-          totalProducts,
+          // 점수 계산에 실제 사용한 제목 일치 상품 수
+          totalProducts:
+            matchedProducts,
+
+          matchedProducts,
+          mismatchedProducts,
+          totalPlatformProducts,
+          matchRate,
+
+          matchedProductTitles:
+            uniqueProductTitles(
+              matchedPrices
+            ),
+
+          mismatchedProductTitles:
+            uniqueProductTitles(
+              mismatchedPrices
+            ),
+
+          totalSearchItems:
+            classified.totalItems,
           totalSearchItems:
             classified.totalItems,
           skipped:
@@ -1079,17 +1371,6 @@ async function processImport(
         ok: false,
         error:
           '가져올 게임을 한 개 이상 입력하세요.',
-      },
-      400
-    )
-  }
-
-  if (groups.length > 100) {
-    return c.json(
-      {
-        ok: false,
-        error:
-          '한 번에 최대 100개까지 처리할 수 있습니다.',
       },
       400
     )
