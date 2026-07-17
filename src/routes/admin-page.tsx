@@ -1089,7 +1089,6 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js"></script>
-    <script src="/static/admin-bulk-fix.js"></script>
 </body>
 </html>`
 }
