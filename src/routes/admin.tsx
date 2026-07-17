@@ -147,12 +147,22 @@ function normalizeCandidateMatchText(
     .replace(/<[^>]*>/g, ' ')
     .replace(/[™®©]/g, ' ')
 
+  // 영문·한글 표기를 같은 제목으로 비교
+  text = text
+    .replace(
+      /spider[\s\-–—_]*man/g,
+      '스파이더맨'
+    )
+
   // 로마 숫자를 일반 숫자로 변환
   text = text.replace(
     /\b(xiii|xii|xi|viii|vii|vi|iv|ix|iii|ii|x|v|i)\b/g,
     (matched) =>
       ROMAN_NUMBER_MAP[matched] ?? matched
   )
+
+  // 이하 기존 코드 그대로
+
 
   // 플랫폼명에 포함된 숫자가 작품 번호로 인식되지 않도록 제거
   text = text
