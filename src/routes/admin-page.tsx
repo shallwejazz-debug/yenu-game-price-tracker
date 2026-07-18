@@ -1088,7 +1088,7 @@ export function AdminPage(): string {
     ></div>
   </main>
 
-    <script src="/static/admin.js"></script>
+    <script src="/static/admin.js?v=20260718-login-fix"></script>
 </body>
 </html>`
 }
