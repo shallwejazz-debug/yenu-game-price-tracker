@@ -1819,13 +1819,6 @@ function renderGames() {
   }
 
   function getSelectedGameIds() {
-
-
-
-
-
-  
-  function getSelectedGameIds() {
     return Array.from(
       document.querySelectorAll('#gameList .game-check:checked')
     ).map(function (checkbox) {
