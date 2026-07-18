@@ -1744,7 +1744,18 @@
                   '개</span>' +
               '</div>' +
             '</div>' +
-
+  
+          
+          // === 👇 여기서부터 추가 👇 ===
+            '<button' +
+              ' type="button"' +
+              ' class="game-edit"' +
+              ' data-edit-url-game="' + escapeHtml(game.id) + '"' +
+              ' data-edit-url-current="' + escapeHtml(game.imageUrl) + '"' +
+              ' style="margin-right: 8px;"' + 
+            '>URL 수정</button>' +
+            // === 👆 여기까지 추가 👆 ===
+          
             '<button' +
               ' type="button"' +
               ' class="game-delete"' +
@@ -1771,9 +1782,47 @@
         })
       })
 
+    // === 👇 여기서부터 추가 👇 ===
+    list
+      .querySelectorAll('[data-edit-url-game]')
+      .forEach(function (button) {
+        button.addEventListener('click', function () {
+          const gameId = Number(button.dataset.editUrlGame)
+          const currentUrl = button.dataset.editUrlCurrent
+          updateGameImage(gameId, currentUrl)
+        })
+      })
+    // === 👆 여기까지 추가 👆 ===
+    
     updateGameSelection()
   }
 
+// === 👇 여기서부터 추가 👇 ===
+  async function updateGameImage(gameId, currentUrl) {
+    const newUrl = window.prompt('새로운 이미지 URL을 입력하세요:', currentUrl || '')
+    
+    // 취소 버튼을 누르거나 값이 변하지 않았다면 무시
+    if (newUrl === null || newUrl.trim() === (currentUrl || '').trim()) {
+      return
+    }
+
+    try {
+      // 기존에 구현된 api() 함수 활용 (토큰 자동 포함됨)
+      await api('/admin/api/games/' + gameId + '/image', {
+        method: 'PATCH',
+        body: { imageUrl: newUrl.trim() }
+      })
+
+      showToast('이미지 URL을 수정했습니다.', 'ok')
+      
+      // 목록 다시 불러오기
+      await loadGames()
+    } catch (error) {
+      showToast('이미지 수정 실패: ' + error.message, 'err')
+    }
+  }
+  // === 👆 여기까지 추가 👆 ===
+  
   function getSelectedGameIds() {
     return Array.from(
       document.querySelectorAll('#gameList .game-check:checked')
