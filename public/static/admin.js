@@ -1744,26 +1744,6 @@
               '<strong class="game-title">' +
                 escapeHtml(game.title) +
               '</strong>' +
-        
-        return (
-          '<li class="game-item" data-game-id="' +
-          escapeHtml(game.id) +
-          '">' +
-            '<input' +
-              ' type="checkbox"' +
-              ' class="game-check"' +
-              ' value="' +
-              escapeHtml(game.id) +
-              '"' +
-              ' aria-label="' +
-              escapeHtml(game.title) +
-              ' 선택"' +
-            '>' +
-
-            '<div class="game-info">' +
-              '<strong class="game-title">' +
-                escapeHtml(game.title) +
-              '</strong>' +
 
               '<div class="game-meta">' +
                 badges +
@@ -1774,7 +1754,6 @@
               '</div>' +
             '</div>' +
   
-          
           // === 👇 여기서부터 추가 👇 ===
             '<button' +
               ' type="button"' +
