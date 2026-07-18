@@ -2006,6 +2006,146 @@
       })
   }
 
+  function formatPasteDuration(milliseconds) {
+    const totalSeconds = Math.max(
+      0,
+      Math.round(Number(milliseconds || 0) / 1000)
+    )
+
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor(
+      (totalSeconds % 3600) / 60
+    )
+    const seconds = totalSeconds % 60
+
+    const parts = []
+
+    if (hours > 0) {
+      parts.push(hours + '시간')
+    }
+
+    if (minutes > 0 || hours > 0) {
+      parts.push(minutes + '분')
+    }
+
+    parts.push(seconds + '초')
+
+    return parts.join(' ')
+  }
+
+  function getPasteProgressCounts(results) {
+    const counts = {
+      success: 0,
+      existing: 0,
+      failed: 0
+    }
+
+    ;(Array.isArray(results) ? results : [])
+      .forEach(function (result) {
+        if (result && result.error) {
+          counts.failed += 1
+        } else if (result && result.existing) {
+          counts.existing += 1
+        } else {
+          counts.success += 1
+        }
+      })
+
+    return counts
+  }
+
+  function renderPasteProgress(
+    done,
+    total,
+    currentTitle,
+    results,
+    startedAt
+  ) {
+    const container = $('pasteResult')
+
+    if (!container) return
+
+    const safeTotal = Math.max(1, Number(total) || 1)
+    const safeDone = Math.max(0, Number(done) || 0)
+
+    const percent = Math.min(
+      100,
+      Math.round((safeDone / safeTotal) * 100)
+    )
+
+    const elapsed = Date.now() - startedAt
+
+    const estimatedTotal =
+      safeDone > 0
+        ? (elapsed / safeDone) * safeTotal
+        : 0
+
+    const remaining =
+      safeDone > 0
+        ? Math.max(0, estimatedTotal - elapsed)
+        : 0
+
+    const counts = getPasteProgressCounts(results)
+
+    container.innerHTML =
+      '<div class="admin-card">' +
+        '<div class="admin-row admin-row-between">' +
+          '<strong>' +
+            escapeHtml(done + ' / ' + total) +
+          '</strong>' +
+          '<strong>' +
+            escapeHtml(percent + '%') +
+          '</strong>' +
+        '</div>' +
+
+        '<div style="' +
+          'height:10px;' +
+          'margin:10px 0;' +
+          'overflow:hidden;' +
+          'border-radius:999px;' +
+          'background:rgba(255,255,255,.1);' +
+        '">' +
+          '<div style="' +
+            'width:' + percent + '%;' +
+            'height:100%;' +
+            'background:#7667f5;' +
+            'transition:width .2s ease;' +
+          '"></div>' +
+        '</div>' +
+
+        '<p class="admin-hint">' +
+          (
+            currentTitle
+              ? '현재 처리: ' +
+                escapeHtml(currentTitle)
+              : '처리를 준비하고 있습니다.'
+          ) +
+        '</p>' +
+
+        '<p class="admin-hint">' +
+          '성공 ' +
+          escapeHtml(counts.success) +
+          ' · 기등록 ' +
+          escapeHtml(counts.existing) +
+          ' · 실패 ' +
+          escapeHtml(counts.failed) +
+        '</p>' +
+
+        '<p class="admin-hint">' +
+          '경과 ' +
+          escapeHtml(formatPasteDuration(elapsed)) +
+          (
+            safeDone > 0 && safeDone < safeTotal
+              ? ' · 예상 남은 시간 ' +
+                escapeHtml(
+                  formatPasteDuration(remaining)
+                )
+              : ''
+          ) +
+        '</p>' +
+      '</div>'
+  }
+
   async function runPasteImport(preview) {
     const groups = parseBackupText(
       $('importPasteArea').value
@@ -2014,6 +2154,10 @@
     const button = preview
       ? $('pastePreviewBtn')
       : $('pasteImportBtn')
+
+    const otherButton = preview
+      ? $('pasteImportBtn')
+      : $('pastePreviewBtn')
 
     if (!groups.length) {
       setStatus(
@@ -2034,55 +2178,181 @@
       return
     }
 
+    const endpoint = preview
+      ? '/admin/api/import/preview'
+      : '/admin/api/import/run'
+
+    const startedAt = Date.now()
+    const allResults = []
+
+    const previousOtherDisabled = otherButton
+      ? otherButton.disabled
+      : false
+
     setBusy(
       button,
       true,
-      preview ? '미리보기 중...' : '복원 중...'
+      preview
+        ? '미리보기 준비 중...'
+        : '복원 준비 중...'
     )
+
+    if (otherButton) {
+      otherButton.disabled = true
+    }
 
     setStatus(
       $('pasteStatus'),
       preview
-        ? '백업 내용을 미리 확인하고 있습니다.'
-        : '백업 내용을 복원하고 있습니다.',
+        ? groups.length +
+          '개 게임의 순차 미리보기를 시작합니다.'
+        : groups.length +
+          '개 게임의 순차 복원을 시작합니다.',
       'info'
     )
 
-    try {
-      const data = await api(
-        preview
-          ? '/admin/api/import/preview'
-          : '/admin/api/import/run',
-        {
-          method: 'POST',
-          body: {
-            groups: groups
-          }
-        }
-      )
+    renderPasteProgress(
+      0,
+      groups.length,
+      '',
+      allResults,
+      startedAt
+    )
 
-      renderPasteResults(data.results || [])
+    for (
+      let index = 0;
+      index < groups.length;
+      index += 1
+    ) {
+      const group = groups[index]
+      const current = index + 1
+
+      if (button) {
+        button.textContent =
+          (preview ? '미리보기 ' : '복원 ') +
+          current +
+          '/' +
+          groups.length
+      }
 
       setStatus(
         $('pasteStatus'),
-        preview
-          ? '붙여넣기 미리보기가 완료되었습니다.'
-          : '붙여넣기 복원 처리가 완료되었습니다.',
-        'ok'
+        current +
+          ' / ' +
+          groups.length +
+          ' · ' +
+          group.name +
+          ' 처리 중',
+        'info'
       )
 
-      if (!preview) {
-        await loadGames()
-        await refreshDashboard()
+      renderPasteProgress(
+        index,
+        groups.length,
+        group.name,
+        allResults,
+        startedAt
+      )
+
+      try {
+        const data = await api(endpoint, {
+          method: 'POST',
+          body: {
+            groups: [group]
+          }
+        })
+
+        const received = Array.isArray(data.results)
+          ? data.results
+          : []
+
+        if (received.length) {
+          received.forEach(function (result) {
+            allResults.push(result)
+          })
+        } else {
+          allResults.push({
+            title: group.name,
+            error: '서버에서 처리 결과를 반환하지 않았습니다.'
+          })
+        }
+      } catch (error) {
+        allResults.push({
+          title: group.name,
+          error:
+            error && error.message
+              ? error.message
+              : '요청 처리에 실패했습니다.'
+        })
       }
-    } catch (error) {
-      setStatus($('pasteStatus'), error.message, 'err')
-    } finally {
-      setBusy(button, false)
+
+      renderPasteProgress(
+        current,
+        groups.length,
+        current < groups.length
+          ? groups[current].name
+          : '',
+        allResults,
+        startedAt
+      )
+    }
+
+    /*
+     * 중요:
+     * 여기서 기존 상세 미리보기 함수를 사용합니다.
+     * 플랫폼·가격·쇼핑몰·이미지 표시를 그대로 보존합니다.
+     */
+    renderPasteResults(allResults)
+
+    const counts = getPasteProgressCounts(allResults)
+    const elapsedText = formatPasteDuration(
+      Date.now() - startedAt
+    )
+
+    if (preview) {
+      setStatus(
+        $('pasteStatus'),
+        '순차 미리보기 완료 · 전체 ' +
+          groups.length +
+          '개 · 성공 ' +
+          counts.success +
+          '개 · 기등록 ' +
+          counts.existing +
+          '개 · 실패 ' +
+          counts.failed +
+          '개 · 경과 ' +
+          elapsedText,
+        counts.failed > 0 ? 'err' : 'ok'
+      )
+    } else {
+      setStatus(
+        $('pasteStatus'),
+        '순차 복원 완료 · 전체 ' +
+          groups.length +
+          '개 · 성공 ' +
+          counts.success +
+          '개 · 기등록 ' +
+          counts.existing +
+          '개 · 실패 ' +
+          counts.failed +
+          '개 · 경과 ' +
+          elapsedText,
+        counts.failed > 0 ? 'err' : 'ok'
+      )
+
+      await loadGames()
+      await refreshDashboard()
+    }
+
+    setBusy(button, false)
+
+    if (otherButton) {
+      otherButton.disabled = previousOtherDisabled
     }
   }
 
-  function renderPasteResults(results) {
+  
+    function renderPasteResults(results) {
     const original = $('importResult')
     const paste = $('pasteResult')
 
