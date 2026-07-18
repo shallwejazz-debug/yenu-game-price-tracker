@@ -2110,6 +2110,41 @@ admin.delete(
 )
 
 // ============================================================
+// 게임 이미지 URL 수정 (여기부터 복사해서 추가하세요)
+// ============================================================
+admin.patch('/api/games/:id/image', async (c) => {
+  const gameId = Number(c.req.param('id'))
+
+  if (!Number.isInteger(gameId) || gameId <= 0) {
+    return c.json({ ok: false, error: '잘못된 게임 ID입니다.' }, 400)
+  }
+
+  let body: any
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ ok: false, error: '올바른 JSON이 아닙니다.' }, 400)
+  }
+
+  const imageUrl = String(body.imageUrl ?? '').trim()
+
+  try {
+    // DB 업데이트 실행
+    await c.env.DB
+      .prepare(`UPDATE games SET image_url = ? WHERE id = ?`)
+      .bind(imageUrl || null, gameId)
+      .run()
+
+    return c.json({ ok: true, message: '이미지 URL을 수정했습니다.' })
+  } catch (error: any) {
+    return c.json(
+      { ok: false, error: `이미지 URL 수정 실패: ${error.message}` },
+      500
+    )
+  }
+})
+
+// ============================================================
 // 전체 데이터 초기화
 // ============================================================
 
