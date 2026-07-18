@@ -1715,7 +1715,36 @@
             ) +
             '</span>'
           : ''
+// === 👇 [추가 1] 썸네일 HTML 태그 생성 👇 ===
+        const thumbHtml = game.imageUrl
+          ? '<img src="' + escapeHtml(game.imageUrl) + '" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px; margin: 0 12px 0 8px; flex-shrink: 0; background: #eee;" alt="썸네일">'
+          : '<div style="width: 48px; height: 48px; background: rgba(128,128,128,0.1); border-radius: 6px; margin: 0 12px 0 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #888;">사진없음</div>'
+        // === 👆 여기까지 추가 👆 ===
 
+        return (
+          '<li class="game-item" data-game-id="' +
+          escapeHtml(game.id) +
+          '">' +
+            '<input' +
+              ' type="checkbox"' +
+              ' class="game-check"' +
+              ' value="' +
+              escapeHtml(game.id) +
+              '"' +
+              ' aria-label="' +
+              escapeHtml(game.title) +
+              ' 선택"' +
+            '>' +
+
+            // === 👇 [추가 2] 위에서 만든 썸네일을 체크박스 바로 뒤에 삽입 👇 ===
+            thumbHtml +
+            // === 👆 여기까지 추가 👆 ===
+
+            '<div class="game-info">' +
+              '<strong class="game-title">' +
+                escapeHtml(game.title) +
+              '</strong>' +
+        
         return (
           '<li class="game-item" data-game-id="' +
           escapeHtml(game.id) +
