@@ -14,7 +14,7 @@ import games from './routes/games'
 import api from './routes/api'
 import { getAllSettings } from './db'
 
-const SITE_URL = 'https://www.yeonudeal.com'
+const SITE_URL = 'https://yeonudeal.com'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
