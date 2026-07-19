@@ -14,6 +14,8 @@ import games from './routes/games'
 import api from './routes/api'
 import { getAllSettings } from './db'
 
+const SITE_URL = 'https://www.yeonudeal.com'
+
 const app = new Hono<{ Bindings: Bindings }>()
 
 // HTML 페이지에는 공통 레이아웃(renderer) 적용
@@ -25,7 +27,6 @@ app.get('/', (c) => c.redirect('/games?platform=pc'))
 // ---------- robots.txt ----------
 // 크롤러 허용 + 관리자/리다이렉터/API 경로 차단 + sitemap 위치 안내
 app.get('/robots.txt', (c) => {
-  const host = new URL(c.req.url).origin
   const body = [
     'User-agent: *',
     'Allow: /',
@@ -33,11 +34,15 @@ app.get('/robots.txt', (c) => {
     'Disallow: /go/',
     'Disallow: /api/',
     '',
-    `Sitemap: ${host}/sitemap.xml`,
+    `Sitemap: ${SITE_URL}/sitemap.xml`,
     '',
   ].join('\n')
-  return c.body(body, 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+
+  return c.body(body, 200, {
+    'Content-Type': 'text/plain; charset=utf-8',
+  })
 })
+
 
 // Google Search Console 소유권 확인용
 app.get('/google8f207302de894f94.html', (c) => {
@@ -58,7 +63,7 @@ app.get('/naver1030d509d7426f4b64ec79baf14c9da5.html', (c) => {
 // 플랫폼 목록 + 특가 + 모든 게임 상세(/games/:id/:platform)
 // 게임별 반복 조회를 제거하고 editions를 한 번만 조회하여 시간 초과 방지
 app.get('/sitemap.xml', async (c) => {
-  const host = new URL(c.req.url).origin
+  const host = SITE_URL
   const urls: Array<{ loc: string; priority: string }> = []
 
   // 플랫폼별 목록 페이지
