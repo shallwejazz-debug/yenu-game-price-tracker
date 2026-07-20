@@ -1272,3 +1272,114 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
    }
 
 }
+
+/* ============================================================
+   공통 메뉴 확대 + 목록 사이드 검색창
+   ============================================================ */
+
+/* 공통 메뉴 크기 조정 */
+.global-nav-inner {
+  min-height: 68px;
+}
+
+.global-brand {
+  font-size: 1.12rem;
+}
+
+.global-nav-links {
+  gap: 14px;
+}
+
+.global-nav-link {
+  min-height: 42px;
+  padding: 9px 14px;
+  font-size: 1rem;
+}
+
+/* 검색창과 특가 순위를 묶는 오른쪽 영역 */
+.side-col {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+}
+
+/* 특가 순위 위에 배치되는 검색창 */
+.side-col .search-box {
+  display: flex;
+  width: 100%;
+  grid-row: auto;
+  grid-column: auto;
+  justify-self: auto;
+  gap: 8px;
+  margin: 0;
+}
+
+.side-col .search-input {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+}
+
+.side-col .search-btn {
+  flex: 0 0 auto;
+}
+
+/* 오른쪽 영역 전체가 고정되므로 특가 박스 자체 고정은 해제 */
+.side-col .sidebar {
+  position: static;
+  top: auto;
+  width: 100%;
+}
+
+/* 목록 제목 아래 요약 정보 */
+.tracking-summary {
+  margin-top: 8px;
+  color: #7f8796;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* 모바일 */
+@media (max-width: 900px) {
+  .side-col {
+    position: static;
+    top: auto;
+    order: -1;
+  }
+
+  .side-col .search-box {
+    width: 100%;
+  }
+
+  .side-col .search-input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .global-nav-inner {
+    min-height: 62px;
+  }
+
+  .global-brand {
+    font-size: 1rem;
+  }
+
+  .global-nav-links {
+    gap: 4px;
+  }
+
+  .global-nav-link {
+    min-height: 38px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+
+  .side-col {
+    gap: 10px;
+  }
+}
+
