@@ -228,14 +228,7 @@ home.get('/', async (c) => {
                 8개입니다.
               </p>
             </div>
-
-            <a
-              href="/games?platform=ps5"
-              class="home-more-link"
-            >
-              게임 둘러보기 →
-            </a>
-          </div>
+        </div>
 
           {recentGames.length === 0 ? (
             <p class="no-data">
