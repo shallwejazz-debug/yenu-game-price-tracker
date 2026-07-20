@@ -3,9 +3,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run check:static",
+    "check:static": "node --check public/static/admin.js && node --check public/static/app.js",
+    "check": "npm run build && npm run check:static",
     "preview": "wrangler pages dev",
-    "deploy": "npm run build && wrangler pages deploy",
+    "deploy": "npm run check && wrangler pages deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
