@@ -15,6 +15,7 @@ export const renderer = jsxRenderer(
       <html lang="ko">
         <head>
           <meta charset="UTF-8" />
+
           <meta
             name="viewport"
             content="width=device-width, initial-scale=1.0"
@@ -57,37 +58,34 @@ export const renderer = jsxRenderer(
               <a href="/" class="global-brand">
                 홈
               </a>
-          
+
               <div class="global-nav-links">
                 <a href="/games" class="global-nav-link">
                   게임 찾기
                 </a>
-          
-                <a href="/games/deals" class="global-nav-link">
+
+                <a
+                  href="/games/deals"
+                  class="global-nav-link"
+                >
                   특가
                 </a>
               </div>
             </div>
           </nav>
+
           {children}
 
           <footer class="site-footer">
             <p>
-              ※ 모든 가격은 쇼핑몰 판매가 기준이며,
-              쿠폰·카드 즉시할인·배송비 등에 따라 실제 결제 금액과
-              다를 수 있습니다.
+              ※ 가격은 수집 시점의 판매가이며, 쿠폰·카드 할인·배송비
+              등에 따라 실제 결제 금액이 달라질 수 있습니다.
             </p>
 
             <p>
-              ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅 활동의
-              일환으로, 이에 따른 일정액의 수수료를 제공받을 수
-              있습니다.
-            </p>
-
-            <p>
-              ※ 게임 이미지 및 상표의 권리는 각 개발사·퍼블리셔 등
-              해당 권리자에게 있습니다. 권리자의 수정·삭제 요청에
-              신속히 대응합니다.
+              ※ 이 사이트는 쿠팡 파트너스 등 제휴 마케팅을 통해
+              일정액의 수수료를 제공받을 수 있습니다. 게임 이미지와
+              상표의 권리는 각 권리자에게 있습니다.
             </p>
           </footer>
 
