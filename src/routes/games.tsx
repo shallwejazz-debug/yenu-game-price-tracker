@@ -94,6 +94,14 @@ function paginationSequence(
   currentPage: number,
   totalPages: number
 ): Array<number | 'ellipsis'> {
+  // 7페이지 이하는 모든 페이지 번호 표시
+  if (totalPages <= 7) {
+    return Array.from(
+      { length: totalPages },
+      (_, index) => index + 1
+    )
+  }
+
   const visiblePages: number[] = []
 
   for (
@@ -131,6 +139,7 @@ function paginationSequence(
 
   return sequence
 }
+
 
 function Pagination({
   platform,
