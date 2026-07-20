@@ -26,6 +26,7 @@ import {
   getTopDiscounts,
   getLastUpdated,
   getPlatformCounts,
+  getTrackingCounts,
 } from '../db'
 
 const games = new Hono<{ Bindings: Bindings }>()
@@ -190,8 +191,9 @@ games.get('/', async (c) => {
 
   const sidebar = await DiscountSidebar({ db: c.env.DB })
   const lastUpdated = toKstLabel(await getLastUpdated(c.env.DB)) // [2026-07-08]
-  const platformCounts = await getPlatformCounts(c.env.DB) // [2026-07-09]
-  const totalCount = Object.values(platformCounts).reduce((a, b) => a + b, 0)
+  const platformCounts = await getPlatformCounts(c.env.DB)
+  const trackingCounts = await getTrackingCounts(c.env.DB)
+
 
   // ── [2026-07-14] SEO: 목록 페이지 title/description ──
   const platformLabel = PLATFORM_LABELS[platform] ?? platform
@@ -211,11 +213,16 @@ games.get('/', async (c) => {
           <h1>🎮 여누의 게임 가격 추적기</h1>
           <p class="subtitle">콘솔별 · 디지털/패키지 분리 가격 비교</p>
           <p class="update-time">
-            🎮 총 {totalCount}개 추적 중 ·{' '}
+            🎮 등록 게임 {trackingCounts.uniqueGames}종 · 플랫폼판{' '}
+            {trackingCounts.platformEditions}개
+          </p>
+          
+          <p class="update-time">
             {PLATFORMS.filter((p) => (platformCounts[p.code] ?? 0) > 0)
               .map((p) => `${p.label} ${platformCounts[p.code]}`)
               .join(' · ')}
           </p>
+
 
           {lastUpdated && (
             <p class="update-time">🕓 가격 업데이트: {lastUpdated} 기준</p>
