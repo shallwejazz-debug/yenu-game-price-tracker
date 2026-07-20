@@ -42,6 +42,8 @@ export async function listGamesByPlatform(
                       FROM prices p2
                       WHERE p2.edition_id = e.id
                         AND p2.source = p.source
+                        AND p2.is_digital = p.is_digital
+
                     )
                     AND p.recorded_at >= datetime(
                       (
@@ -62,6 +64,8 @@ export async function listGamesByPlatform(
                       FROM prices p2
                       WHERE p2.edition_id = e.id
                         AND p2.source = p.source
+                        AND p2.is_digital = p.is_digital
+
                     )
                     AND p.recorded_at >= datetime(
                       (
@@ -95,7 +99,7 @@ export async function searchGamesAllPlatforms(
     Game & {
       lowest_price: number | null
       original_price: number | null
-      platforms: string  // 'ps5,switch,xbox' 형태
+      platforms: string
       first_platform: string
     }
   >
@@ -104,24 +108,78 @@ export async function searchGamesAllPlatforms(
   const { results } = await db
     .prepare(
       `SELECT g.*,
-              (SELECT MIN(p.price)
-                 FROM prices p
-                 INNER JOIN editions e2 ON e2.id = p.edition_id
-                WHERE e2.game_id = g.id) AS lowest_price,
-              (SELECT GROUP_CONCAT(e3.platform)
-                 FROM editions e3 WHERE e3.game_id = g.id) AS platforms,
-              (SELECT e4.platform
-                 FROM editions e4 WHERE e4.game_id = g.id
-                 ORDER BY e4.platform LIMIT 1) AS first_platform
+              COALESCE(
+                (
+                  SELECT MIN(p.price)
+                  FROM prices p
+                  INNER JOIN editions e2 ON e2.id = p.edition_id
+                  WHERE e2.game_id = g.id
+                    AND p.is_digital = 0
+                    AND p.recorded_at = (
+                      SELECT MAX(p2.recorded_at)
+                      FROM prices p2
+                      WHERE p2.edition_id = p.edition_id
+                        AND p2.source = p.source
+                        AND p2.is_digital = p.is_digital
+                    )
+                    AND p.recorded_at >= datetime(
+                      (
+                        SELECT MAX(p3.recorded_at)
+                        FROM prices p3
+                        WHERE p3.edition_id = p.edition_id
+                      ),
+                      '-${STALE_HOURS} hours'
+                    )
+                ),
+                (
+                  SELECT MIN(p.price)
+                  FROM prices p
+                  INNER JOIN editions e2 ON e2.id = p.edition_id
+                  WHERE e2.game_id = g.id
+                    AND p.is_digital = 1
+                    AND p.recorded_at = (
+                      SELECT MAX(p2.recorded_at)
+                      FROM prices p2
+                      WHERE p2.edition_id = p.edition_id
+                        AND p2.source = p.source
+                        AND p2.is_digital = p.is_digital
+                    )
+                    AND p.recorded_at >= datetime(
+                      (
+                        SELECT MAX(p3.recorded_at)
+                        FROM prices p3
+                        WHERE p3.edition_id = p.edition_id
+                      ),
+                      '-${STALE_HOURS} hours'
+                    )
+                )
+              ) AS lowest_price,
+              (
+                SELECT GROUP_CONCAT(e3.platform)
+                FROM editions e3
+                WHERE e3.game_id = g.id
+              ) AS platforms,
+              (
+                SELECT e4.platform
+                FROM editions e4
+                WHERE e4.game_id = g.id
+                ORDER BY e4.platform
+                LIMIT 1
+              ) AS first_platform
          FROM games g
         WHERE g.title LIKE ? COLLATE NOCASE
-          AND EXISTS (SELECT 1 FROM editions e WHERE e.game_id = g.id)
+          AND EXISTS (
+            SELECT 1
+            FROM editions e
+            WHERE e.game_id = g.id
+          )
         ORDER BY g.created_at DESC`
     )
     .bind(q)
     .all()
   return (results ?? []) as any
 }
+
 
 export async function insertGame(
   db: D1Database,
@@ -202,7 +260,10 @@ export async function insertEdition(
 }
 
 // ---------- 가격 ----------
-export async function getCurrentPrices(db: D1Database, editionId: number): Promise<Price[]> {
+export async function getCurrentPrices(
+  db: D1Database,
+  editionId: number
+): Promise<Price[]> {
   const { results } = await db
     .prepare(
       `WITH ed_latest AS (
@@ -213,21 +274,28 @@ export async function getCurrentPrices(db: D1Database, editionId: number): Promi
        SELECT p.*
        FROM prices p
        INNER JOIN (
-         SELECT source, MAX(recorded_at) AS max_at
+         SELECT source, is_digital, MAX(recorded_at) AS max_at
          FROM prices
          WHERE edition_id = ?
-         GROUP BY source
+         GROUP BY source, is_digital
        ) latest
-         ON p.source = latest.source AND p.recorded_at = latest.max_at
+         ON p.source = latest.source
+        AND p.is_digital = latest.is_digital
+        AND p.recorded_at = latest.max_at
        CROSS JOIN ed_latest
        WHERE p.edition_id = ?
-         AND p.recorded_at >= datetime(ed_latest.ed_max, '-' || ? || ' hours')
+         AND p.recorded_at >= datetime(
+           ed_latest.ed_max,
+           '-' || ? || ' hours'
+         )
        ORDER BY p.is_digital DESC, p.price ASC`
     )
     .bind(editionId, editionId, editionId, STALE_HOURS)
     .all<Price>()
+
   return results ?? []
 }
+
 
 export async function getPriceHistory(db: D1Database, editionId: number): Promise<PriceHistory[]> {
   const { results } = await db
@@ -301,37 +369,56 @@ export async function getPlatformCounts(
 // 게임 단위 일괄 조회 (N+1 방지)
 // ============================================================
 
-export async function getCurrentPricesByGame(db: D1Database, gameId: number): Promise<Price[]> {
+export async function getCurrentPricesByGame(
+  db: D1Database,
+  gameId: number
+): Promise<Price[]> {
   const { results } = await db
     .prepare(
       `WITH ed_latest AS (
          SELECT edition_id, MAX(recorded_at) AS ed_max
          FROM prices
-         WHERE edition_id IN (SELECT id FROM editions WHERE game_id = ?)
+         WHERE edition_id IN (
+           SELECT id
+           FROM editions
+           WHERE game_id = ?
+         )
          GROUP BY edition_id
        )
        SELECT p.*
        FROM prices p
-       INNER JOIN editions e ON e.id = p.edition_id
+       INNER JOIN editions e
+         ON e.id = p.edition_id
        INNER JOIN (
-         SELECT edition_id, source, MAX(recorded_at) AS max_at
+         SELECT edition_id, source, is_digital,
+                MAX(recorded_at) AS max_at
          FROM prices
-         WHERE edition_id IN (SELECT id FROM editions WHERE game_id = ?)
-         GROUP BY edition_id, source
+         WHERE edition_id IN (
+           SELECT id
+           FROM editions
+           WHERE game_id = ?
+         )
+         GROUP BY edition_id, source, is_digital
        ) latest
          ON p.edition_id = latest.edition_id
         AND p.source = latest.source
+        AND p.is_digital = latest.is_digital
         AND p.recorded_at = latest.max_at
        INNER JOIN ed_latest
          ON ed_latest.edition_id = p.edition_id
        WHERE e.game_id = ?
-         AND p.recorded_at >= datetime(ed_latest.ed_max, '-' || ? || ' hours')
+         AND p.recorded_at >= datetime(
+           ed_latest.ed_max,
+           '-' || ? || ' hours'
+         )
        ORDER BY p.edition_id, p.is_digital DESC, p.price ASC`
     )
     .bind(gameId, gameId, gameId, STALE_HOURS)
     .all<Price>()
+
   return results ?? []
 }
+
 
 export async function getPriceHistoryByGame(db: D1Database, gameId: number): Promise<PriceHistory[]> {
   const { results } = await db
