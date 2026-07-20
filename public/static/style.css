@@ -1809,3 +1809,51 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   }
 }
 
+
+/* 게임 목록 정보 + 정렬 위치 조정 */
+.sort-toolbar {
+  justify-content: space-between;
+  min-height: 40px;
+  margin: -10px 2px 10px;
+}
+
+.game-list-summary {
+  min-width: 0;
+  color: #9aa0aa;
+  font-size: 0.84rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+@media (max-width: 520px) {
+  .sort-toolbar {
+    min-height: 40px;
+    margin: -6px 2px 10px;
+    gap: 8px;
+  }
+
+  .game-list-summary {
+    overflow: hidden;
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
+  }
+
+  .sort-controls {
+    gap: 3px;
+  }
+
+  .sort-label {
+    display: none;
+  }
+
+  .sort-select {
+    min-width: 128px;
+  }
+}
