@@ -24,6 +24,81 @@ export async function listGames(db: D1Database): Promise<Game[]> {
   return results ?? []
 }
 
+// ---------- 홈: 최근 등록 게임 ----------
+export async function getRecentGames(
+  db: D1Database,
+  limit = 8
+): Promise<
+  Array<
+    Game & {
+      platforms: string
+      first_platform: string
+    }
+  >
+> {
+  const { results } = await db
+    .prepare(
+      `WITH ranked_games AS (
+         SELECT
+           g.*,
+           ROW_NUMBER() OVER (
+             PARTITION BY LOWER(TRIM(g.title))
+             ORDER BY g.created_at DESC, g.id DESC
+           ) AS title_rank
+         FROM games g
+         WHERE EXISTS (
+           SELECT 1
+           FROM editions e
+           WHERE e.game_id = g.id
+         )
+       )
+       SELECT
+         rg.id,
+         rg.title,
+         rg.image_url,
+         rg.release_date,
+         rg.original_price,
+         rg.genre,
+         rg.created_at,
+         (
+           SELECT GROUP_CONCAT(e.platform)
+           FROM editions e
+           WHERE e.game_id = rg.id
+         ) AS platforms,
+         (
+           SELECT e.platform
+           FROM editions e
+           WHERE e.game_id = rg.id
+           ORDER BY
+             CASE e.platform
+               WHEN 'ps5' THEN 1
+               WHEN 'switch' THEN 2
+               WHEN 'switch2' THEN 3
+               WHEN 'xbox' THEN 4
+               WHEN 'ps4' THEN 5
+               WHEN 'pc' THEN 6
+               ELSE 7
+             END,
+             e.id ASC
+           LIMIT 1
+         ) AS first_platform
+       FROM ranked_games rg
+       WHERE rg.title_rank = 1
+       ORDER BY rg.created_at DESC, rg.id DESC
+       LIMIT ?`
+    )
+    .bind(limit)
+    .all<
+      Game & {
+        platforms: string
+        first_platform: string
+      }
+    >()
+
+  return results ?? []
+}
+
+
 export async function listGamesByPlatform(
   db: D1Database,
   platform: string
