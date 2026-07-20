@@ -31,7 +31,48 @@ export async function listGamesByPlatform(
   const { results } = await db
     .prepare(
       `SELECT g.*, e.id AS edition_id,
-              (SELECT MIN(p.price) FROM prices p WHERE p.edition_id = e.id) AS lowest_price
+              COALESCE(
+                (
+                  SELECT MIN(p.price)
+                  FROM prices p
+                  WHERE p.edition_id = e.id
+                    AND p.is_digital = 0
+                    AND p.recorded_at = (
+                      SELECT MAX(p2.recorded_at)
+                      FROM prices p2
+                      WHERE p2.edition_id = e.id
+                        AND p2.source = p.source
+                    )
+                    AND p.recorded_at >= datetime(
+                      (
+                        SELECT MAX(p3.recorded_at)
+                        FROM prices p3
+                        WHERE p3.edition_id = e.id
+                      ),
+                      '-${STALE_HOURS} hours'
+                    )
+                ),
+                (
+                  SELECT MIN(p.price)
+                  FROM prices p
+                  WHERE p.edition_id = e.id
+                    AND p.is_digital = 1
+                    AND p.recorded_at = (
+                      SELECT MAX(p2.recorded_at)
+                      FROM prices p2
+                      WHERE p2.edition_id = e.id
+                        AND p2.source = p.source
+                    )
+                    AND p.recorded_at >= datetime(
+                      (
+                        SELECT MAX(p3.recorded_at)
+                        FROM prices p3
+                        WHERE p3.edition_id = e.id
+                      ),
+                      '-${STALE_HOURS} hours'
+                    )
+                )
+              ) AS lowest_price
        FROM games g
        INNER JOIN editions e ON e.game_id = g.id
        WHERE e.platform = ?
@@ -41,6 +82,7 @@ export async function listGamesByPlatform(
     .all()
   return (results ?? []) as any
 }
+
 
 // [2026-07-14] 검색 전용: 플랫폼 무시하고 전체 게임에서 제목 검색.
 //   각 게임이 어떤 플랫폼(에디션)들을 갖는지 platforms 문자열도 함께 반환
