@@ -1967,3 +1967,110 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
     padding: 0;
   }
 }
+
+/* 게임 목록 페이지네이션 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 30px 0 6px;
+}
+
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pagination-link,
+.pagination-current,
+.pagination-disabled,
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pagination-link {
+  color: #c7cbd4;
+  background: #1a1d27;
+  border: 1px solid #2a2e3a;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.pagination-link:hover {
+  color: #fff;
+  background: #232733;
+  border-color: #4f7cff;
+}
+
+.pagination-current {
+  color: #fff;
+  background: #4f7cff;
+  border: 1px solid #4f7cff;
+}
+
+.pagination-disabled {
+  color: #555c69;
+  background: #151821;
+  border: 1px solid #222630;
+}
+
+.pagination-ellipsis {
+  min-width: 24px;
+  padding: 0;
+  color: #6b7280;
+}
+
+.pagination-direction {
+  gap: 5px;
+  min-width: 68px;
+}
+
+@media (max-width: 520px) {
+  .pagination {
+    gap: 5px;
+    margin-top: 24px;
+  }
+
+  .pagination-pages {
+    gap: 4px;
+  }
+
+  .pagination-link,
+  .pagination-current,
+  .pagination-disabled,
+  .pagination-ellipsis {
+    min-width: 35px;
+    height: 35px;
+    padding: 0 7px;
+    font-size: 0.82rem;
+  }
+
+  .pagination-direction {
+    min-width: 35px;
+    padding: 0;
+  }
+
+  .pagination-label {
+    display: none;
+  }
+
+  .pagination-ellipsis {
+    min-width: 16px;
+    padding: 0;
+  }
+}
