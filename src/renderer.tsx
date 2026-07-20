@@ -47,7 +47,7 @@ export const renderer = jsxRenderer(
           />
 
           <link
-            href="/static/style.css?v=20260720-global-nav"
+            href="/static/style.css?v=20260720-recent-games"
             rel="stylesheet"
           />
         </head>
