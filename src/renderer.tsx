@@ -47,7 +47,7 @@ export const renderer = jsxRenderer(
           />
 
           <link
-            href="/static/style.css?v=20260720-recent-games"
+            href="/static/style.css?v=20260720-game-sort"
             rel="stylesheet"
           />
         </head>
