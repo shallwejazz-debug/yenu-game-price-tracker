@@ -363,6 +363,32 @@ export async function getPlatformCounts(
   return map
 }
 
+// 등록된 고유 게임 수 + 플랫폼판(에디션) 총수
+export async function getTrackingCounts(
+  db: D1Database
+): Promise<{ uniqueGames: number; platformEditions: number }> {
+  const row = await db
+    .prepare(
+      `SELECT
+         (
+           SELECT COUNT(DISTINCT LOWER(TRIM(title)))
+           FROM games
+         ) AS unique_games,
+         (
+           SELECT COUNT(*)
+           FROM editions
+         ) AS platform_editions`
+    )
+    .first<{
+      unique_games: number
+      platform_editions: number
+    }>()
+
+  return {
+    uniqueGames: row?.unique_games ?? 0,
+    platformEditions: row?.platform_editions ?? 0,
+  }
+}
 
 
 // ============================================================
