@@ -2,15 +2,14 @@
   "name": "webapp",
   "type": "module",
   "scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "check:static": "node --check public/static/admin.js && node --check public/static/app.js",
-  "check": "npm run build && npm run check:static",
-  "preview": "wrangler pages dev",
-  "deploy": "npm run check && wrangler pages deploy",
-  "cf-typegen": "wrangler types --env-interface CloudflareBindings"
-}
-
+    "dev": "vite",
+    "build": "vite build",
+    "check:static": "node --check public/static/admin.js && node --check public/static/app.js",
+    "check": "npm run build && npm run check:static",
+    "preview": "wrangler pages dev",
+    "deploy": "npm run check && wrangler pages deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
   "dependencies": {
     "hono": "^4.12.26"
   },
