@@ -704,7 +704,7 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
     top: auto;
   }
   .sidebar {
-    margin-bottom: 20px;  /* 특가 → 카드 목록 순서 (위에 특가) */
+    margin-bottom: 24px;  /* 특가 → 카드 목록 순서 (위에 특가) */
   }
   /* 페이지 가로 overflow 차단 (미디어쿼리 오작동 근본 방지) */
   html, body { overflow-x: hidden; }
@@ -982,7 +982,7 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .home-section-heading h2 {
@@ -1232,9 +1232,9 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   color: #e6e8ec;
-  font-size: clamp(1.35rem, 2.2vw, 1.55rem);
+   font-size: clamp(1.7rem, 3vw, 2rem);
   line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -1266,8 +1266,9 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
     font-size: 0.78rem;
   }
 
-  .home-brand {
-    font-size: 1.35rem;
-    margin-bottom: 18px;
-  }
+   .home-brand {
+     font-size: 1.55rem;
+     margin-bottom: 20px;
+   }
+
 }
