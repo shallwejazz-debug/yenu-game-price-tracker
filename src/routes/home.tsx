@@ -75,22 +75,6 @@ home.get('/', async (c) => {
 
           <button type="submit">검색</button>
         </form>
-
-        <div class="home-actions">
-          <a
-            href="/games?platform=ps5"
-            class="home-button home-button-primary"
-          >
-            게임 가격 찾아보기
-          </a>
-
-          <a
-            href="/games/deals"
-            class="home-button home-button-secondary"
-          >
-            오늘의 특가
-          </a>
-        </div>
       </header>
 
       <main class="home-content">
@@ -101,7 +85,10 @@ home.get('/', async (c) => {
               <p>찾고 있는 게임의 플랫폼을 선택하세요.</p>
             </div>
 
-            <a href="/games?platform=ps5" class="home-more-link">
+            <a
+              href="/games?platform=ps5"
+              class="home-more-link"
+            >
               전체 게임 보기 →
             </a>
           </div>
@@ -132,6 +119,7 @@ home.get('/', async (c) => {
           <div class="home-section-heading">
             <div>
               <h2>여누딜 가격 추적 현황</h2>
+
               <p>
                 등록된 게임과 플랫폼별 가격 정보를 계속 확인하고
                 있습니다.
@@ -141,17 +129,30 @@ home.get('/', async (c) => {
 
           <div class="home-status-grid">
             <div class="home-status-card">
-              <span class="home-status-label">등록 게임</span>
-              <strong>{trackingCounts.uniqueGames}종</strong>
+              <span class="home-status-label">
+                등록 게임
+              </span>
+
+              <strong>
+                {trackingCounts.uniqueGames}종
+              </strong>
             </div>
 
             <div class="home-status-card">
-              <span class="home-status-label">플랫폼판</span>
-              <strong>{trackingCounts.platformEditions}개</strong>
+              <span class="home-status-label">
+                플랫폼판
+              </span>
+
+              <strong>
+                {trackingCounts.platformEditions}개
+              </strong>
             </div>
 
             <div class="home-status-card">
-              <span class="home-status-label">최근 가격 확인</span>
+              <span class="home-status-label">
+                최근 가격 확인
+              </span>
+
               <strong class="home-status-time">
                 {lastUpdated || '확인 중'}
               </strong>
@@ -163,13 +164,13 @@ home.get('/', async (c) => {
           <h2>가격 안내</h2>
 
           <p>
-            표시 가격은 네이버 쇼핑 API와 각 판매처의 수집 시점
-            노출가를 기준으로 합니다.
+            가격 정보는 네이버 쇼핑 API와 판매처의 수집 시점을
+            기준으로 주기적으로 갱신됩니다.
           </p>
 
           <p>
-            배송비·쿠폰·카드 할인·상품 옵션에 따라 실제 결제 금액이
-            달라질 수 있습니다.
+            구매하기 전에 판매처·상품 구성·배송 조건을 확인해
+            주세요.
           </p>
         </section>
       </main>
