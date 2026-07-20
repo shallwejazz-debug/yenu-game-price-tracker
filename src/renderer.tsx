@@ -55,22 +55,20 @@ export const renderer = jsxRenderer(
           <nav class="global-nav" aria-label="주요 메뉴">
             <div class="global-nav-inner">
               <a href="/" class="global-brand">
-                <span aria-hidden="true">🎮</span>
-                <span>여누딜</span>
+                홈
               </a>
-
+          
               <div class="global-nav-links">
                 <a href="/games" class="global-nav-link">
                   게임 찾기
                 </a>
-
+          
                 <a href="/games/deals" class="global-nav-link">
-                  오늘의 특가
+                  특가
                 </a>
               </div>
             </div>
           </nav>
-
           {children}
 
           <footer class="site-footer">
