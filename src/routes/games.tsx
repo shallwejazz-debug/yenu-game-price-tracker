@@ -573,7 +573,14 @@ games.get('/', async (c) => {
             />
           )}
 
-          <div class="sort-toolbar">
+         <div class="sort-toolbar">
+          <p class="game-list-summary">
+            {isSearch
+              ? `검색 결과 ${list.length}개`
+              : `${platformLabel} 게임 ${list.length}개`}
+          </p>
+        
+          <div class="sort-controls">
             <form
               class="sort-form"
               action="/games"
