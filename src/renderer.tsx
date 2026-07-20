@@ -47,7 +47,7 @@ export const renderer = jsxRenderer(
           />
 
           <link
-            href="/static/style.css?v=20260720-game-sort-v3"
+            href="/static/style.css?v=20260720-pagination-v1"
             rel="stylesheet"
           />
         </head>
