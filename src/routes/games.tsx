@@ -202,7 +202,6 @@ games.get('/', async (c) => {
   return c.render(
     <div class="page">
       <header class="site-header">
-        <a href="/admin" class="admin-link header-admin" aria-label="게임 추가/관리">⚙️ 추가/관리</a>
         <div class="header-text">
           <h1>🎮 여누의 게임 가격 추적기</h1>
           <p class="subtitle">콘솔별 · 디지털/패키지 분리 가격 비교</p>
