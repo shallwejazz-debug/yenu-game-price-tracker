@@ -1157,3 +1157,117 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
     padding: 18px;
   }
 }
+
+/* ============================================================
+   공통 상단 내비게이션 + 홈 브랜드 크기 조정
+   ============================================================ */
+
+/* 모든 공개 페이지 공통 상단 메뉴 */
+.global-nav {
+  width: 100%;
+  background: rgba(15, 17, 23, 0.96);
+  border-bottom: 1px solid #232733;
+}
+
+.global-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1180px;
+  min-height: 64px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* 공통 메뉴의 여누딜 로고 */
+.global-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #e6e8ec;
+  font-size: 1.08rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.global-brand:hover {
+  color: #7ea1ff;
+}
+
+/* 공통 메뉴 링크 영역 */
+.global-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 7px 13px;
+  color: #9aa0aa;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.global-nav-link:hover {
+  color: #e6e8ec;
+  background: #1a1d27;
+}
+
+/* 홈 상단의 여누딜 브랜드 크기 확대 */
+.home-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 20px;
+  color: #e6e8ec;
+  font-size: clamp(1.35rem, 2.2vw, 1.55rem);
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  transition: color 0.15s;
+}
+
+.home-brand:hover {
+  color: #7ea1ff;
+}
+
+/* 공통 메뉴 모바일 화면 */
+@media (max-width: 520px) {
+  .global-nav-inner {
+    min-height: 58px;
+    padding: 0 14px;
+  }
+
+  .global-brand {
+    font-size: 1rem;
+  }
+
+  .global-nav-links {
+    gap: 2px;
+  }
+
+  .global-nav-link {
+    min-height: 36px;
+    padding: 7px 8px;
+    font-size: 0.78rem;
+  }
+
+  .home-brand {
+    font-size: 1.35rem;
+    margin-bottom: 18px;
+  }
+}
