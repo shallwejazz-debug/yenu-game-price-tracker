@@ -27,65 +27,79 @@ export async function listGames(db: D1Database): Promise<Game[]> {
 export async function listGamesByPlatform(
   db: D1Database,
   platform: string
-): Promise<Array<Game & { edition_id: number; lowest_price: number | null; original_price: number | null }>> {
+): Promise<
+  Array<
+    Game & {
+      edition_id: number
+      lowest_price: number | null
+      lowest_price_type: 'package' | 'digital' | null
+      original_price: number | null
+    }
+  >
+> {
   const { results } = await db
     .prepare(
-      `SELECT g.*, e.id AS edition_id,
-              COALESCE(
-                (
-                  SELECT MIN(p.price)
-                  FROM prices p
-                  WHERE p.edition_id = e.id
-                    AND p.is_digital = 0
-                    AND p.recorded_at = (
-                      SELECT MAX(p2.recorded_at)
-                      FROM prices p2
-                      WHERE p2.edition_id = e.id
-                        AND p2.source = p.source
-                        AND p2.is_digital = p.is_digital
-
-                    )
-                    AND p.recorded_at >= datetime(
-                      (
-                        SELECT MAX(p3.recorded_at)
-                        FROM prices p3
-                        WHERE p3.edition_id = e.id
-                      ),
-                      '-${STALE_HOURS} hours'
-                    )
-                ),
-                (
-                  SELECT MIN(p.price)
-                  FROM prices p
-                  WHERE p.edition_id = e.id
-                    AND p.is_digital = 1
-                    AND p.recorded_at = (
-                      SELECT MAX(p2.recorded_at)
-                      FROM prices p2
-                      WHERE p2.edition_id = e.id
-                        AND p2.source = p.source
-                        AND p2.is_digital = p.is_digital
-
-                    )
-                    AND p.recorded_at >= datetime(
-                      (
-                        SELECT MAX(p3.recorded_at)
-                        FROM prices p3
-                        WHERE p3.edition_id = e.id
-                      ),
-                      '-${STALE_HOURS} hours'
-                    )
-                )
-              ) AS lowest_price
+      `WITH ed_latest AS (
+         SELECT p.edition_id, MAX(p.recorded_at) AS ed_max
+         FROM prices p
+         INNER JOIN editions e ON e.id = p.edition_id
+         WHERE e.platform = ?
+         GROUP BY p.edition_id
+       ),
+       valid_prices AS (
+         SELECT
+           p.*,
+           ROW_NUMBER() OVER (
+             PARTITION BY p.edition_id, p.source, p.is_digital
+             ORDER BY p.recorded_at DESC, p.price ASC, p.id DESC
+           ) AS rn
+         FROM prices p
+         INNER JOIN ed_latest el ON el.edition_id = p.edition_id
+         WHERE p.recorded_at >= datetime(
+           el.ed_max,
+           '-${STALE_HOURS} hours'
+         )
+       ),
+       price_summary AS (
+         SELECT
+           edition_id,
+           MIN(
+             CASE
+               WHEN is_digital = 0 AND rn = 1 THEN price
+             END
+           ) AS package_lowest,
+           MIN(
+             CASE
+               WHEN is_digital = 1 AND rn = 1 THEN price
+             END
+           ) AS digital_lowest
+         FROM valid_prices
+         GROUP BY edition_id
+       )
+       SELECT
+         g.*,
+         e.id AS edition_id,
+         COALESCE(
+           ps.package_lowest,
+           ps.digital_lowest
+         ) AS lowest_price,
+         CASE
+           WHEN ps.package_lowest IS NOT NULL THEN 'package'
+           WHEN ps.digital_lowest IS NOT NULL THEN 'digital'
+           ELSE NULL
+         END AS lowest_price_type
        FROM games g
        INNER JOIN editions e ON e.game_id = g.id
+       LEFT JOIN price_summary ps ON ps.edition_id = e.id
        WHERE e.platform = ?
        ORDER BY g.created_at DESC`
     )
-    .bind(platform)
+    .bind(platform, platform)
     .all()
+
   return (results ?? []) as any
 }
+
 
 
 // [2026-07-14] 검색 전용: 플랫폼 무시하고 전체 게임에서 제목 검색.
@@ -98,6 +112,7 @@ export async function searchGamesAllPlatforms(
   Array<
     Game & {
       lowest_price: number | null
+      lowest_price_type: 'package' | 'digital' | null
       original_price: number | null
       platforms: string
       first_platform: string
@@ -105,80 +120,92 @@ export async function searchGamesAllPlatforms(
   >
 > {
   const q = `%${query.trim()}%`
+
   const { results } = await db
     .prepare(
-      `SELECT g.*,
-              COALESCE(
-                (
-                  SELECT MIN(p.price)
-                  FROM prices p
-                  INNER JOIN editions e2 ON e2.id = p.edition_id
-                  WHERE e2.game_id = g.id
-                    AND p.is_digital = 0
-                    AND p.recorded_at = (
-                      SELECT MAX(p2.recorded_at)
-                      FROM prices p2
-                      WHERE p2.edition_id = p.edition_id
-                        AND p2.source = p.source
-                        AND p2.is_digital = p.is_digital
-                    )
-                    AND p.recorded_at >= datetime(
-                      (
-                        SELECT MAX(p3.recorded_at)
-                        FROM prices p3
-                        WHERE p3.edition_id = p.edition_id
-                      ),
-                      '-${STALE_HOURS} hours'
-                    )
-                ),
-                (
-                  SELECT MIN(p.price)
-                  FROM prices p
-                  INNER JOIN editions e2 ON e2.id = p.edition_id
-                  WHERE e2.game_id = g.id
-                    AND p.is_digital = 1
-                    AND p.recorded_at = (
-                      SELECT MAX(p2.recorded_at)
-                      FROM prices p2
-                      WHERE p2.edition_id = p.edition_id
-                        AND p2.source = p.source
-                        AND p2.is_digital = p.is_digital
-                    )
-                    AND p.recorded_at >= datetime(
-                      (
-                        SELECT MAX(p3.recorded_at)
-                        FROM prices p3
-                        WHERE p3.edition_id = p.edition_id
-                      ),
-                      '-${STALE_HOURS} hours'
-                    )
-                )
-              ) AS lowest_price,
-              (
-                SELECT GROUP_CONCAT(e3.platform)
-                FROM editions e3
-                WHERE e3.game_id = g.id
-              ) AS platforms,
-              (
-                SELECT e4.platform
-                FROM editions e4
-                WHERE e4.game_id = g.id
-                ORDER BY e4.platform
-                LIMIT 1
-              ) AS first_platform
-         FROM games g
-        WHERE g.title LIKE ? COLLATE NOCASE
-          AND EXISTS (
-            SELECT 1
-            FROM editions e
-            WHERE e.game_id = g.id
-          )
-        ORDER BY g.created_at DESC`
+      `WITH matched_games AS (
+         SELECT *
+         FROM games
+         WHERE title LIKE ? COLLATE NOCASE
+       ),
+       ed_latest AS (
+         SELECT p.edition_id, MAX(p.recorded_at) AS ed_max
+         FROM prices p
+         INNER JOIN editions e ON e.id = p.edition_id
+         INNER JOIN matched_games mg ON mg.id = e.game_id
+         GROUP BY p.edition_id
+       ),
+       valid_prices AS (
+         SELECT
+           p.*,
+           ROW_NUMBER() OVER (
+             PARTITION BY p.edition_id, p.source, p.is_digital
+             ORDER BY p.recorded_at DESC, p.price ASC, p.id DESC
+           ) AS rn
+         FROM prices p
+         INNER JOIN ed_latest el ON el.edition_id = p.edition_id
+         WHERE p.recorded_at >= datetime(
+           el.ed_max,
+           '-${STALE_HOURS} hours'
+         )
+       ),
+       game_price_summary AS (
+         SELECT
+           e.game_id,
+           MIN(
+             CASE
+               WHEN vp.is_digital = 0 AND vp.rn = 1
+               THEN vp.price
+             END
+           ) AS package_lowest,
+           MIN(
+             CASE
+               WHEN vp.is_digital = 1 AND vp.rn = 1
+               THEN vp.price
+             END
+           ) AS digital_lowest
+         FROM editions e
+         LEFT JOIN valid_prices vp ON vp.edition_id = e.id
+         GROUP BY e.game_id
+       )
+       SELECT
+         mg.*,
+         COALESCE(
+           gps.package_lowest,
+           gps.digital_lowest
+         ) AS lowest_price,
+         CASE
+           WHEN gps.package_lowest IS NOT NULL THEN 'package'
+           WHEN gps.digital_lowest IS NOT NULL THEN 'digital'
+           ELSE NULL
+         END AS lowest_price_type,
+         (
+           SELECT GROUP_CONCAT(e3.platform)
+           FROM editions e3
+           WHERE e3.game_id = mg.id
+         ) AS platforms,
+         (
+           SELECT e4.platform
+           FROM editions e4
+           WHERE e4.game_id = mg.id
+           ORDER BY e4.platform
+           LIMIT 1
+         ) AS first_platform
+       FROM matched_games mg
+       LEFT JOIN game_price_summary gps ON gps.game_id = mg.id
+       WHERE EXISTS (
+         SELECT 1
+         FROM editions e
+         WHERE e.game_id = mg.id
+       )
+       ORDER BY mg.created_at DESC`
     )
     .bind(q)
     .all()
+
   return (results ?? []) as any
 }
+
 
 
 export async function insertGame(
