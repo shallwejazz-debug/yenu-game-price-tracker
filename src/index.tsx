@@ -12,6 +12,7 @@ import type { Bindings, Price } from './types'
 import admin from './routes/admin'
 import games from './routes/games'
 import api from './routes/api'
+import home from './routes/home'
 import { getAllSettings } from './db'
 
 const SITE_URL = 'https://yeonudeal.com'
@@ -20,9 +21,6 @@ const app = new Hono<{ Bindings: Bindings }>()
 
 // HTML 페이지에는 공통 레이아웃(renderer) 적용
 app.use(renderer)
-
-// ---------- 홈 → 게임 목록(PC 탭)으로 ----------
-app.get('/', (c) => c.redirect('/games?platform=pc'))
 
 // ---------- robots.txt ----------
 // 크롤러 허용 + 관리자/리다이렉터/API 경로 차단 + sitemap 위치 안내
@@ -65,6 +63,11 @@ app.get('/naver1030d509d7426f4b64ec79baf14c9da5.html', (c) => {
 app.get('/sitemap.xml', async (c) => {
   const host = SITE_URL
   const urls: Array<{ loc: string; priority: string }> = []
+
+  urls.push({
+  loc: `${host}/`,
+  priority: '1.0',
+})
 
   // 플랫폼별 목록 페이지
   for (const platform of ['pc', 'ps5', 'ps4', 'xbox', 'switch', 'switch2']) {
@@ -119,6 +122,7 @@ app.get('/sitemap.xml', async (c) => {
 
 
 // ---------- 라우트 그룹 연결 ----------
+app.route('/', home)
 app.route('/admin', admin)
 app.route('/games', games)
 app.route('/api', api)
