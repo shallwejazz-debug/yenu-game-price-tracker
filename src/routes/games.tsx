@@ -173,7 +173,7 @@ games.get('/deals', async (c) => {
 
 // ---------- 메인: 콘솔별 게임 목록 ----------
 games.get('/', async (c) => {
-  const platform = c.req.query('platform') || 'pc'
+  const platform = c.req.query('platform') || 'ps5'
   const query = (c.req.query('q') || '').trim()
 
   // [2026-07-14] 검색어가 있으면 플랫폼 무시하고 전체에서 검색,
