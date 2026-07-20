@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && npm run check:static"
+    "build": "vite build && npm run check:static",
     "check:static": "node --check public/static/admin.js && node --check public/static/app.js",
     "check": "npm run build && npm run check:static",
     "preview": "wrangler pages dev",
