@@ -1383,3 +1383,214 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
   }
 }
 
+/* ============================================================
+   홈: 최근 추가된 게임 자동 슬라이드
+   ============================================================ */
+
+.home-recent-section {
+  overflow: hidden;
+}
+
+.home-recent-viewport {
+  position: relative;
+  width: 100%;
+  margin-top: 18px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 3%,
+    #000 97%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 3%,
+    #000 97%,
+    transparent 100%
+  );
+}
+
+.home-recent-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: home-recent-scroll 44s linear infinite;
+}
+
+.home-recent-viewport:hover .home-recent-track,
+.home-recent-viewport:focus-within .home-recent-track {
+  animation-play-state: paused;
+}
+
+.home-recent-group {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+  padding-right: 16px;
+}
+
+.home-recent-card {
+  display: flex;
+  width: 220px;
+  overflow: hidden;
+  flex: 0 0 220px;
+  flex-direction: column;
+  color: #e6e8ec;
+  background: #1a1d27;
+  border: 1px solid #2a2e3a;
+  border-radius: 14px;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    background 0.15s;
+}
+
+.home-recent-card:hover,
+.home-recent-card:focus-visible {
+  background: #1d202b;
+  border-color: #4f7cff;
+  transform: translateY(-3px);
+  outline: none;
+}
+
+.home-recent-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #12151d;
+}
+
+.home-recent-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-recent-placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  opacity: 0.45;
+}
+
+.home-recent-body {
+  display: flex;
+  min-height: 112px;
+  padding: 13px 14px 15px;
+  flex-direction: column;
+}
+
+.home-recent-platforms {
+  display: flex;
+  min-height: 22px;
+  margin-bottom: 7px;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.home-recent-platform {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  color: #dbe5ff;
+  background: #304e9c;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.home-recent-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #e6e8ec;
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.45;
+  word-break: keep-all;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.home-recent-link-text {
+  margin-top: auto;
+  padding-top: 10px;
+  color: #7ea1ff;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+@keyframes home-recent-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* 자동 움직임을 줄이도록 설정한 사용자 */
+@media (prefers-reduced-motion: reduce) {
+  .home-recent-viewport {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+    scrollbar-width: thin;
+  }
+
+  .home-recent-track {
+    animation: none;
+  }
+
+  .home-recent-group[aria-hidden='true'] {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-recent-viewport {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 92%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 92%,
+      transparent 100%
+    );
+  }
+
+  .home-recent-track {
+    animation-duration: 38s;
+  }
+
+  .home-recent-group {
+    gap: 12px;
+    padding-right: 12px;
+  }
+
+  .home-recent-card {
+    width: 184px;
+    flex-basis: 184px;
+  }
+
+  .home-recent-body {
+    min-height: 106px;
+    padding: 12px;
+  }
+
+  .home-recent-title {
+    font-size: 0.88rem;
+  }
+}
