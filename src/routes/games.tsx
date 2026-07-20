@@ -41,6 +41,212 @@ type GameSort =
   | 'price_asc'
   | 'price_desc'
 
+const GAMES_PER_PAGE = 24
+
+function normalizePage(
+  value: string | undefined
+): number {
+  if (!value) return 1
+
+  const parsed = Number(value)
+
+  if (
+    !Number.isInteger(parsed) ||
+    parsed < 1
+  ) {
+    return 1
+  }
+
+  return parsed
+}
+
+function buildGamesListHref({
+  platform,
+  query,
+  sort,
+  page,
+}: {
+  platform: string
+  query: string
+  sort: GameSort
+  page: number
+}): string {
+  const params = new URLSearchParams()
+
+  params.set('platform', platform)
+
+  if (query) {
+    params.set('q', query)
+  }
+
+  if (sort !== 'recent') {
+    params.set('sort', sort)
+  }
+
+  if (page > 1) {
+    params.set('page', String(page))
+  }
+
+  return `/games?${params.toString()}`
+}
+
+function paginationSequence(
+  currentPage: number,
+  totalPages: number
+): Array<number | 'ellipsis'> {
+  const visiblePages: number[] = []
+
+  for (
+    let page = 1;
+    page <= totalPages;
+    page += 1
+  ) {
+    const shouldShow =
+      page === 1 ||
+      page === totalPages ||
+      Math.abs(page - currentPage) <= 1
+
+    if (shouldShow) {
+      visiblePages.push(page)
+    }
+  }
+
+  const sequence: Array<
+    number | 'ellipsis'
+  > = []
+
+  let previousPage = 0
+
+  for (const page of visiblePages) {
+    if (
+      previousPage > 0 &&
+      page - previousPage > 1
+    ) {
+      sequence.push('ellipsis')
+    }
+
+    sequence.push(page)
+    previousPage = page
+  }
+
+  return sequence
+}
+
+function Pagination({
+  platform,
+  query,
+  sort,
+  currentPage,
+  totalPages,
+}: {
+  platform: string
+  query: string
+  sort: GameSort
+  currentPage: number
+  totalPages: number
+}) {
+  if (totalPages <= 1) {
+    return null
+  }
+
+  const sequence = paginationSequence(
+    currentPage,
+    totalPages
+  )
+
+  const pageHref = (page: number) =>
+    buildGamesListHref({
+      platform,
+      query,
+      sort,
+      page,
+    })
+
+  return (
+    <nav
+      class="pagination"
+      aria-label="게임 목록 페이지"
+    >
+      {currentPage > 1 ? (
+        <a
+          href={pageHref(currentPage - 1)}
+          class="pagination-link pagination-direction"
+          rel="prev"
+          aria-label="이전 페이지"
+        >
+          <span aria-hidden="true">←</span>
+          <span class="pagination-label">
+            이전
+          </span>
+        </a>
+      ) : (
+        <span
+          class="pagination-disabled pagination-direction"
+          aria-disabled="true"
+        >
+          <span aria-hidden="true">←</span>
+          <span class="pagination-label">
+            이전
+          </span>
+        </span>
+      )}
+
+      <div class="pagination-pages">
+        {sequence.map((item) =>
+          item === 'ellipsis' ? (
+            <span
+              class="pagination-ellipsis"
+              aria-hidden="true"
+            >
+              …
+            </span>
+          ) : item === currentPage ? (
+            <span
+              class="pagination-current"
+              aria-current="page"
+            >
+              {item}
+            </span>
+          ) : (
+            <a
+              href={pageHref(item)}
+              class="pagination-link"
+              aria-label={`${item}페이지로 이동`}
+            >
+              {item}
+            </a>
+          )
+        )}
+      </div>
+
+      {currentPage < totalPages ? (
+        <a
+          href={pageHref(currentPage + 1)}
+          class="pagination-link pagination-direction"
+          rel="next"
+          aria-label="다음 페이지"
+        >
+          <span class="pagination-label">
+            다음
+          </span>
+          <span aria-hidden="true">→</span>
+        </a>
+      ) : (
+        <span
+          class="pagination-disabled pagination-direction"
+          aria-disabled="true"
+        >
+          <span class="pagination-label">
+            다음
+          </span>
+          <span aria-hidden="true">→</span>
+        </span>
+      )}
+    </nav>
+  )
+}
+
+
 function won(
   n: number | null | undefined
 ): string {
@@ -479,6 +685,10 @@ games.get('/', async (c) => {
     c.req.query('sort')
   )
 
+  const requestedPage = normalizePage(
+  c.req.query('page')
+)
+
   // 검색어가 있으면 전체 플랫폼에서 검색
   const isSearch = query.length > 0
 
@@ -493,9 +703,55 @@ games.get('/', async (c) => {
       )
 
   const list = sortGameList(
-    rawList,
-    sort
+  rawList,
+  sort
+)
+
+const totalItems = list.length
+
+const totalPages = Math.max(
+  1,
+  Math.ceil(
+    totalItems / GAMES_PER_PAGE
   )
+)
+
+const currentPage = Math.min(
+  requestedPage,
+  totalPages
+)
+
+// 존재하지 않는 페이지는 마지막 페이지로 이동
+if (requestedPage > totalPages) {
+  return c.redirect(
+    buildGamesListHref({
+      platform,
+      query,
+      sort,
+      page: totalPages,
+    })
+  )
+}
+
+const pageStart =
+  (currentPage - 1) *
+  GAMES_PER_PAGE
+
+const pageEnd = Math.min(
+  pageStart + GAMES_PER_PAGE,
+  totalItems
+)
+
+const pageList = list.slice(
+  pageStart,
+  pageEnd
+)
+
+const rangeStart =
+  totalItems === 0
+    ? 0
+    : pageStart + 1
+
 
   const sidebar = await DiscountSidebar({
     db: c.env.DB,
@@ -561,7 +817,7 @@ games.get('/', async (c) => {
           {isSearch ? (
             <p class="search-meta">
               '<strong>{query}</strong>' 전체
-              플랫폼 검색 결과 {list.length}건
+              플랫폼 검색 결과 {totalItems}건
               {' '}
               <a
                 href={clearSearchHref}
@@ -580,10 +836,9 @@ games.get('/', async (c) => {
           <div class="sort-toolbar">
             <p class="game-list-summary">
               {isSearch
-                ? `검색 결과 ${list.length}개`
-                : `${platformLabel} 게임 ${list.length}개`}
+                ? `검색 결과 ${totalItems}개 · ${rangeStart}–${pageEnd}번째`
+                : `${platformLabel} 게임 ${totalItems}개 · ${rangeStart}–${pageEnd}번째`}
             </p>
-
             <div class="sort-controls">
               <form
                 class="sort-form"
@@ -707,7 +962,7 @@ games.get('/', async (c) => {
             </div>
           </div>
 
-          {list.length === 0 ? (
+          {totalItems === 0 ? (
             <p class="no-data">
               {isSearch
                 ? `'${query}'에 해당하는 게임이 없습니다.`
@@ -717,135 +972,153 @@ games.get('/', async (c) => {
                     ] ?? platform
                   }' 플랫폼에 등록된 게임이 없습니다.`}
             </p>
-          ) : (
-            <ul class="game-grid">
-              {list.map((g: any) => {
-                const rate = discountRate(
-                  g.lowest_price ??
-                    Infinity,
-                  g.original_price
-                )
+                    ) : (
+            <>
+              <ul class="game-grid">
+                {pageList.map((g: any) => {
+                  const rate = discountRate(
+                    g.lowest_price ??
+                      Infinity,
+                    g.original_price
+                  )
 
-                const platformCodes:
-                  string[] = isSearch
-                  ? String(
-                      g.platforms || ''
-                    )
-                      .split(',')
-                      .filter(Boolean)
-                  : [platform]
+                  const platformCodes:
+                    string[] = isSearch
+                    ? String(
+                        g.platforms || ''
+                      )
+                        .split(',')
+                        .filter(Boolean)
+                    : [platform]
 
-                const detailHref =
-                  isSearch
-                    ? `/games/${g.id}`
-                    : `/games/${g.id}/${platform}`
+                  const detailHref =
+                    isSearch
+                      ? `/games/${g.id}`
+                      : `/games/${g.id}/${platform}`
 
-                return (
-                  <li
-                    class="game-card"
-                    data-game-id={String(
-                      g.id
-                    )}
-                    data-platform={
-                      platform
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="game-card-trigger"
-                      aria-expanded="false"
+                  return (
+                    <li
+                      class="game-card"
+                      data-game-id={String(
+                        g.id
+                      )}
+                      data-platform={
+                        platform
+                      }
                     >
-                      <div
-                        class="game-thumb-wrap"
-                        style={
-                          g.image_url
-                            ? `--thumb-bg:url('${g.image_url}')`
-                            : undefined
-                        }
+                      <button
+                        type="button"
+                        class="game-card-trigger"
+                        aria-expanded="false"
                       >
-                        {g.image_url ? (
-                          <img
-                            src={
-                              g.image_url
-                            }
-                            alt={g.title}
-                            class="game-thumb"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div
-                            class="game-thumb-placeholder"
-                            aria-hidden="true"
-                          >
-                            🎮
-                          </div>
-                        )}
-                      </div>
-
-                      <div class="game-card-body">
-                        <div class="platform-badges">
-                          {platformCodes.map(
-                            (code) => (
-                              <span class="platform-badge">
-                                {PLATFORM_LABELS[
-                                  code
-                                ] ?? code}
-                              </span>
-                            )
+                        <div
+                          class="game-thumb-wrap"
+                          style={
+                            g.image_url
+                              ? `--thumb-bg:url('${g.image_url}')`
+                              : undefined
+                          }
+                        >
+                          {g.image_url ? (
+                            <img
+                              src={
+                                g.image_url
+                              }
+                              alt={g.title}
+                              class="game-thumb"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div
+                              class="game-thumb-placeholder"
+                              aria-hidden="true"
+                            >
+                              🎮
+                            </div>
                           )}
                         </div>
 
-                        <h3>{g.title}</h3>
-
-                        <p class="game-price">
-                          {g.lowest_price ? (
-                            <>
-                              <span class="price-type">
-                                {g.lowest_price_type ===
-                                'package'
-                                  ? '📦 패키지 최저'
-                                  : '💾 다운로드 최저'}
-                              </span>{' '}
-
-                              <strong>
-                                {won(
-                                  g.lowest_price
-                                )}
-                              </strong>
-
-                              {rate !== null && (
-                                <span class="discount">
-                                  -{rate}%
+                        <div class="game-card-body">
+                          <div class="platform-badges">
+                            {platformCodes.map(
+                              (code) => (
+                                <span class="platform-badge">
+                                  {PLATFORM_LABELS[
+                                    code
+                                  ] ?? code}
                                 </span>
-                              )}
-                            </>
-                          ) : (
-                            <span class="no-price">
-                              가격 정보 없음
-                            </span>
-                          )}
-                        </p>
-                      </div>
+                              )
+                            )}
+                          </div>
 
-                      <span
-                        class="accordion-chevron"
-                        aria-hidden="true"
+                          <h3>
+                            {g.title}
+                          </h3>
+
+                          <p class="game-price">
+                            {g.lowest_price ? (
+                              <>
+                                <span class="price-type">
+                                  {g.lowest_price_type ===
+                                  'package'
+                                    ? '📦 패키지 최저'
+                                    : '💾 다운로드 최저'}
+                                </span>{' '}
+
+                                <strong>
+                                  {won(
+                                    g.lowest_price
+                                  )}
+                                </strong>
+
+                                {rate !==
+                                  null && (
+                                  <span class="discount">
+                                    -{rate}%
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span class="no-price">
+                                가격 정보 없음
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <span
+                          class="accordion-chevron"
+                          aria-hidden="true"
+                        >
+                          ▼
+                        </span>
+                      </button>
+
+                      <a
+                        class="game-card-permalink"
+                        href={detailHref}
                       >
-                        ▼
-                      </span>
-                    </button>
+                        {g.title} 최저가 상세 보기
+                      </a>
+                    </li>
+                  )
+                })}
+              </ul>
 
-                    <a
-                      class="game-card-permalink"
-                      href={detailHref}
-                    >
-                      {g.title} 최저가 상세 보기
-                    </a>
-                  </li>
-                )
-              })}
-            </ul>
+              <Pagination
+                platform={platform}
+                query={query}
+                sort={sort}
+                currentPage={
+                  currentPage
+                }
+                totalPages={
+                  totalPages
+                }
+              />
+            </>
           )}
+
         </main>
 
         <div class="side-col">
