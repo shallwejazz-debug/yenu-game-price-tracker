@@ -44,9 +44,11 @@ type GameSort =
 function won(
   n: number | null | undefined
 ): string {
-  if (n === null || n === undefined) return '-'
+  if (n === null || n === undefined) {
+    return '-'
+  }
 
-  return '₩' + n.toLocaleString('ko-KR')
+  return `₩${n.toLocaleString('ko-KR')}`
 }
 
 function discountRate(
@@ -195,7 +197,7 @@ function sortGameList(
   }
 
   // 최근 등록순:
-  // created_at 우선, 동일한 경우 id 역순
+  // created_at 우선, 같은 경우 id 역순
   return sorted.sort((a, b) => {
     const aParsed = a.created_at
       ? Date.parse(a.created_at)
@@ -336,7 +338,9 @@ games.get('/deals', async (c) => {
       const ad = a.drop_rate ?? 0
       const bd = b.drop_rate ?? 0
 
-      if (bd !== ad) return bd - ad
+      if (bd !== ad) {
+        return bd - ad
+      }
 
       return (
         (a.lowest_price ?? Infinity) -
@@ -573,129 +577,132 @@ games.get('/', async (c) => {
             />
           )}
 
-         <div class="sort-toolbar">
-          <p class="game-list-summary">
-            {isSearch
-              ? `검색 결과 ${list.length}개`
-              : `${platformLabel} 게임 ${list.length}개`}
-          </p>
-        
-          <div class="sort-controls">
-            <form
-              class="sort-form"
-              action="/games"
-              method="get"
-            >
-              <input
-                type="hidden"
-                name="platform"
-                value={platform}
-              />
+          <div class="sort-toolbar">
+            <p class="game-list-summary">
+              {isSearch
+                ? `검색 결과 ${list.length}개`
+                : `${platformLabel} 게임 ${list.length}개`}
+            </p>
 
-              {query && (
+            <div class="sort-controls">
+              <form
+                class="sort-form"
+                action="/games"
+                method="get"
+              >
                 <input
                   type="hidden"
-                  name="q"
-                  value={query}
+                  name="platform"
+                  value={platform}
                 />
-              )}
 
-              <label
-                for="game-sort"
-                class="sort-label"
-              >
-                정렬
-              </label>
+                {query && (
+                  <input
+                    type="hidden"
+                    name="q"
+                    value={query}
+                  />
+                )}
 
-              <select
-                id="game-sort"
-                name="sort"
-                class="sort-select"
-                onchange="this.form.submit()"
-              >
-                <option
-                  value="recent"
-                  selected={
-                    sort === 'recent'
-                  }
+                <label
+                  for="game-sort"
+                  class="sort-label"
                 >
-                  최근 등록순
-                </option>
+                  정렬
+                </label>
 
-                <option
-                  value="name"
-                  selected={
-                    sort === 'name'
-                  }
+                <select
+                  id="game-sort"
+                  name="sort"
+                  class="sort-select"
+                  onchange="this.form.submit()"
                 >
-                  이름순
-                </option>
+                  <option
+                    value="recent"
+                    selected={
+                      sort === 'recent'
+                    }
+                  >
+                    최근 등록순
+                  </option>
 
-                <option
-                  value="price_asc"
-                  selected={
-                    sort === 'price_asc'
-                  }
+                  <option
+                    value="name"
+                    selected={
+                      sort === 'name'
+                    }
+                  >
+                    이름순
+                  </option>
+
+                  <option
+                    value="price_asc"
+                    selected={
+                      sort === 'price_asc'
+                    }
+                  >
+                    낮은 가격순
+                  </option>
+
+                  <option
+                    value="price_desc"
+                    selected={
+                      sort === 'price_desc'
+                    }
+                  >
+                    높은 가격순
+                  </option>
+                </select>
+              </form>
+
+              <div class="sort-help">
+                <button
+                  type="button"
+                  class="sort-help-button"
+                  aria-label="정렬 기준 설명"
+                  aria-describedby="sort-help-tooltip"
                 >
-                  낮은 가격순
-                </option>
+                  ⓘ
+                </button>
 
-                <option
-                  value="price_desc"
-                  selected={
-                    sort === 'price_desc'
-                  }
+                <div
+                  id="sort-help-tooltip"
+                  class="sort-tooltip"
+                  role="tooltip"
                 >
-                  높은 가격순
-                </option>
-              </select>
-            </form>
+                  <strong>
+                    정렬 기준
+                  </strong>
 
-            <div class="sort-help">
-              <button
-                type="button"
-                class="sort-help-button"
-                aria-label="정렬 기준 설명"
-                aria-describedby="sort-help-tooltip"
-              >
-                ⓘ
-              </button>
+                  <span>
+                    최근 등록순 — 여누딜 DB
+                    등록 순서
+                  </span>
 
-              <div
-                id="sort-help-tooltip"
-                class="sort-tooltip"
-                role="tooltip"
-              >
-                <strong>정렬 기준</strong>
+                  <span>
+                    이름순 — 가나다·ABC 순서
+                  </span>
 
-                <span>
-                  최근 등록순 — 여누딜 DB 등록
-                  순서
-                </span>
+                  <span>
+                    낮은 가격순 — 확인된
+                    최저가가 낮은 순
+                  </span>
 
-                <span>
-                  이름순 — 가나다·ABC 순서
-                </span>
+                  <span>
+                    높은 가격순 — 확인된
+                    최저가가 높은 순
+                  </span>
 
-                <span>
-                  낮은 가격순 — 확인된 최저가가
-                  낮은 순
-                </span>
-
-                <span>
-                  높은 가격순 — 확인된 최저가가
-                  높은 순
-                </span>
-
-                <small>
-                  목록에서는 선택한 플랫폼의
-                  디지털·패키지 중 최저가를
-                  사용합니다. 전체 검색에서는
-                  검색 결과에 포함된 플랫폼의
-                  최저가를 사용하며, 가격 정보가
-                  없는 게임은 마지막에
-                  표시됩니다.
-                </small>
+                  <small>
+                    목록에서는 선택한 플랫폼의
+                    디지털·패키지 중 최저가를
+                    사용합니다. 전체 검색에서는
+                    검색 결과에 포함된 플랫폼의
+                    최저가를 사용하며, 가격
+                    정보가 없는 게임은 마지막에
+                    표시됩니다.
+                  </small>
+                </div>
               </div>
             </div>
           </div>
@@ -994,8 +1001,7 @@ function PriceSection({
 
       {filtered.length === 0 ? (
         <p class="no-data">
-          등록된 {title} 가격이
-          없습니다.
+          등록된 {title} 가격이 없습니다.
         </p>
       ) : (
         <>
@@ -1181,11 +1187,11 @@ games.get(
           <h1>{game.title}</h1>
 
           <p class="no-data">
-            '
-            {PLATFORM_LABELS[
-              platform
-            ] ?? platform}
-            ' 플랫폼 정보가 없습니다.
+            {`'${
+              PLATFORM_LABELS[
+                platform
+              ] ?? platform
+            }' 플랫폼 정보가 없습니다.`}
           </p>
         </main>
       )
