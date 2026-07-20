@@ -154,15 +154,25 @@ export async function listGamesByPlatform(
        SELECT
          g.*,
          e.id AS edition_id,
-         COALESCE(
-           ps.package_lowest,
-           ps.digital_lowest
-         ) AS lowest_price,
-         CASE
-           WHEN ps.package_lowest IS NOT NULL THEN 'package'
-           WHEN ps.digital_lowest IS NOT NULL THEN 'digital'
-           ELSE NULL
-         END AS lowest_price_type
+          CASE
+            WHEN ps.package_lowest IS NULL THEN ps.digital_lowest
+            WHEN ps.digital_lowest IS NULL THEN ps.package_lowest
+            WHEN ps.package_lowest <= ps.digital_lowest
+              THEN ps.package_lowest
+            ELSE ps.digital_lowest
+          END AS lowest_price,
+          CASE
+            WHEN ps.package_lowest IS NULL
+              AND ps.digital_lowest IS NULL
+              THEN NULL
+            WHEN ps.package_lowest IS NULL
+              THEN 'digital'
+            WHEN ps.digital_lowest IS NULL
+              THEN 'package'
+            WHEN ps.package_lowest <= ps.digital_lowest
+              THEN 'package'
+            ELSE 'digital'
+          END AS lowest_price_type
        FROM games g
        INNER JOIN editions e ON e.game_id = g.id
        LEFT JOIN price_summary ps ON ps.edition_id = e.id
@@ -245,15 +255,26 @@ export async function searchGamesAllPlatforms(
        )
        SELECT
          mg.*,
-         COALESCE(
-           gps.package_lowest,
-           gps.digital_lowest
-         ) AS lowest_price,
-         CASE
-           WHEN gps.package_lowest IS NOT NULL THEN 'package'
-           WHEN gps.digital_lowest IS NOT NULL THEN 'digital'
-           ELSE NULL
-         END AS lowest_price_type,
+               CASE
+        WHEN gps.package_lowest IS NULL THEN gps.digital_lowest
+        WHEN gps.digital_lowest IS NULL THEN gps.package_lowest
+        WHEN gps.package_lowest <= gps.digital_lowest
+          THEN gps.package_lowest
+        ELSE gps.digital_lowest
+      END AS lowest_price,
+      CASE
+        WHEN gps.package_lowest IS NULL
+          AND gps.digital_lowest IS NULL
+          THEN NULL
+        WHEN gps.package_lowest IS NULL
+          THEN 'digital'
+        WHEN gps.digital_lowest IS NULL
+          THEN 'package'
+        WHEN gps.package_lowest <= gps.digital_lowest
+          THEN 'package'
+        ELSE 'digital'
+      END AS lowest_price_type,
+
          (
            SELECT GROUP_CONCAT(e3.platform)
            FROM editions e3
