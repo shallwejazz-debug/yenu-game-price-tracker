@@ -203,8 +203,10 @@ games.get('/', async (c) => {
     <div class="page">
       <header class="site-header">
         <div class="header-text">
-          <h1>🎮 여누의 게임 가격 추적기</h1>
-          <p class="subtitle">콘솔별 · 디지털/패키지 분리 가격 비교</p>
+          <h1>🎮 게임 가격 비교</h1>
+              <p class="subtitle">
+                플랫폼별 · 디지털/패키지 가격 비교
+              </p>
           <p class="update-time">
             🎮 등록 게임 {trackingCounts.uniqueGames}종 · 플랫폼판{' '}
             {trackingCounts.platformEditions}개
@@ -422,7 +424,13 @@ games.get('/:gameId', async (c) => {
     const game = await getGameById(c.env.DB, gameId)
     return c.render(
       <main class="container">
-        <a href="/games" class="back-link">← 목록으로</a>
+        <a
+        href={`/games?platform=${platform}`}
+        class="back-link"
+        >
+  ← {PLATFORM_LABELS[platform] ?? platform} 목록으로
+</a>
+
         <h1>{game?.title ?? '게임'}</h1>
         <p class="no-data">아직 등록된 플랫폼(에디션)이 없습니다.</p>
       </main>
