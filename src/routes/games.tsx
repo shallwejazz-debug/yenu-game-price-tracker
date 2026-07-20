@@ -299,13 +299,18 @@ games.get('/', async (c) => {
                         <p class="game-price">
                           {g.lowest_price ? (
                             <>
-                              최저 <strong>{won(g.lowest_price)}</strong>
-                              {rate !== null && <span class="card-discount"> -{rate}%</span>}
+                              <span class="price-type">
+                                {g.lowest_price_type === 'package'
+                                  ? '📦 패키지 최저'
+                                  : '💾 다운로드 최저'}
+                              </span>{' '}
+                              <strong>{won(g.lowest_price)}</strong>
+                              {rate !== null && <span class="discount">-{rate}%</span>}
                             </>
                           ) : (
                             <span class="no-price">가격 정보 없음</span>
                           )}
-                        </p>
+                                             </p>
                       </div>
                       <span class="accordion-chevron" aria-hidden="true">▼</span>
                     </button>
