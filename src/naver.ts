@@ -181,7 +181,9 @@ const BLOCKED_MALLS = [
 ];
 
 function isBlacklisted(title: string, customKeywords: string[] = []): boolean {
-  const t = title.toLowerCase();
+  const t = title
+   .toLowerCase()
+   .replace(/디지털\s*터치/g, '')
   const effectiveKeywords = [...BLACKLIST_KEYWORDS, ...customKeywords];
 
   if (effectiveKeywords.some((word) => t.includes(word.toLowerCase()))) {
