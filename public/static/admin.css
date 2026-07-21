@@ -1844,4 +1844,150 @@
   }
 }
 
+/* ------------------------------------------------------------
+   WATCHER 이벤트
+   ------------------------------------------------------------ */
+
+.watcher-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.watcher-event-card {
+  display: flex;
+  padding: 12px 13px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: #12151d;
+  border: 1px solid #343a48;
+  border-left: 3px solid #6879ef;
+  border-radius: 9px;
+}
+
+.watcher-event-card.is-read {
+  opacity: 0.58;
+  border-left-color: #464d5b;
+}
+
+.watcher-event-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.watcher-event-top {
+  display: flex;
+  margin-bottom: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.watcher-event-title {
+  display: block;
+  color: #edf0f4;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.watcher-event-message {
+  margin: 5px 0 0;
+  color: #9ba3af;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.watcher-event-meta {
+  display: flex;
+  margin-top: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  color: #747d8b;
+  font-size: 0.69rem;
+}
+
+.watcher-event-link {
+  color: #9db8ff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.watcher-event-link:hover {
+  color: #c2d1ff;
+}
+
+.watcher-event-source {
+  color: #8f97a4;
+  font-size: 0.7rem;
+}
+
+.watcher-event-unread {
+  display: inline-flex;
+  padding: 2px 6px;
+  color: #ffffff;
+  background: #6274eb;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.watcher-event-action {
+  flex: 0 0 auto;
+}
+
+.watcher-event-read-label {
+  display: inline-flex;
+  min-height: 32px;
+  padding: 0 8px;
+  align-items: center;
+  color: #7d8592;
+  font-size: 0.7rem;
+}
+
+.watcher-event-source-new {
+  color: #9ec3ff;
+  background: rgba(76, 119, 195, 0.16);
+  border-color: rgba(94, 140, 218, 0.42);
+}
+
+.watcher-event-source-changed {
+  color: #f2ca6a;
+  background: rgba(200, 151, 40, 0.15);
+  border-color: rgba(205, 158, 52, 0.42);
+}
+
+.watcher-event-image-new {
+  color: #d0aeff;
+  background: rgba(133, 86, 190, 0.16);
+  border-color: rgba(160, 108, 221, 0.42);
+}
+
+.watcher-event-error {
+  color: #f29a9e;
+  background: rgba(190, 74, 81, 0.15);
+  border-color: rgba(202, 87, 94, 0.42);
+}
+
+.watcher-event-uploaded,
+.watcher-event-released {
+  color: #8ce2b5;
+  background: rgba(47, 157, 101, 0.15);
+  border-color: rgba(64, 182, 121, 0.42);
+}
+
+@media (max-width: 680px) {
+  .watcher-event-card {
+    flex-direction: column;
+  }
+
+  .watcher-event-action {
+    width: 100%;
+  }
+
+  .watcher-event-action .btn {
+    width: 100%;
+  }
+}
 
