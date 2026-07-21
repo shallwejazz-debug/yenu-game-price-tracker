@@ -6,6 +6,7 @@
 
 export type Bindings = {
   DB: D1Database
+  GAME_IMAGES: R2Bucket
   NAVER_CLIENT_ID: string
   NAVER_CLIENT_SECRET: string
   ADMIN_TOKEN?: string
