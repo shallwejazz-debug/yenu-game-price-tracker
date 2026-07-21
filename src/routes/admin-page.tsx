@@ -333,8 +333,179 @@ export function AdminPage(): string {
       </section>
     </section>
 
+      <button
+        type="button"
+        class="admin-tab"
+        data-admin-tab="watcher"
+        aria-selected="false"
+      >
+        <span class="admin-tab-icon">📡</span>
+        <span>예판 WATCHER</span>
+        <span
+          id="watcherTabBadge"
+          class="admin-tab-badge"
+          hidden
+        >
+          0
+        </span>
+      </button>
+
     <!-- ====================================================
-         탭 2: 후보 선별
+         탭 2: 예판 WATCHER
+         ==================================================== -->
+    <section
+      class="admin-panel"
+      data-admin-panel="watcher"
+      hidden
+    >
+      <section class="admin-card">
+        <div class="admin-section-head">
+          <div>
+            <h2>📡 예판 WATCHER</h2>
+            <p class="admin-hint">
+              공식 보도자료 발견 현황과 출처별 이미지 사용 정책을
+              확인합니다. 허가 대기 이미지는 공개되지 않습니다.
+            </p>
+          </div>
+
+          <button
+            id="refreshWatcher"
+            class="btn btn-sm"
+            type="button"
+          >
+            새로고침
+          </button>
+        </div>
+
+        <div class="watcher-summary-grid">
+          <article class="dashboard-stat">
+            <span class="dashboard-stat-label">활성 출처</span>
+            <strong
+              id="watcherEnabledSources"
+              class="dashboard-stat-value"
+            >
+              -
+            </strong>
+            <span class="dashboard-stat-sub">현재 감시 대상</span>
+          </article>
+
+          <article class="dashboard-stat">
+            <span class="dashboard-stat-label">신규 발견</span>
+            <strong
+              id="watcherDiscoveredItems"
+              class="dashboard-stat-value"
+            >
+              -
+            </strong>
+            <span class="dashboard-stat-sub">변환 전 보도자료</span>
+          </article>
+
+          <article class="dashboard-stat">
+            <span class="dashboard-stat-label">변환 완료</span>
+            <strong
+              id="watcherTransformedItems"
+              class="dashboard-stat-value"
+            >
+              -
+            </strong>
+            <span class="dashboard-stat-sub">검수 준비 완료</span>
+          </article>
+
+          <article class="dashboard-stat">
+            <span class="dashboard-stat-label">검수 중</span>
+            <strong
+              id="watcherReviewingItems"
+              class="dashboard-stat-value"
+            >
+              -
+            </strong>
+            <span class="dashboard-stat-sub">관리자 확인 필요</span>
+          </article>
+
+          <article class="dashboard-stat">
+            <span class="dashboard-stat-label">이미지 허가 대기</span>
+            <strong
+              id="watcherPendingPermissions"
+              class="dashboard-stat-value"
+            >
+              -
+            </strong>
+            <span class="dashboard-stat-sub">출처별 정책 회신 대기</span>
+          </article>
+
+          <article class="dashboard-stat">
+            <span class="dashboard-stat-label">새 이벤트</span>
+            <strong
+              id="watcherUnreadEvents"
+              class="dashboard-stat-value"
+            >
+              -
+            </strong>
+            <span class="dashboard-stat-sub">읽지 않은 알림</span>
+          </article>
+        </div>
+
+        <p
+          id="watcherStatus"
+          class="admin-status"
+          aria-live="polite"
+        ></p>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-section-head">
+          <div>
+            <h2>🏢 수집 출처 및 이미지 정책</h2>
+            <p class="admin-hint">
+              PENDING은 사용 허가를 의미하지 않습니다.
+              회신 전에는 관리자 후보 확인만 가능합니다.
+            </p>
+          </div>
+        </div>
+
+        <div
+          id="watcherSourceList"
+          class="watcher-source-list"
+        >
+          <div class="admin-empty">
+            출처 정보를 불러오는 중입니다.
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-card">
+        <div class="admin-section-head">
+          <div>
+            <h2>📰 발견된 공식 보도자료</h2>
+            <p class="admin-hint">
+              최신 발견 항목 50개를 표시합니다.
+            </p>
+          </div>
+        </div>
+
+        <div
+          id="watcherItemList"
+          class="watcher-item-list"
+        >
+          <div class="admin-empty">
+            수집 항목을 불러오는 중입니다.
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-card">
+        <h2>🔒 현재 이미지 운영 원칙</h2>
+
+        <div class="admin-notice">
+          이미지 정책이 PENDING인 출처는 공식 이미지 URL만 후보로
+          기록합니다. 사이트 공개, 자체 저장, 리사이즈 및 재배포는
+          허가 범위가 확인될 때까지 차단합니다.
+        </div>
+      </section>
+    </section>
+
+    <!-- ====================================================
+         탭 3: 후보 선별
          ==================================================== -->
     <section
       class="admin-panel"
@@ -643,7 +814,7 @@ export function AdminPage(): string {
     </section>
 
     <!-- ====================================================
-         탭 3: 게임 가져오기
+         탭 4: 게임 가져오기
          ==================================================== -->
     <section
       class="admin-panel"
@@ -786,7 +957,7 @@ export function AdminPage(): string {
     </section>
 
     <!-- ====================================================
-         탭 4: 게임 관리
+         탭 5: 게임 관리
          ==================================================== -->
     <section
       class="admin-panel"
@@ -859,7 +1030,7 @@ export function AdminPage(): string {
     </section>
 
     <!-- ====================================================
-         탭 5: 설정 및 백업
+         탭 6: 설정 및 백업
          ==================================================== -->
     <section
       class="admin-panel"
@@ -1088,7 +1259,8 @@ export function AdminPage(): string {
     ></div>
   </main>
 
-    <script src="/static/admin.js?v=20260718-login-fix"></script>
+    <script src="/static/admin.js?v=20260721-watcher-tab"></script>
+    <script src="/static/watcher-admin.js?v=20260721-1"></script>
 </body>
 </html>`
 }
