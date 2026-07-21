@@ -33,7 +33,10 @@ export function AdminPage(): string {
   />
 
   <link href="/static/style.css" rel="stylesheet" />
-  <link href="/static/admin.css" rel="stylesheet" />
+  <link
+    href="/static/admin.css?v=20260721-event-groups-1"
+    rel="stylesheet"
+  />
 </head>
 
 <body>
