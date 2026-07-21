@@ -355,6 +355,7 @@
   function switchTab(tabName, save) {
     const validTabs = [
       'dashboard',
+      'watcher',
       'candidates',
       'import',
       'games',
