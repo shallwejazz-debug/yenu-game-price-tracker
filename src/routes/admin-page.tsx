@@ -1535,7 +1535,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-watcher-register-1"></script>
+    <script src="/static/watcher-admin.js?v=20260721-watcher-register-2"></script>
 </body>
 </html>`
 }
