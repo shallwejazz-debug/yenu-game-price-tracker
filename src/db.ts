@@ -13,13 +13,32 @@ import type { Game, Edition, Price, PriceHistory } from './types'
 const STALE_HOURS = 24
 
 // ---------- 게임(작품) ----------
-export async function getGameById(db: D1Database, id: number): Promise<Game | null> {
-  return await db.prepare('SELECT * FROM games WHERE id = ?').bind(id).first<Game>()
+export async function getGameById(
+  db: D1Database,
+  id: number
+): Promise<Game | null> {
+  return await db
+    .prepare(`
+      SELECT *
+      FROM games
+      WHERE
+        id = ?
+        AND publish_status = 'PUBLISHED'
+      LIMIT 1
+    `)
+    .bind(id)
+    .first<Game>()
 }
+
 
 export async function listGames(db: D1Database): Promise<Game[]> {
   const { results } = await db
-    .prepare('SELECT * FROM games ORDER BY created_at DESC')
+.prepare(`
+  SELECT *
+  FROM games
+  WHERE publish_status = 'PUBLISHED'
+  ORDER BY created_at DESC
+`)
     .all<Game>()
   return results ?? []
 }
@@ -46,7 +65,9 @@ export async function getRecentGames(
              ORDER BY g.created_at DESC, g.id DESC
            ) AS title_rank
          FROM games g
-         WHERE EXISTS (
+         WHERE
+          g.publish_status = 'PUBLISHED'
+          AND EXISTS (
            SELECT 1
            FROM editions e
            WHERE e.game_id = g.id
@@ -176,8 +197,10 @@ export async function listGamesByPlatform(
        FROM games g
        INNER JOIN editions e ON e.game_id = g.id
        LEFT JOIN price_summary ps ON ps.edition_id = e.id
-       WHERE e.platform = ?
-       ORDER BY g.created_at DESC`
+       WHERE
+        e.platform = ?
+        AND g.publish_status = 'PUBLISHED'
+        ORDER BY g.created_at DESC`
     )
     .bind(platform, platform)
     .all()
@@ -209,10 +232,13 @@ export async function searchGamesAllPlatforms(
   const { results } = await db
     .prepare(
       `WITH matched_games AS (
-         SELECT *
-         FROM games
-         WHERE title LIKE ? COLLATE NOCASE
-       ),
+        SELECT *
+        FROM games
+        WHERE
+      publish_status = 'PUBLISHED'
+      AND title LIKE ? COLLATE NOCASE
+),
+
        ed_latest AS (
          SELECT p.edition_id, MAX(p.recorded_at) AS ed_max
          FROM prices p
@@ -345,13 +371,30 @@ export async function findEdition(
     .first<Edition>()
 }
 
-export async function listEditionsByGame(db: D1Database, gameId: number): Promise<Edition[]> {
+export async function listEditionsByGame(
+  db: D1Database,
+  gameId: number
+): Promise<Edition[]> {
   const { results } = await db
-    .prepare('SELECT * FROM editions WHERE game_id = ? ORDER BY platform')
+    .prepare(`
+      SELECT e.*
+      FROM editions e
+
+      INNER JOIN games g
+        ON g.id = e.game_id
+
+      WHERE
+        e.game_id = ?
+        AND g.publish_status = 'PUBLISHED'
+
+      ORDER BY e.platform
+    `)
     .bind(gameId)
     .all<Edition>()
+
   return results ?? []
 }
+
 
 export async function insertEdition(
   db: D1Database,
@@ -468,8 +511,20 @@ export async function getWeekLow(
 
 // ★ [2026-07-08 추가] 전체 가격 마지막 업데이트 시각 (UTC 문자열)
 export async function getLastUpdated(db: D1Database): Promise<string | null> {
-  const row = await db
-    .prepare('SELECT MAX(recorded_at) AS last FROM prices')
+  const row = await db.prepare(`
+  SELECT MAX(p.recorded_at) AS last
+
+  FROM prices p
+
+  INNER JOIN editions e
+    ON e.id = p.edition_id
+
+  INNER JOIN games g
+    ON g.id = e.game_id
+
+  WHERE g.publish_status = 'PUBLISHED'
+`)
+
     .first<{ last: string | null }>()
   return row?.last ?? null
 }
@@ -479,7 +534,20 @@ export async function getPlatformCounts(
   db: D1Database
 ): Promise<Record<string, number>> {
   const { results } = await db
-    .prepare('SELECT platform, COUNT(*) AS cnt FROM editions GROUP BY platform')
+    .prepare(`
+      SELECT
+        e.platform AS platform,
+        COUNT(*) AS cnt
+    
+      FROM editions e
+    
+      INNER JOIN games g
+        ON g.id = e.game_id
+    
+      WHERE g.publish_status = 'PUBLISHED'
+    
+      GROUP BY e.platform
+    `)
     .all<{ platform: string; cnt: number }>()
   const map: Record<string, number> = {}
   for (const row of results ?? []) map[row.platform] = row.cnt ?? 0
@@ -490,22 +558,30 @@ export async function getPlatformCounts(
 export async function getTrackingCounts(
   db: D1Database
 ): Promise<{ uniqueGames: number; platformEditions: number }> {
-  const row = await db
-    .prepare(
-      `SELECT
-         (
-           SELECT COUNT(DISTINCT LOWER(TRIM(title)))
-           FROM games
-         ) AS unique_games,
-         (
-           SELECT COUNT(*)
-           FROM editions
-         ) AS platform_editions`
-    )
-    .first<{
-      unique_games: number
-      platform_editions: number
-    }>()
+  const row = await db.prepare(`
+    SELECT
+      (
+        SELECT COUNT(
+          DISTINCT LOWER(TRIM(title))
+        )
+        FROM games
+        WHERE publish_status = 'PUBLISHED'
+      ) AS unique_games,
+
+      (
+        SELECT COUNT(*)
+        FROM editions e
+
+        INNER JOIN games g
+          ON g.id = e.game_id
+
+        WHERE g.publish_status = 'PUBLISHED'
+      ) AS platform_editions
+  `).first<{
+    unique_games: number
+    platform_editions: number
+  }>()
+
 
   return {
     uniqueGames: row?.unique_games ?? 0,
@@ -721,8 +797,11 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
          JOIN games g ON g.id = e.game_id
          JOIN weekstats w
            ON w.edition_id = l.edition_id AND w.is_digital = l.is_digital
-         WHERE w.week_high IS NOT NULL AND w.week_high > 0
-           AND l.cur_price >= w.week_high * 0.55
+         WHERE 
+         g.publish_status = 'PUBLISHED'
+         AND w.week_high IS NOT NULL 
+         AND w.week_high > 0
+         AND l.cur_price >= w.week_high * 0.55
        )
        SELECT game_id, title, image_url, original_price,
               edition_id, platform, is_digital, lowest_price,
