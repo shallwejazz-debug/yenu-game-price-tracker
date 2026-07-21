@@ -3047,6 +3047,396 @@ watcherAdmin.post(
   }
 )
 
+// ------------------------------------------------------------
+// 비공개 R2 대표 이미지 관리자 미리보기
+//
+// 보안:
+//   - watcherAdmin 공통 X-Admin-Token 인증 적용
+//   - 선택·승인된 대표 이미지만 허용
+//   - DRAFT 게임·예약판매 정보만 허용
+//   - DB에 기록된 고정 R2 객체만 반환
+//   - 외부 R2 공개 URL은 사용하지 않음
+// ------------------------------------------------------------
+
+watcherAdmin.get(
+  '/items/:id/images/:imageId/preview',
+  async (c) => {
+    const itemId = Number(
+      c.req.param('id')
+    )
+
+    const imageId = Number(
+      c.req.param('imageId')
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher image id',
+        },
+        400
+      )
+    }
+
+    const record = await c.env.DB.prepare(`
+      SELECT
+        wi.id AS watch_item_id,
+        wi.linked_game_id,
+
+        g.publish_status
+          AS game_publish_status,
+
+        image.id AS image_id,
+        image.stored_image_url,
+        image.image_hash,
+        image.image_type,
+        image.permission_status
+          AS image_permission_status,
+        image.selected_for_publish,
+
+        policy.permission_status
+          AS source_permission_status,
+        policy.local_storage_allowed,
+
+        ep.id AS preorder_id,
+        ep.selected_image_id,
+        ep.publish_status
+          AS preorder_publish_status
+
+      FROM watch_items wi
+
+      INNER JOIN games g
+        ON g.id = wi.linked_game_id
+
+      INNER JOIN watch_item_images image
+        ON
+          image.watch_item_id = wi.id
+          AND image.id = ?
+
+      LEFT JOIN source_image_policies policy
+        ON policy.source_id = wi.source_id
+
+      INNER JOIN game_official_sources gos
+        ON
+          gos.game_id = g.id
+          AND gos.watch_item_id = wi.id
+
+      INNER JOIN edition_preorders ep
+        ON ep.official_source_id = gos.id
+
+      WHERE wi.id = ?
+
+      LIMIT 1
+    `)
+      .bind(
+        imageId,
+        itemId
+      )
+      .first<{
+        watch_item_id: number
+        linked_game_id: number | null
+
+        game_publish_status: string
+
+        image_id: number
+        stored_image_url: string | null
+        image_hash: string | null
+        image_type: string
+        image_permission_status: string
+        selected_for_publish: number
+
+        source_permission_status:
+          string | null
+        local_storage_allowed:
+          number | null
+
+        preorder_id: number
+        selected_image_id: number | null
+        preorder_publish_status: string
+      }>()
+
+    if (!record) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '미리보기 이미지 정보를 찾을 수 없습니다.',
+        },
+        404
+      )
+    }
+
+    const gameId = Number(
+      record.linked_game_id || 0
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '연결된 게임 정보가 올바르지 않습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.game_publish_status !== 'DRAFT'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '현재 관리자 미리보기는 DRAFT 게임에서만 사용할 수 있습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.preorder_publish_status !==
+      'DRAFT'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '현재 관리자 미리보기는 DRAFT 예약판매 정보에서만 사용할 수 있습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      Number(
+        record.selected_for_publish
+      ) !== 1 ||
+      Number(
+        record.selected_image_id
+      ) !== imageId
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '현재 선택된 대표 이미지만 미리볼 수 있습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.image_permission_status !==
+      'APPROVED'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '개별 이미지 검수가 승인되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    const sourcePermissionStatus =
+      String(
+        record.source_permission_status ||
+        'PENDING'
+      ).toUpperCase()
+
+    if (
+      sourcePermissionStatus !==
+        'APPROVED' &&
+      sourcePermissionStatus !==
+        'CONDITIONAL'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      Number(
+        record.local_storage_allowed
+      ) !== 1
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이 출처는 이미지 로컬 저장과 미리보기를 허용하지 않습니다.',
+        },
+        409
+      )
+    }
+
+    const expectedObjectKey =
+      `watcher/games/${gameId}/` +
+      `images/${imageId}/original`
+
+    const expectedStoredImageUrl =
+      `r2://GAME_IMAGES/` +
+      expectedObjectKey
+
+    if (
+      record.stored_image_url !==
+      expectedStoredImageUrl
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '비공개 R2 저장 정보가 올바르지 않습니다.',
+        },
+        409
+      )
+    }
+
+    if (!record.image_hash) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '저장된 이미지의 무결성 해시가 없습니다.',
+        },
+        409
+      )
+    }
+
+    const object =
+      await c.env.GAME_IMAGES.get(
+        expectedObjectKey
+      )
+
+    if (!object) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '비공개 R2에서 이미지 객체를 찾을 수 없습니다.',
+        },
+        404
+      )
+    }
+
+    const metadata =
+      object.customMetadata || {}
+
+    if (
+      metadata.watchItemId !==
+        String(itemId) ||
+      metadata.imageId !==
+        String(imageId) ||
+      metadata.gameId !==
+        String(gameId) ||
+      metadata.sha256 !==
+        record.image_hash
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'R2 이미지 메타데이터와 DB 정보가 일치하지 않습니다.',
+        },
+        409
+      )
+    }
+
+    const contentType =
+      object.httpMetadata
+        ?.contentType ||
+      'application/octet-stream'
+
+    if (
+      contentType !== 'image/jpeg' &&
+      contentType !== 'image/png' &&
+      contentType !== 'image/webp'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '미리보기를 허용하지 않는 파일 형식입니다.',
+        },
+        415
+      )
+    }
+
+    const headers = new Headers()
+
+    object.writeHttpMetadata(headers)
+
+    headers.set(
+      'Content-Type',
+      contentType
+    )
+
+    headers.set(
+      'Content-Length',
+      String(object.size)
+    )
+
+    headers.set(
+      'ETag',
+      object.httpEtag
+    )
+
+    headers.set(
+      'Cache-Control',
+      'private, no-store, max-age=0'
+    )
+
+    headers.set(
+      'Pragma',
+      'no-cache'
+    )
+
+    headers.set(
+      'X-Content-Type-Options',
+      'nosniff'
+    )
+
+    headers.set(
+      'Content-Disposition',
+      `inline; filename="game-${gameId}-image-${imageId}"`
+    )
+
+    return new Response(
+      object.body,
+      {
+        status: 200,
+        headers,
+      }
+    )
+  }
+)
 
 // ------------------------------------------------------------
 // 아크시스템웍스아시아 수동 수집 실행
