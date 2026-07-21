@@ -6,15 +6,24 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+
   // D1 데이터베이스 바인딩
   // - binding "DB": 코드에서 c.env.DB 로 접근
-  // - database_name: 운영용 DB 이름 (로컬은 --local 플래그로 자동 SQLite 생성)
-  // - database_id: 운영 배포 시 `npx wrangler d1 create webapp-production` 결과값으로 교체
+  // - database_name: 운영용 DB 이름
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "webapp-production",
       "database_id": "c02e6277-0285-4043-92a1-489fc9bfb731"
+    }
+  ],
+
+  // 게임 공식 이미지 저장용 비공개 R2 버킷
+  // - 코드에서 c.env.GAME_IMAGES 로 접근
+  "r2_buckets": [
+    {
+      "binding": "GAME_IMAGES",
+      "bucket_name": "yeonudeal-game-images"
     }
   ]
 }
