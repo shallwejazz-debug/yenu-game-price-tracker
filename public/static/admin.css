@@ -2465,3 +2465,84 @@
     gap: 4px;
   }
 }
+
+/* ==========================================================
+   WATCHER 비공개 R2 대표 이미지 미리보기
+   ========================================================== */
+
+.watcher-private-preview {
+  margin-top: 16px;
+}
+
+.watcher-private-preview .admin-section-head {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.watcher-private-preview-frame {
+  margin-top: 16px;
+  padding: 20px;
+  min-height: 240px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      45deg,
+      rgba(148, 163, 184, 0.08) 25%,
+      transparent 25%
+    ),
+    linear-gradient(
+      -45deg,
+      rgba(148, 163, 184, 0.08) 25%,
+      transparent 25%
+    ),
+    linear-gradient(
+      45deg,
+      transparent 75%,
+      rgba(148, 163, 184, 0.08) 75%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 75%,
+      rgba(148, 163, 184, 0.08) 75%
+    );
+  background-size: 24px 24px;
+  background-position:
+    0 0,
+    0 12px,
+    12px -12px,
+    -12px 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+.watcher-private-preview-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 640px;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .watcher-private-preview .admin-section-head {
+    display: block;
+  }
+
+  .watcher-private-preview
+  #loadWatcherPrivatePreview {
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .watcher-private-preview-frame {
+    padding: 12px;
+    min-height: 180px;
+  }
+
+  .watcher-private-preview-image {
+    max-height: 480px;
+  }
+}
