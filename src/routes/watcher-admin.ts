@@ -345,6 +345,154 @@ watcherAdmin.get('/items', async (c) => {
   })
 })
 
+// ------------------------------------------------------------
+// WATCHER 이벤트 목록
+// ------------------------------------------------------------
+
+watcherAdmin.get('/events', async (c) => {
+  const rawLimit = Number(
+    c.req.query('limit') ?? 100
+  )
+
+  const limit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(200, rawLimit))
+    : 100
+
+  const unreadOnly =
+    String(c.req.query('unread') ?? '') === '1'
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT
+      e.id,
+      e.watch_item_id,
+      e.source_id,
+      e.event_type,
+      e.title,
+      e.message,
+      e.event_json,
+      e.is_read,
+      e.notified_at,
+      e.created_at,
+
+      ws.source_key,
+      ws.source_name,
+
+      wi.source_url,
+      wi.review_status
+
+    FROM watch_events e
+
+    LEFT JOIN watch_sources ws
+      ON ws.id = e.source_id
+
+    LEFT JOIN watch_items wi
+      ON wi.id = e.watch_item_id
+
+    WHERE
+      (? = 0 OR e.is_read = 0)
+
+    ORDER BY
+      e.created_at DESC,
+      e.id DESC
+
+    LIMIT ?
+  `)
+    .bind(unreadOnly ? 1 : 0, limit)
+    .all()
+
+  return c.json({
+    ok: true,
+    events: results ?? [],
+    filters: {
+      unreadOnly,
+      limit,
+    },
+  })
+})
+
+
+// ------------------------------------------------------------
+// WATCHER 이벤트 개별 읽음
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/events/:id/read',
+  async (c) => {
+    const id = Number(c.req.param('id'))
+
+    if (
+      !Number.isInteger(id) ||
+      id <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher event id',
+        },
+        400
+      )
+    }
+
+    const existing = await c.env.DB.prepare(`
+      SELECT id
+      FROM watch_events
+      WHERE id = ?
+      LIMIT 1
+    `)
+      .bind(id)
+      .first()
+
+    if (!existing) {
+      return c.json(
+        {
+          ok: false,
+          error: 'watcher event not found',
+        },
+        404
+      )
+    }
+
+    const result = await c.env.DB.prepare(`
+      UPDATE watch_events
+      SET is_read = 1
+      WHERE id = ?
+    `)
+      .bind(id)
+      .run()
+
+    return c.json({
+      ok: true,
+      id,
+      changed: Number(
+        result.meta.changes || 0
+      ),
+    })
+  }
+)
+
+
+// ------------------------------------------------------------
+// WATCHER 이벤트 모두 읽음
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/events/read-all',
+  async (c) => {
+    const result = await c.env.DB.prepare(`
+      UPDATE watch_events
+      SET is_read = 1
+      WHERE is_read = 0
+    `).run()
+
+    return c.json({
+      ok: true,
+      changed: Number(
+        result.meta.changes || 0
+      ),
+    })
+  }
+)
+
 
 // ------------------------------------------------------------
 // 특정 수집 항목 상세
