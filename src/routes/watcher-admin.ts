@@ -1168,6 +1168,596 @@ watcherAdmin.post(
   }
 )
 
+// ------------------------------------------------------------
+// WATCHER 초안을 실제 비공개 게임 DRAFT로 등록
+//
+// 생성:
+//   games                  DRAFT
+//   editions               플랫폼판
+//   game_official_sources  공식 출처
+//   edition_preorders      예약판매 초안
+//
+// 이미지:
+//   선택·다운로드·공개하지 않음
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/items/:id/register-draft',
+  async (c) => {
+    const id = Number(c.req.param('id'))
+
+    if (
+      !Number.isInteger(id) ||
+      id <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    const item = await c.env.DB.prepare(`
+      SELECT
+        wi.id,
+        wi.source_id,
+        wi.source_url,
+        wi.title AS source_title,
+        wi.published_at,
+        wi.review_status,
+        wi.transformed_json,
+        wi.linked_game_id,
+
+        ws.source_key,
+        ws.source_name,
+
+        p.permission_status,
+        p.required_credit,
+        p.required_copyright
+
+      FROM watch_items wi
+
+      INNER JOIN watch_sources ws
+        ON ws.id = wi.source_id
+
+      LEFT JOIN source_image_policies p
+        ON p.source_id = wi.source_id
+
+      WHERE wi.id = ?
+
+      LIMIT 1
+    `)
+      .bind(id)
+      .first<{
+        id: number
+        source_id: number
+        source_url: string
+        source_title: string
+        published_at: string | null
+        review_status: string
+        transformed_json: string | null
+        linked_game_id: number | null
+        source_key: string
+        source_name: string
+        permission_status: string | null
+        required_credit: string | null
+        required_copyright: string | null
+      }>()
+
+    if (!item) {
+      return c.json(
+        {
+          ok: false,
+          error: 'watcher item not found',
+        },
+        404
+      )
+    }
+
+    if (item.linked_game_id) {
+      return c.json({
+        ok: true,
+        alreadyRegistered: true,
+        itemId: item.id,
+        gameId: Number(item.linked_game_id),
+        message:
+          '이미 게임 DRAFT에 연결된 보도자료입니다.',
+      })
+    }
+
+    if (
+      item.review_status !== 'TRANSFORMED'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '게임 등록 초안을 먼저 저장해 주세요.',
+        },
+        409
+      )
+    }
+
+    if (!item.transformed_json) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'transformed draft is missing',
+        },
+        409
+      )
+    }
+
+    const permissionStatus = String(
+      item.permission_status || 'PENDING'
+    ).toUpperCase()
+
+    if (
+      permissionStatus !== 'APPROVED' &&
+      permissionStatus !== 'CONDITIONAL'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '공식 출처 이미지·정보 사용 정책이 승인되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    let draft: Record<string, unknown>
+
+    try {
+      const parsed = JSON.parse(
+        item.transformed_json
+      )
+
+      if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+      ) {
+        throw new Error(
+          'invalid transformed draft'
+        )
+      }
+
+      draft = parsed as Record<
+        string,
+        unknown
+      >
+    } catch (error) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '저장된 게임 초안을 해석할 수 없습니다.',
+        },
+        409
+      )
+    }
+
+    const text = (
+      value: unknown
+    ): string => {
+      return String(value ?? '').trim()
+    }
+
+    const title = text(draft.title)
+
+    const platform = text(
+      draft.platform
+    ).toLowerCase()
+
+    const editionName =
+      text(draft.editionName)
+
+    const genre = text(draft.genre)
+
+    const releaseDate =
+      text(draft.releaseDate)
+
+    const preorderStartDate =
+      text(draft.preorderStartDate)
+
+    const preorderEndDate =
+      text(draft.preorderEndDate)
+
+    const preorderBonus =
+      text(draft.preorderBonus)
+
+    const preorderBonusNote =
+      text(draft.preorderBonusNote)
+
+    const trailerUrl =
+      text(draft.trailerUrl)
+
+    const rawCandidatePrice =
+      draft.candidatePrice
+
+    const candidatePrice =
+      rawCandidatePrice == null ||
+      rawCandidatePrice === ''
+        ? null
+        : Number(rawCandidatePrice)
+
+    const allowedPlatforms = new Set([
+      'pc',
+      'ps5',
+      'ps4',
+      'xbox',
+      'switch',
+      'etc',
+    ])
+
+    if (
+      !title ||
+      !allowedPlatforms.has(platform) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        releaseDate
+      )
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '게임 제목·플랫폼·발매일을 다시 확인해 주세요.',
+        },
+        400
+      )
+    }
+
+    if (
+      candidatePrice != null &&
+      (
+        !Number.isInteger(candidatePrice) ||
+        candidatePrice <= 0
+      )
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '가격 후보가 올바르지 않습니다.',
+        },
+        400
+      )
+    }
+
+    const existingGame =
+      await c.env.DB.prepare(`
+        SELECT
+          id,
+          publish_status
+
+        FROM games
+
+        WHERE
+          LOWER(TRIM(title)) =
+          LOWER(TRIM(?))
+
+        LIMIT 1
+      `)
+        .bind(title)
+        .first<{
+          id: number
+          publish_status: string
+        }>()
+
+    if (existingGame) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '같은 제목의 게임이 이미 있습니다. 기존 게임 연결 기능에서 처리해 주세요.',
+          existingGameId:
+            Number(existingGame.id),
+          existingPublishStatus:
+            existingGame.publish_status,
+        },
+        409
+      )
+    }
+
+    let preorderStatus =
+      'UNKNOWN'
+
+    const todayKst = new Date(
+      Date.now() + 9 * 60 * 60 * 1000
+    )
+      .toISOString()
+      .slice(0, 10)
+
+    if (preorderStartDate) {
+      if (todayKst < preorderStartDate) {
+        preorderStatus = 'UPCOMING'
+      } else if (
+        preorderEndDate &&
+        todayKst > preorderEndDate
+      ) {
+        preorderStatus = 'CLOSED'
+      } else {
+        preorderStatus = 'OPEN'
+      }
+    }
+
+    const priceStatus =
+      candidatePrice == null
+        ? 'UNCONFIRMED'
+        : 'CANDIDATE'
+
+    const sourceCredit =
+      text(item.required_credit) ||
+      (
+        '이미지 및 정보 출처: ' +
+        item.source_name
+      )
+
+    let createdGameId:
+      number | null = null
+
+    try {
+      const game =
+        await c.env.DB.prepare(`
+          INSERT INTO games (
+            title,
+            image_url,
+            release_date,
+            original_price,
+            genre,
+            publish_status,
+            published_at
+          )
+          VALUES (
+            ?,
+            NULL,
+            ?,
+            NULL,
+            ?,
+            'DRAFT',
+            NULL
+          )
+          RETURNING id
+        `)
+          .bind(
+            title,
+            releaseDate,
+            genre || null
+          )
+          .first<{
+            id: number
+          }>()
+
+      if (!game?.id) {
+        throw new Error(
+          'failed to create game draft'
+        )
+      }
+
+      createdGameId = Number(game.id)
+
+      const edition =
+        await c.env.DB.prepare(`
+          INSERT INTO editions (
+            game_id,
+            platform,
+            edition_name,
+            search_query,
+            keywords,
+            steam_appid
+          )
+          VALUES (
+            ?, ?, ?, ?, ?, NULL
+          )
+          RETURNING id
+        `)
+          .bind(
+            createdGameId,
+            platform,
+            editionName || null,
+            title,
+            title
+          )
+          .first<{
+            id: number
+          }>()
+
+      if (!edition?.id) {
+        throw new Error(
+          'failed to create edition draft'
+        )
+      }
+
+      const officialSource =
+        await c.env.DB.prepare(`
+          INSERT INTO game_official_sources (
+            game_id,
+            watch_item_id,
+            source_id,
+            source_title,
+            official_source_url,
+            trailer_url,
+            source_credit,
+            required_copyright,
+            permission_status_snapshot
+          )
+          VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?
+          )
+          RETURNING id
+        `)
+          .bind(
+            createdGameId,
+            item.id,
+            item.source_id,
+            item.source_title,
+            item.source_url,
+            trailerUrl || null,
+            sourceCredit,
+            item.required_copyright || null,
+            permissionStatus
+          )
+          .first<{
+            id: number
+          }>()
+
+      if (!officialSource?.id) {
+        throw new Error(
+          'failed to create official source'
+        )
+      }
+
+      const preorder =
+        await c.env.DB.prepare(`
+          INSERT INTO edition_preorders (
+            edition_id,
+            official_source_id,
+            release_date,
+            preorder_start_date,
+            preorder_end_date,
+            preorder_status,
+            preorder_bonus,
+            preorder_bonus_note,
+            candidate_price,
+            confirmed_price,
+            price_status,
+            selected_image_id,
+            publish_status,
+            display_order,
+            approved_at,
+            published_at
+          )
+          VALUES (
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, NULL, ?,
+            NULL, 'DRAFT', 0,
+            NULL, NULL
+          )
+          RETURNING id
+        `)
+          .bind(
+            edition.id,
+            officialSource.id,
+            releaseDate,
+            preorderStartDate || null,
+            preorderEndDate || null,
+            preorderStatus,
+            preorderBonus || null,
+            preorderBonusNote || null,
+            candidatePrice,
+            priceStatus
+          )
+          .first<{
+            id: number
+          }>()
+
+      if (!preorder?.id) {
+        throw new Error(
+          'failed to create preorder draft'
+        )
+      }
+
+      await c.env.DB.prepare(`
+        UPDATE watch_items
+
+        SET
+          linked_game_id = ?,
+          review_status = 'APPROVED',
+          reviewed_at = CURRENT_TIMESTAMP,
+          error_message = NULL,
+          updated_at = CURRENT_TIMESTAMP
+
+        WHERE id = ?
+      `)
+        .bind(
+          createdGameId,
+          item.id
+        )
+        .run()
+
+      return c.json({
+        ok: true,
+        alreadyRegistered: false,
+
+        itemId: item.id,
+        gameId: createdGameId,
+        editionId: Number(edition.id),
+
+        officialSourceId:
+          Number(officialSource.id),
+
+        preorderId:
+          Number(preorder.id),
+
+        gamePublishStatus: 'DRAFT',
+        preorderPublishStatus: 'DRAFT',
+
+        imageSelected: false,
+        imagePublished: false,
+
+        message:
+          '비공개 게임 DRAFT를 생성했습니다.',
+      })
+    } catch (error) {
+      if (createdGameId) {
+        try {
+          await c.env.DB.prepare(`
+            DELETE FROM games
+            WHERE
+              id = ?
+              AND publish_status = 'DRAFT'
+          `)
+            .bind(createdGameId)
+            .run()
+        } catch (cleanupError) {
+          console.error(
+            'Failed to clean up game draft:',
+            cleanupError
+          )
+        }
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'failed to register game draft'
+
+      await c.env.DB.prepare(`
+        UPDATE watch_items
+        SET
+          error_message = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `)
+        .bind(
+          message.slice(0, 1000),
+          item.id
+        )
+        .run()
+
+      console.error(
+        'WATCHER game draft registration failed:',
+        error
+      )
+
+      return c.json(
+        {
+          ok: false,
+          error:
+            '게임 DRAFT 등록에 실패했습니다: ' +
+            message,
+        },
+        500
+      )
+    }
+  }
+)
+
+
 
 // ------------------------------------------------------------
 // 아크시스템웍스아시아 수동 수집 실행
