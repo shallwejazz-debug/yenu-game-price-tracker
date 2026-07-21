@@ -2190,6 +2190,863 @@ watcherAdmin.post(
   }
 )
 
+// ------------------------------------------------------------
+// 선택된 WATCHER 대표 이미지 원본을 비공개 R2에 저장
+//
+// 처리:
+//   - 선택·승인된 이미지인지 재검증
+//   - 출처의 로컬 저장 허용 여부 재검증
+//   - DRAFT 게임·예약판매인지 재검증
+//   - 공식 원본 URL에서 서버가 다운로드
+//   - 파일 크기 및 실제 이미지 형식 검증
+//   - SHA-256 계산
+//   - 비공개 GAME_IMAGES R2 버킷에 저장
+//   - watch_item_images에 내부 저장 위치 기록
+//
+// 하지 않는 처리:
+//   - games.image_url 변경
+//   - 게임 또는 예약판매 공개
+//   - 공개 이미지 URL 생성
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/items/:id/images/:imageId/store',
+  async (c) => {
+    const itemId = Number(
+      c.req.param('id')
+    )
+
+    const imageId = Number(
+      c.req.param('imageId')
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher image id',
+        },
+        400
+      )
+    }
+
+    const record = await c.env.DB.prepare(`
+      SELECT
+        wi.id AS watch_item_id,
+        wi.source_id,
+        wi.linked_game_id,
+        wi.review_status,
+
+        ws.source_key,
+        ws.source_name,
+
+        g.publish_status
+          AS game_publish_status,
+
+        image.id AS image_id,
+        image.source_image_url,
+        image.stored_image_url,
+        image.image_type,
+        image.image_hash,
+        image.permission_status
+          AS image_permission_status,
+        image.selected_for_publish,
+
+        policy.permission_status
+          AS source_permission_status,
+        policy.local_storage_allowed,
+
+        ep.id AS preorder_id,
+        ep.selected_image_id,
+        ep.publish_status
+          AS preorder_publish_status
+
+      FROM watch_items wi
+
+      INNER JOIN watch_sources ws
+        ON ws.id = wi.source_id
+
+      INNER JOIN games g
+        ON g.id = wi.linked_game_id
+
+      INNER JOIN watch_item_images image
+        ON image.watch_item_id = wi.id
+
+      LEFT JOIN source_image_policies policy
+        ON policy.source_id = wi.source_id
+
+      INNER JOIN game_official_sources gos
+        ON
+          gos.game_id = g.id
+          AND gos.watch_item_id = wi.id
+
+      INNER JOIN edition_preorders ep
+        ON ep.official_source_id = gos.id
+
+      INNER JOIN editions edition
+        ON
+          edition.id = ep.edition_id
+          AND edition.game_id = g.id
+
+      WHERE
+        wi.id = ?
+        AND image.id = ?
+
+      LIMIT 1
+    `)
+      .bind(
+        itemId,
+        imageId
+      )
+      .first<{
+        watch_item_id: number
+        source_id: number
+        linked_game_id: number | null
+        review_status: string
+
+        source_key: string
+        source_name: string
+
+        game_publish_status: string
+
+        image_id: number
+        source_image_url: string
+        stored_image_url: string | null
+        image_type: string
+        image_hash: string | null
+        image_permission_status: string
+        selected_for_publish: number
+
+        source_permission_status: string | null
+        local_storage_allowed: number | null
+
+        preorder_id: number
+        selected_image_id: number | null
+        preorder_publish_status: string
+      }>()
+
+    if (!record) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '연결된 이미지·게임·예약판매 정보를 찾을 수 없습니다.',
+        },
+        404
+      )
+    }
+
+    const gameId = Number(
+      record.linked_game_id || 0
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '비공개 게임 DRAFT를 먼저 등록해 주세요.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.game_publish_status !== 'DRAFT'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미지 저장은 DRAFT 게임에서만 가능합니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.preorder_publish_status !== 'DRAFT'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미지 저장은 DRAFT 예약판매 정보에서만 가능합니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      Number(record.selected_for_publish) !== 1 ||
+      Number(record.selected_image_id) !== imageId
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '대표 이미지 후보를 먼저 선택해 주세요.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.image_permission_status !==
+      'APPROVED'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '개별 이미지 검수가 승인되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    const sourcePermissionStatus = String(
+      record.source_permission_status ||
+      'PENDING'
+    ).toUpperCase()
+
+    if (
+      sourcePermissionStatus !== 'APPROVED' &&
+      sourcePermissionStatus !== 'CONDITIONAL'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      Number(record.local_storage_allowed) !== 1
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이 출처는 이미지 로컬 저장을 허용하지 않습니다.',
+        },
+        409
+      )
+    }
+
+    const allowedRepresentativeTypes =
+      new Set([
+        'PACKAGE',
+        'LIMITED_EDITION',
+        'PREORDER_BONUS',
+        'FIRST_PRINT_BONUS',
+        'STORE_BONUS',
+        'KEY_VISUAL',
+        'SCREENSHOT',
+      ])
+
+    if (
+      !allowedRepresentativeTypes.has(
+        String(record.image_type).toUpperCase()
+      )
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '저장할 수 없는 이미지 유형입니다.',
+        },
+        409
+      )
+    }
+
+    let sourceUrl: URL
+
+    try {
+      sourceUrl = new URL(
+        record.source_image_url
+      )
+    } catch (error) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '공식 이미지 원본 URL이 올바르지 않습니다.',
+        },
+        409
+      )
+    }
+
+    if (
+      sourceUrl.protocol !== 'https:' &&
+      sourceUrl.protocol !== 'http:'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'HTTP 또는 HTTPS 이미지 URL만 저장할 수 있습니다.',
+        },
+        409
+      )
+    }
+
+    const isUnsafeHostname = (
+      value: string
+    ): boolean => {
+      const hostname = value
+        .trim()
+        .toLowerCase()
+        .replace(/^\[/, '')
+        .replace(/\]$/, '')
+
+      if (
+        hostname === 'localhost' ||
+        hostname.endsWith('.localhost') ||
+        hostname.endsWith('.local') ||
+        hostname === '::1'
+      ) {
+        return true
+      }
+
+      const parts = hostname
+        .split('.')
+        .map(Number)
+
+      if (
+        parts.length === 4 &&
+        parts.every(
+          (part) =>
+            Number.isInteger(part) &&
+            part >= 0 &&
+            part <= 255
+        )
+      ) {
+        const first = parts[0]
+        const second = parts[1]
+
+        return (
+          first === 0 ||
+          first === 10 ||
+          first === 127 ||
+          (
+            first === 169 &&
+            second === 254
+          ) ||
+          (
+            first === 172 &&
+            second >= 16 &&
+            second <= 31
+          ) ||
+          (
+            first === 192 &&
+            second === 168
+          )
+        )
+      }
+
+      return false
+    }
+
+    if (isUnsafeHostname(sourceUrl.hostname)) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '내부 네트워크 주소에서는 이미지를 가져올 수 없습니다.',
+        },
+        409
+      )
+    }
+
+    const originalHostname =
+      sourceUrl.hostname.toLowerCase()
+
+    const isAllowedRedirectHost = (
+      hostname: string
+    ): boolean => {
+      const nextHostname =
+        hostname.toLowerCase()
+
+      return (
+        nextHostname === originalHostname ||
+        nextHostname.endsWith(
+          '.' + originalHostname
+        ) ||
+        originalHostname.endsWith(
+          '.' + nextHostname
+        )
+      )
+    }
+
+    const maximumBytes =
+      10 * 1024 * 1024
+
+    let response: Response | null = null
+    let currentUrl = sourceUrl
+
+    try {
+      for (
+        let redirectCount = 0;
+        redirectCount <= 3;
+        redirectCount += 1
+      ) {
+        response = await fetch(
+          currentUrl.toString(),
+          {
+            method: 'GET',
+            redirect: 'manual',
+            headers: {
+              Accept:
+                'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8',
+            },
+            signal:
+              AbortSignal.timeout(15000),
+          }
+        )
+
+        if (
+          response.status < 300 ||
+          response.status >= 400
+        ) {
+          break
+        }
+
+        const location =
+          response.headers.get('location')
+
+        if (!location) {
+          break
+        }
+
+        if (redirectCount >= 3) {
+          return c.json(
+            {
+              ok: false,
+              error:
+                '이미지 원본의 리디렉션 횟수가 너무 많습니다.',
+            },
+            502
+          )
+        }
+
+        const nextUrl = new URL(
+          location,
+          currentUrl
+        )
+
+        if (
+          (
+            nextUrl.protocol !== 'https:' &&
+            nextUrl.protocol !== 'http:'
+          ) ||
+          isUnsafeHostname(nextUrl.hostname) ||
+          !isAllowedRedirectHost(
+            nextUrl.hostname
+          )
+        ) {
+          return c.json(
+            {
+              ok: false,
+              error:
+                '허용되지 않은 주소로 이미지 요청이 이동했습니다.',
+            },
+            409
+          )
+        }
+
+        currentUrl = nextUrl
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'image download failed'
+
+      return c.json(
+        {
+          ok: false,
+          error:
+            '공식 이미지 원본을 가져오지 못했습니다: ' +
+            message,
+        },
+        502
+      )
+    }
+
+    if (!response || !response.ok) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '공식 이미지 서버가 오류를 반환했습니다.',
+          sourceStatus:
+            response?.status ?? null,
+        },
+        502
+      )
+    }
+
+    const declaredLength = Number(
+      response.headers.get(
+        'content-length'
+      ) || 0
+    )
+
+    if (
+      Number.isFinite(declaredLength) &&
+      declaredLength > maximumBytes
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미지 파일이 10MB 제한을 초과합니다.',
+        },
+        413
+      )
+    }
+
+    let imageBuffer: ArrayBuffer
+
+    try {
+      imageBuffer =
+        await response.arrayBuffer()
+    } catch (error) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미지 데이터를 읽지 못했습니다.',
+        },
+        502
+      )
+    }
+
+    if (
+      imageBuffer.byteLength <= 0 ||
+      imageBuffer.byteLength >
+        maximumBytes
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            imageBuffer.byteLength <= 0
+              ? '빈 이미지 파일입니다.'
+              : '이미지 파일이 10MB 제한을 초과합니다.',
+        },
+        imageBuffer.byteLength <= 0
+          ? 422
+          : 413
+      )
+    }
+
+    const bytes =
+      new Uint8Array(imageBuffer)
+
+    let contentType = ''
+
+    if (
+      bytes.length >= 3 &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff
+    ) {
+      contentType = 'image/jpeg'
+    } else if (
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    ) {
+      contentType = 'image/png'
+    } else if (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    ) {
+      contentType = 'image/webp'
+    }
+
+    if (!contentType) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'JPEG, PNG 또는 WebP 이미지만 저장할 수 있습니다.',
+          sourceContentType:
+            response.headers.get(
+              'content-type'
+            ),
+        },
+        415
+      )
+    }
+
+    const digest =
+      await crypto.subtle.digest(
+        'SHA-256',
+        imageBuffer
+      )
+
+    const imageHash = Array.from(
+      new Uint8Array(digest)
+    )
+      .map(
+        (value) =>
+          value
+            .toString(16)
+            .padStart(2, '0')
+      )
+      .join('')
+
+    const objectKey =
+      `watcher/games/${gameId}/` +
+      `images/${imageId}/original`
+
+    const storedImageUrl =
+      `r2://GAME_IMAGES/${objectKey}`
+
+    const existingObject =
+      await c.env.GAME_IMAGES.head(
+        objectKey
+      )
+
+    if (
+      existingObject &&
+      record.stored_image_url ===
+        storedImageUrl &&
+      record.image_hash === imageHash
+    ) {
+      return c.json({
+        ok: true,
+        alreadyStored: true,
+
+        itemId,
+        imageId,
+        gameId,
+        preorderId:
+          Number(record.preorder_id),
+
+        objectKey,
+        storedImageUrl,
+
+        contentType:
+          existingObject
+            .httpMetadata
+            ?.contentType ||
+          contentType,
+
+        size:
+          existingObject.size,
+
+        etag:
+          existingObject.etag,
+
+        imageHash,
+
+        gamePublishStatus:
+          record.game_publish_status,
+
+        preorderPublishStatus:
+          record.preorder_publish_status,
+
+        gameImageUrlChanged: false,
+        imagePublished: false,
+
+        message:
+          '이미 비공개 R2에 저장된 이미지입니다.',
+      })
+    }
+
+    let storedObject:
+      R2Object | null = null
+
+    try {
+      storedObject =
+        await c.env.GAME_IMAGES.put(
+          objectKey,
+          imageBuffer,
+          {
+            httpMetadata: {
+              contentType,
+              cacheControl:
+                'private, max-age=0, no-store',
+            },
+
+            customMetadata: {
+              watchItemId:
+                String(itemId),
+
+              imageId:
+                String(imageId),
+
+              gameId:
+                String(gameId),
+
+              imageType:
+                String(record.image_type),
+
+              sha256:
+                imageHash,
+            },
+
+            sha256: digest,
+          }
+        )
+
+      if (!storedObject) {
+        throw new Error(
+          'R2 put returned null'
+        )
+      }
+
+      const updateResult =
+        await c.env.DB.prepare(`
+          UPDATE watch_item_images
+
+          SET
+            stored_image_url = ?,
+            image_hash = ?,
+            updated_at = CURRENT_TIMESTAMP
+
+          WHERE
+            id = ?
+            AND watch_item_id = ?
+            AND selected_for_publish = 1
+            AND permission_status = 'APPROVED'
+        `)
+          .bind(
+            storedImageUrl,
+            imageHash,
+            imageId,
+            itemId
+          )
+          .run()
+
+      if (
+        Number(
+          updateResult.meta.changes || 0
+        ) !== 1
+      ) {
+        await c.env.GAME_IMAGES.delete(
+          objectKey
+        )
+
+        return c.json(
+          {
+            ok: false,
+            error:
+              '이미지 선택 상태가 변경되어 R2 저장을 취소했습니다.',
+          },
+          409
+        )
+      }
+    } catch (error) {
+      if (storedObject) {
+        try {
+          await c.env.GAME_IMAGES.delete(
+            objectKey
+          )
+        } catch (cleanupError) {
+          console.error(
+            'Failed to clean up R2 object:',
+            cleanupError
+          )
+        }
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'R2 storage failed'
+
+      console.error(
+        'WATCHER image R2 storage failed:',
+        error
+      )
+
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미지를 비공개 저장소에 저장하지 못했습니다: ' +
+            message,
+        },
+        500
+      )
+    }
+
+    return c.json({
+      ok: true,
+      alreadyStored: false,
+
+      itemId,
+      imageId,
+      gameId,
+      preorderId:
+        Number(record.preorder_id),
+
+      objectKey,
+      storedImageUrl,
+
+      contentType,
+      size:
+        storedObject.size,
+      etag:
+        storedObject.etag,
+
+      imageHash,
+
+      gamePublishStatus:
+        record.game_publish_status,
+
+      preorderPublishStatus:
+        record.preorder_publish_status,
+
+      gameImageUrlChanged: false,
+      imagePublished: false,
+
+      message:
+        '선택된 대표 이미지를 비공개 R2에 저장했습니다.',
+    })
+  }
+)
+
 
 // ------------------------------------------------------------
 // 아크시스템웍스아시아 수동 수집 실행
