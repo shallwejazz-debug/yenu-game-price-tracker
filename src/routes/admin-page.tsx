@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260721-watcher-images-1"
+    href="/static/admin.css?v=20260721-watcher-preview-1"
     rel="stylesheet"
   />
 </head>
@@ -1654,7 +1654,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-watcher-r2-1"></script>
+    <script src="/static/watcher-admin.js?v=20260721-watcher-preview-1"></script>
 </body>
 </html>`
 }
