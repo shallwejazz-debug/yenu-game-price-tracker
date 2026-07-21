@@ -17,6 +17,8 @@
   let collectorRunning = false
   let eventActionRunning = false
   let transformActionRunning = false
+  let registerDraftRunning = false
+
 
 
   function escapeHtml(value) {
