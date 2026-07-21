@@ -701,6 +701,14 @@ export function AdminPage(): string {
           >
             초안 저장
           </button>
+            <button
+              id="registerWatcherDraft"
+              class="btn"
+              type="button"
+              disabled
+            >
+              초안 저장 후 등록
+            </button>
 
           <button
             id="cancelWatcherTransform"
