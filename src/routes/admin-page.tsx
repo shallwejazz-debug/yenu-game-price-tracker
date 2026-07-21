@@ -683,16 +683,83 @@ export function AdminPage(): string {
           />
         </label>
 
-        <div class="admin-notice">
-          <strong>이미지 운영 상태</strong>
+  <!-- ==================================================
+       WATCHER 대표 이미지 후보
+       ================================================== -->
+  <div
+    id="watcherTransformImageSection"
+    class="watcher-transform-images"
+  >
+    <div class="admin-section-head">
+      <div>
+        <h3>🖼️ 공식 이미지 후보</h3>
 
-          <p class="admin-hint">
-            초안 단계에서는 이미지를 선택하지 않습니다.
-            개별 이미지 상태는 PENDING으로 유지되고
-            자동 다운로드·R2 저장·공개도 하지 않습니다.
-          </p>
-        </div>
+        <p class="admin-hint">
+          공식 보도자료에서 수집된 이미지 중 대표 이미지 후보를
+          한 장 선택합니다. 후보 선택만으로 이미지를 다운로드하거나
+          공개하지 않습니다.
+        </p>
+      </div>
 
+      <span
+        id="watcherTransformImageCount"
+        class="watcher-badge"
+      >
+        0개
+      </span>
+    </div>
+
+    <div
+      id="watcherTransformImagePolicy"
+      class="admin-notice"
+    >
+      <strong>이미지 정책 확인 중</strong>
+
+      <p class="admin-hint">
+        출처의 이미지 사용 정책과 게임 등록 상태를 확인합니다.
+      </p>
+    </div>
+
+    <div
+      id="watcherTransformSelectedImage"
+      class="admin-notice"
+      hidden
+    >
+      <strong>선택된 대표 이미지</strong>
+
+      <p
+        id="watcherTransformSelectedImageText"
+        class="admin-hint"
+      ></p>
+    </div>
+
+    <div
+      id="watcherTransformImageList"
+      class="watcher-transform-image-grid"
+    >
+      <div class="admin-empty">
+        보도자료를 열면 공식 이미지 후보를 불러옵니다.
+      </div>
+    </div>
+
+    <p
+      id="watcherTransformImageStatus"
+      class="admin-status"
+      aria-live="polite"
+    ></p>
+
+    <div class="admin-notice">
+      <strong>현재 단계의 안전 원칙</strong>
+
+      <p class="admin-hint">
+        대표 이미지 후보를 선택해도 게임은 DRAFT 상태로 유지됩니다.
+        games.image_url은 변경하지 않으며 이미지 다운로드·R2 저장·
+        공개 처리는 별도의 최종 승인 단계에서만 진행합니다.
+      </p>
+    </div>
+  </div>
+
+     
         <div class="admin-row admin-row-wrap">
           <button
             id="saveWatcherTransform"
