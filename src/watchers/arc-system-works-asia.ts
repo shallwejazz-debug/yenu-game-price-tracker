@@ -551,7 +551,7 @@ export async function collectArcSystemWorksAsia(
               'PENDING',
               0,
               ?,
-              '이미지 및 정보 출처: 아크시스템웍스아시아',
+              '이미지 및 정보 출처: 아크시스템웍스아시아 (공식 보도자료 링크)',
               ?
             )
           `)
