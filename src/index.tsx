@@ -10,6 +10,7 @@ import { Hono } from 'hono'
 import { renderer } from './renderer'
 import type { Bindings, Price } from './types'
 import admin from './routes/admin'
+import watcherAdmin from './routes/watcher-admin'
 import games from './routes/games'
 import api from './routes/api'
 import home from './routes/home'
@@ -123,6 +124,7 @@ app.get('/sitemap.xml', async (c) => {
 
 // ---------- 라우트 그룹 연결 ----------
 app.route('/', home)
+app.route('/admin/api/watcher', watcherAdmin)
 app.route('/admin', admin)
 app.route('/games', games)
 app.route('/api', api)
