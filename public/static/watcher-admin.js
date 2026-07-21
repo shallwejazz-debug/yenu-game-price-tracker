@@ -17,8 +17,8 @@
   let collectorRunning = false
   let eventActionRunning = false
   let transformActionRunning = false
-  let registerDraftRunning = false
-
+  let registerDraftRunning = false  
+  let imageActionRunning = false
 
 
   function escapeHtml(value) {
@@ -1204,6 +1204,178 @@ async function readAllWatcherEvents() {
     }
   }
 
+  async function selectWatcherImage(
+    imageIdValue
+  ) {
+    if (imageActionRunning) return
+
+    const imageId = Number(
+      imageIdValue
+    )
+
+    const itemIdElement =
+      $('watcherTransformItemId')
+
+    const itemId = Number(
+      itemIdElement
+        ? itemIdElement.value
+        : 0
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      setTransformImageStatus(
+        '보도자료 항목 정보가 올바르지 않습니다.',
+        'err'
+      )
+
+      return
+    }
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      setTransformImageStatus(
+        '이미지 후보 정보가 올바르지 않습니다.',
+        'err'
+      )
+
+      return
+    }
+
+    const imageList =
+      $('watcherTransformImageList')
+
+    if (!imageList) return
+
+    const typeSelect =
+      imageList.querySelector(
+        '[data-watcher-image-type="' +
+          imageId +
+        '"]'
+      )
+
+    const imageType = typeSelect
+      ? String(
+          typeSelect.value || ''
+        )
+          .trim()
+          .toUpperCase()
+      : ''
+
+    if (!imageType) {
+      setTransformImageStatus(
+        '대표 이미지로 사용할 이미지 유형을 선택해 주세요.',
+        'err'
+      )
+
+      if (
+        typeSelect &&
+        typeof typeSelect.focus === 'function'
+      ) {
+        typeSelect.focus()
+      }
+
+      return
+    }
+
+    const allowedTypes = [
+      'PACKAGE',
+      'LIMITED_EDITION',
+      'PREORDER_BONUS',
+      'FIRST_PRINT_BONUS',
+      'STORE_BONUS',
+      'KEY_VISUAL',
+      'SCREENSHOT'
+    ]
+
+    if (!allowedTypes.includes(imageType)) {
+      setTransformImageStatus(
+        '선택할 수 없는 이미지 유형입니다.',
+        'err'
+      )
+
+      return
+    }
+
+    const confirmed = window.confirm(
+      '이미지 #' +
+        imageId +
+        '을(를) 대표 이미지 후보로 선택할까요?\n\n' +
+        '이미지 유형: ' +
+        imageTypeLabel(imageType) +
+        '\n\n' +
+        '이 단계에서는 이미지를 다운로드하거나 공개하지 않습니다.'
+    )
+
+    if (!confirmed) return
+
+    const button =
+      imageList.querySelector(
+        '[data-watcher-image-select="' +
+          imageId +
+        '"]'
+      )
+
+    imageActionRunning = true
+
+    if (button) {
+      button.disabled = true
+      button.textContent = '선택 중...'
+    }
+
+    setTransformImageStatus(
+      '대표 이미지 후보를 저장하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/items/' +
+          itemId +
+          '/images/' +
+          imageId +
+          '/select',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            imageType
+          })
+        }
+      )
+
+      await openWatcherTransform(itemId)
+
+      setTransformImageStatus(
+        '대표 이미지 후보 #' +
+          Number(
+            data.selectedImageId ||
+            imageId
+          ) +
+          '을 선택했습니다. ' +
+          '아직 다운로드하거나 공개하지 않았습니다.',
+        'ok'
+      )
+    } catch (error) {
+      setTransformImageStatus(
+        error && error.message
+          ? error.message
+          : '대표 이미지 후보 선택에 실패했습니다.',
+        'err'
+      )
+
+      if (button) {
+        button.disabled = false
+        button.textContent =
+          '대표 이미지 선택'
+      }
+    } finally {
+      imageActionRunning = false
+    }
+  }
 
   
   async function openWatcherTransform(itemId) {
@@ -1620,13 +1792,16 @@ async function readAllWatcherEvents() {
         }
       )
 
+
       watcherLoaded = false
       await loadWatcher(true)
+      await openWatcherTransform(itemId)
 
       setRegisterDraftButton(
         'APPROVED',
         data.gameId
       )
+
 
       if (data.alreadyRegistered) {
         setTransformStatus(
@@ -2014,8 +2189,12 @@ async function readAllWatcherEvents() {
 
   const eventList = $('watcherEventList')
 
+  const imageList =
+    $('watcherTransformImageList')
+
   const saveTransformButton =
     $('saveWatcherTransform')
+
 
   const registerDraftButton =
     $('registerWatcherDraft')
@@ -2064,6 +2243,37 @@ async function readAllWatcherEvents() {
     registerDraftButton.addEventListener(
       'click',
       registerWatcherDraft
+    )
+  }
+
+  if (imageList) {
+    imageList.addEventListener(
+      'click',
+      function (event) {
+        const target = event.target
+
+        if (!(target instanceof Element)) {
+          return
+        }
+
+        const selectButton =
+          target.closest(
+            '[data-watcher-image-select]'
+          )
+
+        if (
+          !selectButton ||
+          !imageList.contains(selectButton)
+        ) {
+          return
+        }
+
+        selectWatcherImage(
+          selectButton.getAttribute(
+            'data-watcher-image-select'
+          )
+        )
+      }
     )
   }
 
