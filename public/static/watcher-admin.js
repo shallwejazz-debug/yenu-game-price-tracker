@@ -20,6 +20,9 @@
   let registerDraftRunning = false  
   let imageActionRunning = false
   let imageStoreRunning = false
+  let imagePreviewRunning = false
+  let watcherPreviewObjectUrl = ''
+
 
 
   function escapeHtml(value) {
@@ -752,9 +755,11 @@ async function readAllWatcherEvents() {
       ''
     )
 
-        setTransformStatus('', '')
+    setTransformStatus('', '')
     setTransformImageStatus('', '')
     setRegisterDraftButton('', null)
+    clearWatcherPrivatePreview(true)
+
 
     const imageList =
       $('watcherTransformImageList')
@@ -809,6 +814,132 @@ async function readAllWatcherEvents() {
     return {}
   }
 
+  function clearWatcherPrivatePreview(
+    hidePanel
+  ) {
+    if (watcherPreviewObjectUrl) {
+      window.URL.revokeObjectURL(
+        watcherPreviewObjectUrl
+      )
+
+      watcherPreviewObjectUrl = ''
+    }
+
+    const panel =
+      $('watcherTransformPrivatePreview')
+
+    const frame =
+      $('watcherTransformPreviewFrame')
+
+    const image =
+      $('watcherTransformPreviewImage')
+
+    const info =
+      $('watcherTransformPreviewInfo')
+
+    const status =
+      $('watcherTransformPreviewStatus')
+
+    const button =
+      $('loadWatcherPrivatePreview')
+
+    if (image) {
+      image.removeAttribute('src')
+    }
+
+    if (frame) {
+      frame.hidden = true
+    }
+
+    if (info) {
+      info.textContent =
+        '저장된 대표 이미지를 선택해 주세요.'
+    }
+
+    if (status) {
+      status.textContent = ''
+      status.className = 'admin-status'
+    }
+
+    if (button) {
+      button.disabled = true
+      button.textContent =
+        '관리자 미리보기 불러오기'
+
+      button.removeAttribute(
+        'data-watcher-preview-image-id'
+      )
+    }
+
+    if (panel && hidePanel) {
+      panel.hidden = true
+    }
+  }
+
+  function configureWatcherPrivatePreview(
+    selectedImage
+  ) {
+    clearWatcherPrivatePreview(false)
+
+    const panel =
+      $('watcherTransformPrivatePreview')
+
+    const button =
+      $('loadWatcherPrivatePreview')
+
+    const info =
+      $('watcherTransformPreviewInfo')
+
+    if (!panel || !button) return
+
+    const imageId = Number(
+      selectedImage &&
+      selectedImage.id
+        ? selectedImage.id
+        : 0
+    )
+
+    const stored = Boolean(
+      selectedImage &&
+      String(
+        selectedImage.stored_image_url ||
+        ''
+      ).trim()
+    )
+
+    const available =
+      Number.isInteger(imageId) &&
+      imageId > 0 &&
+      stored
+
+    panel.hidden = !available
+
+    if (!available) {
+      return
+    }
+
+    button.disabled = false
+    button.textContent =
+      '관리자 미리보기 불러오기'
+
+    button.setAttribute(
+      'data-watcher-preview-image-id',
+      String(imageId)
+    )
+
+    if (info) {
+      info.textContent =
+        '이미지 #' +
+        imageId +
+        ' · ' +
+        imageTypeLabel(
+          selectedImage.image_type
+        ) +
+        ' · 비공개 R2 저장 완료'
+    }
+  }
+
+  
   function setTransformImageStatus(
     message,
     type
@@ -993,6 +1124,10 @@ async function readAllWatcherEvents() {
       }
     )
 
+    configureWatcherPrivatePreview(
+      selectedImage || null
+    )
+    
     if (selectedElement) {
       selectedElement.hidden =
         !selectedImage
@@ -1277,6 +1412,251 @@ async function readAllWatcherEvents() {
     }
   }
 
+  async function loadWatcherPrivatePreview() {
+    if (imagePreviewRunning) return
+
+    const button =
+      $('loadWatcherPrivatePreview')
+
+    const itemIdElement =
+      $('watcherTransformItemId')
+
+    const itemId = Number(
+      itemIdElement
+        ? itemIdElement.value
+        : 0
+    )
+
+    const imageId = Number(
+      button
+        ? button.getAttribute(
+          'data-watcher-preview-image-id'
+        )
+        : 0
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0 ||
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      const status =
+        $('watcherTransformPreviewStatus')
+
+      if (status) {
+        status.textContent =
+          '미리보기 이미지 정보가 올바르지 않습니다.'
+
+        status.className =
+          'admin-status err'
+      }
+
+      return
+    }
+
+    const token =
+      window.localStorage.getItem(
+        TOKEN_KEY
+      ) || ''
+
+    if (!token) {
+      const status =
+        $('watcherTransformPreviewStatus')
+
+      if (status) {
+        status.textContent =
+          '관리자 토큰이 없습니다. 다시 로그인해 주세요.'
+
+        status.className =
+          'admin-status err'
+      }
+
+      return
+    }
+
+    const frame =
+      $('watcherTransformPreviewFrame')
+
+    const image =
+      $('watcherTransformPreviewImage')
+
+    const info =
+      $('watcherTransformPreviewInfo')
+
+    const status =
+      $('watcherTransformPreviewStatus')
+
+    imagePreviewRunning = true
+
+    if (button) {
+      button.disabled = true
+      button.textContent =
+        '미리보기 불러오는 중...'
+    }
+
+    if (status) {
+      status.textContent =
+        '비공개 R2 이미지를 불러오고 있습니다.'
+
+      status.className =
+        'admin-status info'
+    }
+
+    try {
+      const response =
+        await window.fetch(
+          '/admin/api/watcher/items/' +
+            itemId +
+            '/images/' +
+            imageId +
+            '/preview',
+          {
+            method: 'GET',
+
+            headers: {
+              'X-Admin-Token': token
+            },
+
+            cache: 'no-store'
+          }
+        )
+
+      if (!response.ok) {
+        let data = {}
+
+        try {
+          data = await response.json()
+        } catch (error) {
+          data = {}
+        }
+
+        throw new Error(
+          data.error ||
+          data.message ||
+          '이미지 미리보기 요청에 실패했습니다. (' +
+            response.status +
+          ')'
+        )
+      }
+
+      const contentType = String(
+        response.headers.get(
+          'content-type'
+        ) || ''
+      )
+        .split(';')[0]
+        .trim()
+        .toLowerCase()
+
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/webp'
+      ]
+
+      if (
+        !allowedTypes.includes(
+          contentType
+        )
+      ) {
+        throw new Error(
+          '허용되지 않은 미리보기 파일 형식입니다.'
+        )
+      }
+
+      const blob =
+        await response.blob()
+
+      if (!blob.size) {
+        throw new Error(
+          '빈 이미지 파일이 반환되었습니다.'
+        )
+      }
+
+      if (watcherPreviewObjectUrl) {
+        window.URL.revokeObjectURL(
+          watcherPreviewObjectUrl
+        )
+      }
+
+      watcherPreviewObjectUrl =
+        window.URL.createObjectURL(
+          blob
+        )
+
+      if (image) {
+        image.src =
+          watcherPreviewObjectUrl
+
+        image.alt =
+          '게임 대표 이미지 #' +
+          imageId +
+          ' 비공개 미리보기'
+      }
+
+      if (frame) {
+        frame.hidden = false
+      }
+
+      const sizeText =
+        blob.size >= 1024 * 1024
+          ? (
+            blob.size /
+            (1024 * 1024)
+          ).toFixed(2) + 'MB'
+          : (
+            blob.size / 1024
+          ).toFixed(1) + 'KB'
+
+      if (info) {
+        info.textContent =
+          '이미지 #' +
+          imageId +
+          ' · ' +
+          contentType +
+          ' · ' +
+          sizeText +
+          ' · 관리자 전용 Blob 미리보기'
+      }
+
+      if (status) {
+        status.textContent =
+          '비공개 R2 대표 이미지를 불러왔습니다. 아직 공개되지 않았습니다.'
+
+        status.className =
+          'admin-status ok'
+      }
+    } catch (error) {
+      if (frame) {
+        frame.hidden = true
+      }
+
+      if (image) {
+        image.removeAttribute('src')
+      }
+
+      if (status) {
+        status.textContent =
+          error && error.message
+            ? error.message
+            : '비공개 이미지 미리보기에 실패했습니다.'
+
+        status.className =
+          'admin-status err'
+      }
+    } finally {
+      imagePreviewRunning = false
+
+      if (button) {
+        button.disabled = false
+        button.textContent =
+          '미리보기 다시 불러오기'
+      }
+    }
+  }
+
+  
   async function selectWatcherImage(
     imageIdValue
   ) {
@@ -1321,6 +1701,9 @@ async function readAllWatcherEvents() {
 
     const imageList =
       $('watcherTransformImageList')
+    const privatePreviewButton =
+    $('loadWatcherPrivatePreview')
+
 
     if (!imageList) return
 
