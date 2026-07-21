@@ -1991,3 +1991,224 @@
   }
 }
 
+/* ============================================================
+   WATCHER 이벤트 날짜·보도자료 그룹 표시
+   ============================================================ */
+
+.watcher-event-date {
+  margin: 24px 0 10px;
+  padding-bottom: 8px;
+  color: #dfe4ec;
+  border-bottom: 1px solid #343947;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.watcher-event-date:first-child {
+  margin-top: 0;
+}
+
+.watcher-event-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 16px;
+  background: #171a23;
+  border: 1px solid #343947;
+  border-left: 4px solid #6f82ff;
+  border-radius: 10px;
+  box-sizing: border-box;
+  transition:
+    opacity 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.watcher-event-card:last-child {
+  margin-bottom: 0;
+}
+
+.watcher-event-card:hover {
+  background: #1b1f2a;
+  border-color: #485064;
+  border-left-color: #8191ff;
+}
+
+.watcher-event-card.is-read {
+  opacity: 0.62;
+  background: #14171f;
+  border-left-color: #454b58;
+}
+
+.watcher-event-card.is-read:hover {
+  opacity: 0.78;
+}
+
+.watcher-event-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.watcher-event-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 9px;
+}
+
+.watcher-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.watcher-event-source-new {
+  color: #8ce2b5;
+  background: rgba(47, 157, 101, 0.15);
+  border-color: rgba(64, 182, 121, 0.42);
+}
+
+.watcher-event-source-changed {
+  color: #f0ca79;
+  background: rgba(181, 126, 37, 0.15);
+  border-color: rgba(209, 153, 57, 0.42);
+}
+
+.watcher-event-image-new {
+  color: #9ebcff;
+  background: rgba(69, 105, 192, 0.16);
+  border-color: rgba(88, 127, 220, 0.42);
+}
+
+.watcher-event-error {
+  color: #f49ca0;
+  background: rgba(190, 66, 75, 0.15);
+  border-color: rgba(210, 80, 89, 0.42);
+}
+
+.watcher-event-source {
+  color: #969eab;
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.watcher-event-unread {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  color: #ffffff;
+  background: #687cff;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.watcher-event-title {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #eef1f5;
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.watcher-event-message {
+  margin: 7px 0 0;
+  color: #a9b0bb;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.watcher-event-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 11px;
+  color: #858d9a;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.watcher-event-link {
+  color: #9db8ff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.watcher-event-link:hover {
+  color: #c0d0ff;
+  text-decoration: underline;
+}
+
+.watcher-event-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.watcher-event-read {
+  white-space: nowrap;
+}
+
+.watcher-event-read-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  color: #777f8b;
+  background: #11141b;
+  border: 1px solid #2d323e;
+  border-radius: 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* WATCHER 이벤트 그룹 모바일 표시 */
+
+@media (max-width: 680px) {
+  .watcher-event-date {
+    margin-top: 20px;
+    font-size: 0.86rem;
+  }
+
+  .watcher-event-card {
+    flex-direction: column;
+    gap: 13px;
+    padding: 14px;
+  }
+
+  .watcher-event-action {
+    width: 100%;
+  }
+
+  .watcher-event-action .btn,
+  .watcher-event-read-label {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .watcher-event-title {
+    font-size: 0.9rem;
+  }
+
+  .watcher-event-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
