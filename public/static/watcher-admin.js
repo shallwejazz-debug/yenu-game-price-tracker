@@ -104,30 +104,6 @@
     return data
   }
 
-
-    let data
-
-    try {
-      data = await response.json()
-    } catch (error) {
-      throw new Error('WATCHER 응답을 읽을 수 없습니다.')
-    }
-
-    if (response.status === 401) {
-      throw new Error('관리자 인증이 만료되었습니다.')
-    }
-
-    if (!response.ok || !data || data.ok === false) {
-      throw new Error(
-        data && (data.error || data.message)
-          ? data.error || data.message
-          : 'WATCHER 요청에 실패했습니다.'
-      )
-    }
-
-    return data
-  }
-
   function permissionInfo(status) {
     const normalized = String(status || 'PENDING').toUpperCase()
 
