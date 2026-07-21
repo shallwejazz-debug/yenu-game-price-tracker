@@ -96,10 +96,21 @@ INSERT INTO watch_events (
 )
 SELECT
   NULL,
-  id,
+  ws.id,
   'PERMISSION_CHANGED',
   '아크시스템웍스아시아 이미지 사용 정책 변경',
   '공식 보도자료 이미지 정책이 PENDING에서 CONDITIONAL로 변경되었습니다.',
   0
-FROM watch_sources
-WHERE source_key = 'ARC_SYSTEM_WORKS_ASIA';
+FROM watch_sources ws
+WHERE
+  ws.source_key = 'ARC_SYSTEM_WORKS_ASIA'
+
+  AND NOT EXISTS (
+    SELECT 1
+    FROM watch_events we
+    WHERE
+      we.source_id = ws.id
+      AND we.event_type = 'PERMISSION_CHANGED'
+      AND we.title =
+        '아크시스템웍스아시아 이미지 사용 정책 변경'
+  );
