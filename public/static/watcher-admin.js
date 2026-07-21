@@ -450,11 +450,17 @@ function renderEvents(groups) {
             'data-watcher-transform-open="' +
               escapeHtml(watchItemId) +
             '">' +
-            (
+                        (
               reviewStatus === 'TRANSFORMED'
                 ? '초안 수정'
-                : '초안 작성'
+                : (
+                  reviewStatus === 'APPROVED' ||
+                  reviewStatus === 'UPLOADED'
+                    ? '등록 확인'
+                    : '초안 작성'
+                )
             ) +
+
           '</button>'
         )
         : ''
@@ -688,7 +694,7 @@ async function readAllWatcherEvents() {
     }
   }
 
-  function setTransformStatus(message, type) {
+    function setTransformStatus(message, type) {
     const element = $('watcherTransformStatus')
     if (!element) return
 
@@ -698,6 +704,39 @@ async function readAllWatcherEvents() {
     if (type) {
       element.classList.add(type)
     }
+  }
+
+  function setRegisterDraftButton(
+    reviewStatus,
+    linkedGameId
+  ) {
+    const button = $('registerWatcherDraft')
+    if (!button) return
+
+    const status = String(
+      reviewStatus || ''
+    ).toUpperCase()
+
+    const gameId = Number(linkedGameId || 0)
+
+    if (
+      Number.isInteger(gameId) &&
+      gameId > 0
+    ) {
+      button.disabled = true
+      button.textContent =
+        '비공개 등록 완료 #' + gameId
+      return
+    }
+
+    if (status === 'TRANSFORMED') {
+      button.disabled = false
+      button.textContent = '비공개 게임 등록'
+      return
+    }
+
+    button.disabled = true
+    button.textContent = '초안 저장 후 등록'
   }
 
   function closeWatcherTransform() {
@@ -713,7 +752,9 @@ async function readAllWatcherEvents() {
     )
 
     setTransformStatus('', '')
+    setRegisterDraftButton('', null)
   }
+
 
   function parseTransformDraft(value) {
     if (!value) return {}
@@ -781,10 +822,16 @@ async function readAllWatcherEvents() {
         item.transformed_json
       )
 
+      setRegisterDraftButton(
+        item.review_status,
+        item.linked_game_id
+      )
+
       setTransformValue(
         'watcherTransformItemId',
         id
       )
+
 
       setTransformValue(
         'watcherTransformTitle',
@@ -882,12 +929,20 @@ async function readAllWatcherEvents() {
     }
   }
 
-  async function saveWatcherTransform() {
-    if (transformActionRunning) return
+   async function saveWatcherTransform() {
+    if (
+      transformActionRunning ||
+      registerDraftRunning
+    ) {
+      return
+    }
+
+    const itemIdElement =
+      $('watcherTransformItemId')
 
     const itemId = Number(
-      $('watcherTransformItemId')
-        ? $('watcherTransformItemId').value
+      itemIdElement
+        ? itemIdElement.value
         : 0
     )
 
@@ -916,7 +971,9 @@ async function readAllWatcherEvents() {
     )
 
     const payload = {
-      title: value('watcherTransformTitle'),
+      title: value(
+        'watcherTransformTitle'
+      ),
 
       platform: value(
         'watcherTransformPlatform'
@@ -978,6 +1035,23 @@ async function readAllWatcherEvents() {
       return
     }
 
+    if (
+      payload.candidatePrice !== null &&
+      (
+        !Number.isInteger(
+          payload.candidatePrice
+        ) ||
+        payload.candidatePrice <= 0
+      )
+    ) {
+      setTransformStatus(
+        '가격 후보는 1원 이상의 정수로 입력해 주세요.',
+        'err'
+      )
+
+      return
+    }
+
     const button = $('saveWatcherTransform')
 
     transformActionRunning = true
@@ -1006,6 +1080,11 @@ async function readAllWatcherEvents() {
       watcherLoaded = false
       await loadWatcher(true)
 
+      setRegisterDraftButton(
+        data.reviewStatus || 'TRANSFORMED',
+        null
+      )
+
       setTransformStatus(
         '초안 저장 완료 — 검수 상태가 ' +
           reviewStatusLabel(
@@ -1028,6 +1107,113 @@ async function readAllWatcherEvents() {
         button.disabled = false
         button.textContent = '초안 저장'
       }
+    }
+  }
+}
+
+   async function registerWatcherDraft() {
+    if (
+      registerDraftRunning ||
+      transformActionRunning
+    ) {
+      return
+    }
+
+    const itemIdElement =
+      $('watcherTransformItemId')
+
+    const itemId = Number(
+      itemIdElement
+        ? itemIdElement.value
+        : 0
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      setTransformStatus(
+        '보도자료를 먼저 선택해 주세요.',
+        'err'
+      )
+
+      return
+    }
+
+    const confirmed = window.confirm(
+      '저장된 초안을 비공개 게임으로 등록할까요?\n\n' +
+      'games와 editions에 DRAFT 상태로 저장됩니다.\n' +
+      '공개 사이트에는 표시되지 않으며 이미지도 등록하지 않습니다.'
+    )
+
+    if (!confirmed) return
+
+    const button =
+      $('registerWatcherDraft')
+
+    registerDraftRunning = true
+
+    if (button) {
+      button.disabled = true
+      button.textContent =
+        '비공개 등록 중...'
+    }
+
+    setTransformStatus(
+      '게임과 예약판매 정보를 비공개 DRAFT로 등록하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/items/' +
+          itemId +
+          '/register-draft',
+        {
+          method: 'POST'
+        }
+      )
+
+      watcherLoaded = false
+      await loadWatcher(true)
+
+      setRegisterDraftButton(
+        'APPROVED',
+        data.gameId
+      )
+
+      if (data.alreadyRegistered) {
+        setTransformStatus(
+          '이미 비공개 게임에 연결되어 있습니다. ' +
+            '게임 ID: ' +
+            Number(data.gameId || 0),
+          'ok'
+        )
+      } else {
+        setTransformStatus(
+          '비공개 게임 등록 완료 — ' +
+            '게임 ID: ' +
+            Number(data.gameId || 0) +
+            ', 에디션 ID: ' +
+            Number(data.editionId || 0) +
+            '. 아직 공개되지 않았습니다.',
+          'ok'
+        )
+      }
+    } catch (error) {
+      setTransformStatus(
+        error && error.message
+          ? error.message
+          : '비공개 게임 등록에 실패했습니다.',
+        'err'
+      )
+
+      setRegisterDraftButton(
+        'TRANSFORMED',
+        null
+      )
+    } finally {
+      registerDraftRunning = false
     }
   }
 
@@ -1385,6 +1571,9 @@ async function readAllWatcherEvents() {
   const saveTransformButton =
     $('saveWatcherTransform')
 
+  const registerDraftButton =
+    $('registerWatcherDraft')
+   
   const closeTransformButton =
     $('closeWatcherTransform')
 
@@ -1422,6 +1611,13 @@ async function readAllWatcherEvents() {
     saveTransformButton.addEventListener(
       'click',
       saveWatcherTransform
+    )
+  }
+
+  if (registerDraftButton) {
+    registerDraftButton.addEventListener(
+      'click',
+      registerWatcherDraft
     )
   }
 
