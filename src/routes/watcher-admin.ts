@@ -11,6 +11,9 @@
 
 import { Hono } from 'hono'
 import type { Bindings } from '../types'
+import {
+  collectArcSystemWorksAsia,
+} from '../watchers/arc-system-works-asia'
 
 const watcherAdmin = new Hono<{
   Bindings: Bindings
@@ -429,5 +432,41 @@ watcherAdmin.get('/items/:id', async (c) => {
     images: images ?? [],
   })
 })
+
+// ------------------------------------------------------------
+// 아크시스템웍스아시아 수동 수집 실행
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/collect/arc-system-works',
+  async (c) => {
+    try {
+      const result =
+        await collectArcSystemWorksAsia(c.env.DB, 10)
+
+      return c.json({
+        ok: true,
+        result,
+      })
+    } catch (error) {
+      console.error(
+        'ARC System Works Asia collector failed:',
+        error
+      )
+
+      return c.json(
+        {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'ARC collector failed',
+        },
+        500
+      )
+    }
+  }
+)
+
 
 export default watcherAdmin
