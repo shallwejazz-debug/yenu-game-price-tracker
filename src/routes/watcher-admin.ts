@@ -69,9 +69,27 @@ watcherAdmin.get('/summary', async (c) => {
     SELECT
       (
         SELECT COUNT(*)
-        FROM watch_sources
-        WHERE enabled = 1
-      ) AS enabled_sources,
+        FROM (
+          SELECT
+            date(created_at, '+9 hours') AS event_date,
+      
+            CASE
+              WHEN watch_item_id IS NOT NULL
+                THEN 'item:' || watch_item_id
+              ELSE
+                'event:' || id
+            END AS event_group
+      
+          FROM watch_events
+      
+          WHERE is_read = 0
+      
+          GROUP BY
+            event_date,
+            event_group
+        )
+      ) AS unread_events,
+
 
       (
         SELECT COUNT(*)
@@ -346,7 +364,10 @@ watcherAdmin.get('/items', async (c) => {
 })
 
 // ------------------------------------------------------------
-// WATCHER 이벤트 목록
+// WATCHER 이벤트 그룹 목록
+//
+// DB에는 상세 이벤트를 그대로 유지하고,
+// 관리자 화면에서는 날짜별·보도자료별로 묶어서 반환한다.
 // ------------------------------------------------------------
 
 watcherAdmin.get('/events', async (c) => {
@@ -363,22 +384,81 @@ watcherAdmin.get('/events', async (c) => {
 
   const { results } = await c.env.DB.prepare(`
     SELECT
-      e.id,
+      date(e.created_at, '+9 hours')
+        AS event_date,
+
       e.watch_item_id,
-      e.source_id,
-      e.event_type,
-      e.title,
-      e.message,
-      e.event_json,
-      e.is_read,
-      e.notified_at,
-      e.created_at,
 
-      ws.source_key,
-      ws.source_name,
+      MAX(e.id)
+        AS representative_event_id,
 
-      wi.source_url,
-      wi.review_status
+      MAX(e.source_id)
+        AS source_id,
+
+      MAX(e.title)
+        AS title,
+
+      MAX(e.message)
+        AS latest_message,
+
+      MAX(ws.source_key)
+        AS source_key,
+
+      MAX(ws.source_name)
+        AS source_name,
+
+      MAX(wi.source_url)
+        AS source_url,
+
+      MAX(wi.review_status)
+        AS review_status,
+
+      datetime(
+        MAX(e.created_at),
+        '+9 hours'
+      ) AS latest_at,
+
+      COUNT(*)
+        AS event_count,
+
+      SUM(
+        CASE
+          WHEN e.is_read = 0 THEN 1
+          ELSE 0
+        END
+      ) AS unread_count,
+
+      SUM(
+        CASE
+          WHEN e.event_type = 'SOURCE_NEW'
+            THEN 1
+          ELSE 0
+        END
+      ) AS source_new_count,
+
+      SUM(
+        CASE
+          WHEN e.event_type = 'SOURCE_CHANGED'
+            THEN 1
+          ELSE 0
+        END
+      ) AS source_changed_count,
+
+      SUM(
+        CASE
+          WHEN e.event_type = 'IMAGE_NEW'
+            THEN 1
+          ELSE 0
+        END
+      ) AS image_new_count,
+
+      SUM(
+        CASE
+          WHEN e.event_type = 'ERROR'
+            THEN 1
+          ELSE 0
+        END
+      ) AS error_count
 
     FROM watch_events e
 
@@ -388,12 +468,23 @@ watcherAdmin.get('/events', async (c) => {
     LEFT JOIN watch_items wi
       ON wi.id = e.watch_item_id
 
-    WHERE
-      (? = 0 OR e.is_read = 0)
+    GROUP BY
+      event_date,
+
+      CASE
+        WHEN e.watch_item_id IS NOT NULL
+          THEN 'item:' || e.watch_item_id
+        ELSE
+          'event:' || e.id
+      END
+
+    HAVING
+      (? = 0 OR unread_count > 0)
 
     ORDER BY
-      e.created_at DESC,
-      e.id DESC
+      event_date DESC,
+      latest_at DESC,
+      representative_event_id DESC
 
     LIMIT ?
   `)
@@ -402,7 +493,7 @@ watcherAdmin.get('/events', async (c) => {
 
   return c.json({
     ok: true,
-    events: results ?? [],
+    groups: results ?? [],
     filters: {
       unreadOnly,
       limit,
@@ -410,6 +501,133 @@ watcherAdmin.get('/events', async (c) => {
   })
 })
 
+// ------------------------------------------------------------
+// WATCHER 이벤트 모두 읽음
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/events/read-all',
+  async (c) => {
+    const result = await c.env.DB.prepare(`
+      UPDATE watch_events
+      SET is_read = 1
+      WHERE is_read = 0
+    `).run()
+
+    return c.json({
+      ok: true,
+      changed: Number(
+        result.meta.changes || 0
+      ),
+    })
+  }
+)
+
+// ------------------------------------------------------------
+// WATCHER 이벤트 그룹 읽음
+//
+// 같은 날짜에 같은 보도자료에서 생성된 이벤트를
+// 한 번에 읽음 처리한다.
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/events/group/read',
+  async (c) => {
+    let body: {
+      eventDate?: unknown
+      watchItemId?: unknown
+    }
+
+    try {
+      body = await c.req.json()
+    } catch (error) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid JSON body',
+        },
+        400
+      )
+    }
+
+    const eventDate = String(
+      body.eventDate ?? ''
+    ).trim()
+
+    const watchItemId = Number(
+      body.watchItemId
+    )
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid event date',
+        },
+        400
+      )
+    }
+
+    if (
+      !Number.isInteger(watchItemId) ||
+      watchItemId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    const item = await c.env.DB.prepare(`
+      SELECT id
+      FROM watch_items
+      WHERE id = ?
+      LIMIT 1
+    `)
+      .bind(watchItemId)
+      .first()
+
+    if (!item) {
+      return c.json(
+        {
+          ok: false,
+          error: 'watcher item not found',
+        },
+        404
+      )
+    }
+
+    const result = await c.env.DB.prepare(`
+      UPDATE watch_events
+
+      SET is_read = 1
+
+      WHERE
+        watch_item_id = ?
+        AND date(created_at, '+9 hours') = ?
+        AND is_read = 0
+    `)
+      .bind(
+        watchItemId,
+        eventDate
+      )
+      .run()
+
+    return c.json({
+      ok: true,
+      eventDate,
+      watchItemId,
+      changed: Number(
+        result.meta.changes || 0
+      ),
+    })
+  }
+)
 
 // ------------------------------------------------------------
 // WATCHER 이벤트 개별 읽음
@@ -469,30 +687,6 @@ watcherAdmin.post(
     })
   }
 )
-
-
-// ------------------------------------------------------------
-// WATCHER 이벤트 모두 읽음
-// ------------------------------------------------------------
-
-watcherAdmin.post(
-  '/events/read-all',
-  async (c) => {
-    const result = await c.env.DB.prepare(`
-      UPDATE watch_events
-      SET is_read = 1
-      WHERE is_read = 0
-    `).run()
-
-    return c.json({
-      ok: true,
-      changed: Number(
-        result.meta.changes || 0
-      ),
-    })
-  }
-)
-
 
 // ------------------------------------------------------------
 // 특정 수집 항목 상세
