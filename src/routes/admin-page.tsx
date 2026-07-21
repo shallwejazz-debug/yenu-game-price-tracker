@@ -385,13 +385,24 @@ export function AdminPage(): string {
             </p>
           </div>
 
-          <button
-            id="refreshWatcher"
-            class="btn btn-sm"
-            type="button"
-          >
-            새로고침
-          </button>
+                    <div class="admin-row" style="margin-top: 0;">
+            <button
+              id="collectArcWatcher"
+              class="btn btn-sm"
+              type="button"
+            >
+              아크 수집 실행
+            </button>
+
+            <button
+              id="refreshWatcher"
+              class="btn btn-sm"
+              type="button"
+            >
+              새로고침
+            </button>
+          </div>
+
         </div>
 
         <div class="watcher-summary-grid">
@@ -1277,7 +1288,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-1"></script>
+    <script src="/static/watcher-admin.js?v=20260721-2"></script>
 </body>
 </html>`
 }
