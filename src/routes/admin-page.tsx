@@ -498,6 +498,227 @@ export function AdminPage(): string {
           </div>
         </div>
       </section>
+
+            <!-- ==================================================
+           WATCHER 게임 등록 초안
+           ================================================== -->
+      <section
+        id="watcherTransformCard"
+        class="admin-card"
+        hidden
+      >
+        <div class="admin-section-head">
+          <div>
+            <h2>📝 게임 등록 초안</h2>
+
+            <p class="admin-hint">
+              보도자료에서 확인한 사실 정보만 입력합니다.
+              초안 저장만으로 게임이 공개되지는 않습니다.
+            </p>
+          </div>
+
+          <button
+            id="closeWatcherTransform"
+            class="btn btn-sm"
+            type="button"
+          >
+            닫기
+          </button>
+        </div>
+
+        <input
+          id="watcherTransformItemId"
+          type="hidden"
+          value=""
+        />
+
+        <div class="admin-notice">
+          <strong id="watcherTransformSourceTitle">
+            보도자료를 선택해 주세요.
+          </strong>
+
+          <div>
+            <a
+              id="watcherTransformSourceLink"
+              class="watcher-item-link"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+            >
+              공식 보도자료 열기 ↗
+            </a>
+          </div>
+        </div>
+
+        <div class="watcher-transform-grid">
+          <label class="admin-field">
+            <span>게임 제목</span>
+
+            <input
+              id="watcherTransformTitle"
+              type="text"
+              placeholder="게임 공식 제목"
+            />
+          </label>
+
+          <label class="admin-field">
+            <span>플랫폼</span>
+
+            <select id="watcherTransformPlatform">
+              <option value="switch">
+                Nintendo Switch
+              </option>
+
+              <option value="ps5">
+                PlayStation 5
+              </option>
+
+              <option value="ps4">
+                PlayStation 4
+              </option>
+
+              <option value="xbox">
+                Xbox
+              </option>
+
+              <option value="pc">
+                PC
+              </option>
+
+              <option value="etc">
+                기타
+              </option>
+            </select>
+          </label>
+
+          <label class="admin-field">
+            <span>에디션 표시명</span>
+
+            <input
+              id="watcherTransformEditionName"
+              type="text"
+              placeholder="예: Nintendo Switch 한국어 패키지판"
+            />
+          </label>
+
+          <label class="admin-field">
+            <span>장르</span>
+
+            <input
+              id="watcherTransformGenre"
+              type="text"
+              placeholder="예: 판타지 RPG"
+            />
+          </label>
+
+          <label class="admin-field">
+            <span>패키지 발매일</span>
+
+            <input
+              id="watcherTransformReleaseDate"
+              type="date"
+            />
+          </label>
+
+          <label class="admin-field">
+            <span>예약판매 시작일</span>
+
+            <input
+              id="watcherTransformPreorderStart"
+              type="date"
+            />
+          </label>
+
+          <label class="admin-field">
+            <span>예약판매 종료일</span>
+
+            <input
+              id="watcherTransformPreorderEnd"
+              type="date"
+            />
+          </label>
+
+          <label class="admin-field">
+            <span>가격 후보</span>
+
+            <input
+              id="watcherTransformCandidatePrice"
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              placeholder="예: 44800"
+            />
+          </label>
+        </div>
+
+        <label class="admin-field">
+          <span>예약 구매 특전</span>
+
+          <input
+            id="watcherTransformBonus"
+            type="text"
+            placeholder="예: 멀티 클리너"
+          />
+        </label>
+
+        <label class="admin-field">
+          <span>특전 참고사항</span>
+
+          <textarea
+            id="watcherTransformBonusNote"
+            rows="3"
+            placeholder="예: 약 200 × 200mm, 수량 한정, 조기 소진 가능"
+          ></textarea>
+        </label>
+
+        <label class="admin-field">
+          <span>공식 트레일러 URL</span>
+
+          <input
+            id="watcherTransformTrailer"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
+        </label>
+
+        <div class="admin-notice">
+          <strong>이미지 운영 상태</strong>
+
+          <p class="admin-hint">
+            초안 단계에서는 이미지를 선택하지 않습니다.
+            개별 이미지 상태는 PENDING으로 유지되고
+            자동 다운로드·R2 저장·공개도 하지 않습니다.
+          </p>
+        </div>
+
+        <div class="admin-row admin-row-wrap">
+          <button
+            id="saveWatcherTransform"
+            class="btn btn-primary"
+            type="button"
+          >
+            초안 저장
+          </button>
+
+          <button
+            id="cancelWatcherTransform"
+            class="btn"
+            type="button"
+          >
+            취소
+          </button>
+        </div>
+
+        <p
+          id="watcherTransformStatus"
+          class="admin-status"
+          aria-live="polite"
+        ></p>
+      </section>
+
+
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
