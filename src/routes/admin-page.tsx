@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260721-watcher-preview-1"
+    href="/static/admin.css?v=20260721-watcher-final-review-1"
     rel="stylesheet"
   />
 </head>
@@ -810,6 +810,159 @@ export function AdminPage(): string {
       </p>
     </div>
   </div>
+
+        <!-- ================================================
+             WATCHER 최종 공개 화면 검수
+             실제 공개 처리 없음
+             ================================================ -->
+        <section
+          id="watcherFinalReview"
+          class="watcher-final-review"
+          hidden
+        >
+          <div class="admin-section-head">
+            <div>
+              <h3>👁️ 최종 공개 화면 검수</h3>
+
+              <p class="admin-hint">
+                현재 입력값과 비공개 R2 이미지를 실제 공개 화면과
+                비슷한 형태로 확인합니다. 이 카드는 조회 전용이며
+                게임 공개 상태를 변경하지 않습니다.
+              </p>
+            </div>
+
+            <span class="watcher-badge watcher-final-draft-badge">
+              DRAFT · 비공개
+            </span>
+          </div>
+
+          <article class="watcher-final-card">
+            <div class="watcher-final-image-area">
+              <img
+                id="watcherFinalImage"
+                class="watcher-final-image"
+                alt="게임 대표 이미지 최종 검수"
+                hidden
+              />
+
+              <div
+                id="watcherFinalImagePlaceholder"
+                class="watcher-final-image-placeholder"
+              >
+                🔒
+                <span>
+                  관리자 R2 미리보기를 먼저 불러와 주세요.
+                </span>
+              </div>
+            </div>
+
+            <div class="watcher-final-body">
+              <div class="watcher-final-badges">
+                <span
+                  id="watcherFinalPlatform"
+                  class="watcher-badge"
+                >
+                  플랫폼 미입력
+                </span>
+
+                <span
+                  id="watcherFinalGameId"
+                  class="watcher-badge"
+                >
+                  게임 DRAFT
+                </span>
+              </div>
+
+              <h3 id="watcherFinalTitle">
+                게임 제목 미입력
+              </h3>
+
+              <p
+                id="watcherFinalEdition"
+                class="watcher-final-edition"
+              >
+                에디션 표시명 미입력
+              </p>
+
+              <dl class="watcher-final-meta">
+                <div>
+                  <dt>발매일</dt>
+                  <dd id="watcherFinalReleaseDate">-</dd>
+                </div>
+
+                <div>
+                  <dt>예약판매 기간</dt>
+                  <dd id="watcherFinalPreorderPeriod">-</dd>
+                </div>
+
+                <div>
+                  <dt>가격 후보</dt>
+                  <dd id="watcherFinalPrice">미확정</dd>
+                </div>
+
+                <div>
+                  <dt>장르</dt>
+                  <dd id="watcherFinalGenre">-</dd>
+                </div>
+              </dl>
+
+              <section class="watcher-final-bonus">
+                <strong>🎁 예약 구매 특전</strong>
+
+                <p id="watcherFinalBonus">
+                  등록된 특전 정보가 없습니다.
+                </p>
+
+                <p
+                  id="watcherFinalBonusNote"
+                  class="admin-hint"
+                ></p>
+              </section>
+
+              <div class="watcher-final-links">
+                <a
+                  id="watcherFinalSourceLink"
+                  class="watcher-item-link"
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  hidden
+                >
+                  공식 보도자료 확인 ↗
+                </a>
+
+                <a
+                  id="watcherFinalTrailerLink"
+                  class="watcher-item-link"
+                  href="#"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  hidden
+                >
+                  공식 트레일러 확인 ↗
+                </a>
+              </div>
+
+              <footer class="watcher-final-credit">
+                <p id="watcherFinalCredit">
+                  출처 정보를 확인해 주세요.
+                </p>
+
+                <p id="watcherFinalCopyright"></p>
+              </footer>
+            </div>
+          </article>
+
+          <div class="admin-notice watcher-final-safety">
+            <strong>현재 검수 상태</strong>
+
+            <p class="admin-hint">
+              이 화면은 관리자 브라우저에서 생성한 Blob 이미지와
+              입력값만 조합합니다. games.image_url, 게임 공개 상태,
+              예약판매 공개 상태는 변경하지 않습니다.
+            </p>
+          </div>
+        </section>
 
      
         <div class="admin-row admin-row-wrap">
@@ -1654,7 +1807,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-watcher-preview-1"></script>
+    <script src="/static/watcher-admin.js?v=20260721-watcher-final-review-1"></script>
 </body>
 </html>`
 }
