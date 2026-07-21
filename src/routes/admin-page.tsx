@@ -434,7 +434,7 @@ export function AdminPage(): string {
           </article>
 
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">이미지 허가 대기</span>
+            <span class="dashboard-stat-label">출처 허가 대기</span>
             <strong
               id="watcherPendingPermissions"
               class="dashboard-stat-value"
@@ -463,6 +463,38 @@ export function AdminPage(): string {
         ></p>
       </section>
 
+      <!-- ======================================================
+           WATCHER 이벤트
+           ====================================================== -->
+      <section class="admin-card">
+        <div class="admin-section-head">
+          <div>
+            <h2>🔔 WATCHER 이벤트</h2>
+      
+            <p class="admin-hint">
+              보도자료와 이미지 후보 발견 이력을 표시합니다.
+              읽음 처리해도 기록은 삭제되지 않습니다.
+            </p>
+          </div>
+      
+          <button
+            id="markAllWatcherEventsRead"
+            class="btn btn-sm"
+            type="button"
+          >
+            모두 읽음
+          </button>
+        </div>
+      
+        <div
+          id="watcherEventList"
+          class="watcher-event-list"
+        >
+          <div class="admin-empty">
+            이벤트를 불러오는 중입니다.
+          </div>
+        </div>
+      </section>
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
@@ -1271,7 +1303,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-3"></script>
+    <script src="/static/watcher-admin.js?v=20260721-events-1"></script>
 </body>
 </html>`
 }
