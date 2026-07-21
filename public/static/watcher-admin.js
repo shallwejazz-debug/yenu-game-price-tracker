@@ -751,8 +751,33 @@ async function readAllWatcherEvents() {
       ''
     )
 
-    setTransformStatus('', '')
+        setTransformStatus('', '')
+    setTransformImageStatus('', '')
     setRegisterDraftButton('', null)
+
+    const imageList =
+      $('watcherTransformImageList')
+
+    if (imageList) {
+      imageList.innerHTML =
+        '<div class="admin-empty">' +
+          '보도자료를 열면 공식 이미지 후보를 불러옵니다.' +
+        '</div>'
+    }
+
+    const imageCount =
+      $('watcherTransformImageCount')
+
+    if (imageCount) {
+      imageCount.textContent = '0개'
+    }
+
+    const selectedImage =
+      $('watcherTransformSelectedImage')
+
+    if (selectedImage) {
+      selectedImage.hidden = true
+    }
   }
 
 
@@ -783,6 +808,404 @@ async function readAllWatcherEvents() {
     return {}
   }
 
+  function setTransformImageStatus(
+    message,
+    type
+  ) {
+    const element =
+      $('watcherTransformImageStatus')
+
+    if (!element) return
+
+    element.textContent = message || ''
+    element.className = 'admin-status'
+
+    if (type) {
+      element.classList.add(type)
+    }
+  }
+
+  function imageTypeLabel(value) {
+    const type = String(
+      value || ''
+    ).toUpperCase()
+
+    const labels = {
+      PACKAGE: '패키지 이미지',
+      LIMITED_EDITION: '한정판 이미지',
+      PREORDER_BONUS: '예약 특전',
+      FIRST_PRINT_BONUS: '초회 특전',
+      STORE_BONUS: '판매처 특전',
+      KEY_VISUAL: '키 비주얼',
+      SCREENSHOT: '스크린샷',
+      BANNER: '배너',
+      UNKNOWN: '미분류'
+    }
+
+    return labels[type] || type || '미분류'
+  }
+
+  function imageTypeOptions(
+    selectedType
+  ) {
+    const selected = String(
+      selectedType || ''
+    ).toUpperCase()
+
+    const options = [
+      {
+        value: '',
+        label: '이미지 유형 선택'
+      },
+      {
+        value: 'PACKAGE',
+        label: '패키지 이미지'
+      },
+      {
+        value: 'LIMITED_EDITION',
+        label: '한정판 이미지'
+      },
+      {
+        value: 'PREORDER_BONUS',
+        label: '예약 특전'
+      },
+      {
+        value: 'FIRST_PRINT_BONUS',
+        label: '초회 특전'
+      },
+      {
+        value: 'STORE_BONUS',
+        label: '판매처 특전'
+      },
+      {
+        value: 'KEY_VISUAL',
+        label: '키 비주얼'
+      },
+      {
+        value: 'SCREENSHOT',
+        label: '스크린샷'
+      }
+    ]
+
+    return options
+      .map(function (option) {
+        return (
+          '<option value="' +
+            escapeHtml(option.value) +
+            '"' +
+            (
+              option.value === selected
+                ? ' selected'
+                : ''
+            ) +
+          '>' +
+            escapeHtml(option.label) +
+          '</option>'
+        )
+      })
+      .join('')
+  }
+
+  function renderTransformImages(
+    images,
+    item,
+    policy
+  ) {
+    const container =
+      $('watcherTransformImageList')
+
+    const countElement =
+      $('watcherTransformImageCount')
+
+    const policyElement =
+      $('watcherTransformImagePolicy')
+
+    const selectedElement =
+      $('watcherTransformSelectedImage')
+
+    const selectedText =
+      $('watcherTransformSelectedImageText')
+
+    if (!container) return
+
+    const list = Array.isArray(images)
+      ? images
+      : []
+
+    if (countElement) {
+      countElement.textContent =
+        String(list.length) + '개'
+    }
+
+    const linkedGameId = Number(
+      item && item.linked_game_id
+        ? item.linked_game_id
+        : 0
+    )
+
+    const policyStatus = String(
+      policy && policy.permission_status
+        ? policy.permission_status
+        : (
+          item &&
+          item.source_permission_status
+            ? item.source_permission_status
+            : 'PENDING'
+        )
+    ).toUpperCase()
+
+    const policyAllowed =
+      policyStatus === 'APPROVED' ||
+      policyStatus === 'CONDITIONAL'
+
+    if (policyElement) {
+      if (policyAllowed) {
+        policyElement.innerHTML =
+          '<strong>' +
+            escapeHtml(
+              policyStatus === 'CONDITIONAL'
+                ? '🔵 조건부 이미지 사용 허가'
+                : '🟢 이미지 사용 허가'
+            ) +
+          '</strong>' +
+          '<p class="admin-hint">' +
+            '출처 정책이 확인되었습니다. ' +
+            '이미지 유형을 확인한 뒤 대표 후보를 선택할 수 있습니다.' +
+          '</p>'
+      } else {
+        policyElement.innerHTML =
+          '<strong>🟡 이미지 사용 허가 대기</strong>' +
+          '<p class="admin-hint">' +
+            '출처의 이미지 사용 정책이 승인되기 전에는 ' +
+            '대표 이미지로 선택할 수 없습니다.' +
+          '</p>'
+      }
+    }
+
+    const selectedImage = list.find(
+      function (image) {
+        return (
+          Number(
+            image.selected_for_publish || 0
+          ) === 1
+        )
+      }
+    )
+
+    if (selectedElement) {
+      selectedElement.hidden =
+        !selectedImage
+    }
+
+    if (
+      selectedText &&
+      selectedImage
+    ) {
+      selectedText.textContent =
+        '이미지 #' +
+        Number(selectedImage.id || 0) +
+        ' · ' +
+        imageTypeLabel(
+          selectedImage.image_type
+        ) +
+        ' · 개별 상태 ' +
+        String(
+          selectedImage.permission_status ||
+          'PENDING'
+        )
+    }
+
+    if (!list.length) {
+      container.innerHTML =
+        '<div class="admin-empty">' +
+          '이 보도자료에서 수집된 이미지 후보가 없습니다.' +
+        '</div>'
+
+      setTransformImageStatus(
+        '이미지 후보가 없습니다.',
+        'info'
+      )
+
+      return
+    }
+
+    container.innerHTML = list
+      .map(function (image, index) {
+        const imageId = Number(
+          image.id || 0
+        )
+
+        const sourceUrl = safeUrl(
+          image.source_image_url
+        )
+
+        const selected =
+          Number(
+            image.selected_for_publish || 0
+          ) === 1
+
+        const permissionStatus = String(
+          image.permission_status ||
+          'PENDING'
+        ).toUpperCase()
+
+        const currentType = String(
+          image.image_type || ''
+        ).toUpperCase()
+
+        const selectable =
+          Number.isInteger(linkedGameId) &&
+          linkedGameId > 0 &&
+          policyAllowed &&
+          Number.isInteger(imageId) &&
+          imageId > 0
+
+        let hostName = '공식 이미지'
+
+        if (sourceUrl) {
+          try {
+            hostName =
+              new URL(sourceUrl).hostname
+          } catch (error) {
+            hostName = '공식 이미지'
+          }
+        }
+
+        const sourceLink = sourceUrl
+          ? (
+            '<a ' +
+              'class="watcher-item-link" ' +
+              'href="' +
+                escapeHtml(sourceUrl) +
+              '" ' +
+              'target="_blank" ' +
+              'rel="noopener noreferrer">' +
+              '공식 이미지 원본 확인 ↗' +
+            '</a>'
+          )
+          : (
+            '<span class="admin-hint">' +
+              '이미지 URL 없음' +
+            '</span>'
+          )
+
+        return (
+          '<article class="watcher-transform-image-card' +
+            (selected ? ' is-selected' : '') +
+          '">' +
+
+            '<div class="watcher-transform-image-head">' +
+              '<strong>' +
+                '후보 ' +
+                escapeHtml(index + 1) +
+              '</strong>' +
+
+              (
+                selected
+                  ? (
+                    '<span class="watcher-badge ' +
+                      'watcher-permission-approved">' +
+                      '대표 이미지 선택됨' +
+                    '</span>'
+                  )
+                  : ''
+              ) +
+            '</div>' +
+
+            '<div class="watcher-transform-image-meta">' +
+              '<span>이미지 ID: ' +
+                escapeHtml(imageId) +
+              '</span>' +
+
+              '<span>수집 유형: ' +
+                escapeHtml(
+                  imageTypeLabel(currentType)
+                ) +
+              '</span>' +
+
+              '<span>개별 상태: ' +
+                escapeHtml(permissionStatus) +
+              '</span>' +
+
+              '<span>출처: ' +
+                escapeHtml(hostName) +
+              '</span>' +
+            '</div>' +
+
+            (
+              image.alt_text
+                ? (
+                  '<p class="watcher-transform-image-alt">' +
+                    escapeHtml(image.alt_text) +
+                  '</p>'
+                )
+                : ''
+            ) +
+
+            sourceLink +
+
+            '<label class="admin-field">' +
+              '<span>사용할 이미지 유형</span>' +
+
+              '<select ' +
+                'data-watcher-image-type="' +
+                  escapeHtml(imageId) +
+                '"' +
+                (selectable ? '' : ' disabled') +
+              '>' +
+                imageTypeOptions(currentType) +
+              '</select>' +
+            '</label>' +
+
+            '<button ' +
+              'type="button" ' +
+              'class="btn btn-sm ' +
+                'watcher-image-select" ' +
+              'data-watcher-image-select="' +
+                escapeHtml(imageId) +
+              '"' +
+              (selectable ? '' : ' disabled') +
+            '>' +
+              (
+                selected
+                  ? '대표 이미지 다시 선택'
+                  : (
+                    linkedGameId > 0
+                      ? '대표 이미지 선택'
+                      : '비공개 게임 등록 후 선택'
+                  )
+              ) +
+            '</button>' +
+          '</article>'
+        )
+      })
+      .join('')
+
+    if (linkedGameId <= 0) {
+      setTransformImageStatus(
+        '비공개 게임 DRAFT를 등록한 뒤 대표 이미지를 선택할 수 있습니다.',
+        'info'
+      )
+    } else if (!policyAllowed) {
+      setTransformImageStatus(
+        '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+        'err'
+      )
+    } else if (selectedImage) {
+      setTransformImageStatus(
+        '대표 이미지 후보가 선택되어 있습니다. 아직 다운로드하거나 공개하지 않았습니다.',
+        'ok'
+      )
+    } else {
+      setTransformImageStatus(
+        '공식 원본을 확인하고 이미지 유형을 선택해 주세요.',
+        'info'
+      )
+    }
+  }
+
+
+  
   async function openWatcherTransform(itemId) {
     const id = Number(itemId)
     const card = $('watcherTransformCard')
@@ -817,15 +1240,39 @@ async function readAllWatcherEvents() {
         '/admin/api/watcher/items/' + id
       )
 
-      const item = data.item || {}
+        const item = data.item || {}
+
       const draft = parseTransformDraft(
         item.transformed_json
       )
+
+      const images = Array.isArray(
+        data.images
+      )
+        ? data.images
+        : (
+          Array.isArray(item.images)
+            ? item.images
+            : []
+        )
+
+      const imagePolicy =
+        data.imagePolicy ||
+        data.policy ||
+        item.image_policy ||
+        {}
 
       setRegisterDraftButton(
         item.review_status,
         item.linked_game_id
       )
+
+      renderTransformImages(
+        images,
+        item,
+        imagePolicy
+      )
+
 
       setTransformValue(
         'watcherTransformItemId',
