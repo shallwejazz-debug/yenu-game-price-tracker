@@ -121,6 +121,23 @@ export function AdminPage(): string {
       </button>
 
       <button
+              type="button"
+              class="admin-tab"
+              data-admin-tab="watcher"
+              aria-selected="false"
+            >
+              <span class="admin-tab-icon">📡</span>
+              <span>예판 WATCHER</span>
+              <span
+                id="watcherTabBadge"
+                class="admin-tab-badge"
+                hidden
+              >
+                0
+              </span>
+            </button>
+
+      <button
         type="button"
         class="admin-tab"
         data-admin-tab="candidates"
