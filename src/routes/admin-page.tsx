@@ -752,9 +752,9 @@ export function AdminPage(): string {
       <strong>현재 단계의 안전 원칙</strong>
 
       <p class="admin-hint">
-        대표 이미지 후보를 선택해도 게임은 DRAFT 상태로 유지됩니다.
-        games.image_url은 변경하지 않으며 이미지 다운로드·R2 저장·
-        공개 처리는 별도의 최종 승인 단계에서만 진행합니다.
+      대표 이미지 후보 선택 후 공식 원본을 비공개 R2에 저장할 수
+      있습니다. R2 저장만으로 게임은 공개되지 않으며,
+      games.image_url과 공개 상태는 변경하지 않습니다.
       </p>
     </div>
   </div>
@@ -1602,7 +1602,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-watcher-images-1"></script>
+    <script src="/static/watcher-admin.js?v=20260721-watcher-r2-1"></script>
 </body>
 </html>`
 }
