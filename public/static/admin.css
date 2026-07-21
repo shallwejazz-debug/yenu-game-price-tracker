@@ -2546,3 +2546,216 @@
     max-height: 480px;
   }
 }
+
+/* ------------------------------------------------------------
+   WATCHER 최종 공개 화면 검수
+   ------------------------------------------------------------ */
+
+.watcher-final-review {
+  margin-top: 22px;
+  padding: 18px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(87, 105, 225, 0.09),
+      rgba(18, 21, 29, 0.96)
+    );
+  border: 1px solid #3b456b;
+  border-radius: 13px;
+}
+
+.watcher-final-review h3 {
+  margin: 0 0 6px;
+}
+
+.watcher-final-draft-badge {
+  color: #f2ca6a;
+  background: rgba(200, 151, 40, 0.14);
+  border-color: rgba(205, 158, 52, 0.4);
+}
+
+.watcher-final-card {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 0.82fr)
+    minmax(0, 1.35fr);
+  overflow: hidden;
+  background: #11141c;
+  border: 1px solid #303746;
+  border-radius: 12px;
+}
+
+.watcher-final-image-area {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  background: #0d1016;
+  border-right: 1px solid #303746;
+}
+
+.watcher-final-image {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  display: block;
+  object-fit: contain;
+  background: #0d1016;
+}
+
+.watcher-final-image-placeholder {
+  min-height: 360px;
+  padding: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: #77808e;
+  font-size: 2rem;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.watcher-final-image-placeholder span {
+  max-width: 230px;
+  color: #858d9a;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.watcher-final-body {
+  min-width: 0;
+  padding: 22px;
+}
+
+.watcher-final-badges {
+  display: flex;
+  margin-bottom: 11px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.watcher-final-body > h3 {
+  margin: 0 0 7px;
+  color: #f2f4f7;
+  font-size: 1.35rem;
+  line-height: 1.4;
+}
+
+.watcher-final-edition {
+  margin: 0 0 18px;
+  color: #9da5b1;
+  font-size: 0.86rem;
+}
+
+.watcher-final-meta {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+
+.watcher-final-meta div {
+  padding: 10px 11px;
+  background: #181c25;
+  border: 1px solid #292f3c;
+  border-radius: 8px;
+}
+
+.watcher-final-meta dt {
+  margin-bottom: 4px;
+  color: #7f8896;
+  font-size: 0.69rem;
+}
+
+.watcher-final-meta dd {
+  margin: 0;
+  color: #d8dce3;
+  font-size: 0.81rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.watcher-final-bonus {
+  margin-top: 14px;
+  padding: 12px 13px;
+  background: rgba(89, 108, 224, 0.08);
+  border: 1px solid rgba(113, 130, 239, 0.22);
+  border-radius: 9px;
+}
+
+.watcher-final-bonus strong {
+  color: #d9defc;
+  font-size: 0.82rem;
+}
+
+.watcher-final-bonus p {
+  margin: 7px 0 0;
+  color: #c8ced8;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.watcher-final-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.watcher-final-credit {
+  margin-top: 16px;
+  padding-top: 12px;
+  color: #7f8794;
+  border-top: 1px solid #2b303c;
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.watcher-final-credit p {
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.watcher-final-safety {
+  margin-bottom: 0;
+}
+
+@media (max-width: 760px) {
+  .watcher-final-card {
+    grid-template-columns: 1fr;
+  }
+
+  .watcher-final-image-area {
+    min-height: 280px;
+    border-right: 0;
+    border-bottom: 1px solid #303746;
+  }
+
+  .watcher-final-image,
+  .watcher-final-image-placeholder {
+    min-height: 280px;
+  }
+
+  .watcher-final-body {
+    padding: 17px;
+  }
+}
+
+@media (max-width: 430px) {
+  .watcher-final-review {
+    padding: 13px;
+  }
+
+  .watcher-final-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .watcher-final-body > h3 {
+    font-size: 1.13rem;
+  }
+}
+
+
