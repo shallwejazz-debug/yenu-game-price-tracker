@@ -69,27 +69,9 @@ watcherAdmin.get('/summary', async (c) => {
     SELECT
       (
         SELECT COUNT(*)
-        FROM (
-          SELECT
-            date(created_at, '+9 hours') AS event_date,
-      
-            CASE
-              WHEN watch_item_id IS NOT NULL
-                THEN 'item:' || watch_item_id
-              ELSE
-                'event:' || id
-            END AS event_group
-      
-          FROM watch_events
-      
-          WHERE is_read = 0
-      
-          GROUP BY
-            event_date,
-            event_group
-        )
-      ) AS unread_events,
-
+        FROM watch_sources
+        WHERE enabled = 1
+      ) AS enabled_sources,
 
       (
         SELECT COUNT(*)
@@ -123,8 +105,25 @@ watcherAdmin.get('/summary', async (c) => {
 
       (
         SELECT COUNT(*)
-        FROM watch_events
-        WHERE is_read = 0
+        FROM (
+          SELECT
+            date(created_at, '+9 hours') AS event_date,
+
+            CASE
+              WHEN watch_item_id IS NOT NULL
+                THEN 'item:' || watch_item_id
+              ELSE
+                'event:' || id
+            END AS event_group
+
+          FROM watch_events
+
+          WHERE is_read = 0
+
+          GROUP BY
+            event_date,
+            event_group
+        )
       ) AS unread_events,
 
       (
