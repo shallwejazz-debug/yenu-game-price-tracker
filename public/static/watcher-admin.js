@@ -1109,7 +1109,6 @@ async function readAllWatcherEvents() {
       }
     }
   }
-}
 
    async function registerWatcherDraft() {
     if (
