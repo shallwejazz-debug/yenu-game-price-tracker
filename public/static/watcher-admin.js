@@ -15,6 +15,7 @@
   let watcherLoaded = false
   let watcherLoading = false
   let collectorRunning = false
+  let eventActionRunning = false
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -244,6 +245,241 @@
     return Number(value) === 1 ? '허용' : '차단'
   }
 
+  function eventInfo(type) {
+  const normalized = String(type || 'OTHER')
+    .toUpperCase()
+
+  const labels = {
+    SOURCE_NEW: {
+      label: '신규 보도자료',
+      className: 'source-new'
+    },
+    SOURCE_CHANGED: {
+      label: '보도자료 변경',
+      className: 'source-changed'
+    },
+    IMAGE_NEW: {
+      label: '신규 이미지',
+      className: 'image-new'
+    },
+    PREORDER_OPEN: {
+      label: '예약판매 시작',
+      className: 'preorder'
+    },
+    PREORDER_ENDING: {
+      label: '예약판매 종료 임박',
+      className: 'preorder'
+    },
+    PREORDER_ENDED: {
+      label: '예약판매 종료',
+      className: 'preorder'
+    },
+    UPLOADED: {
+      label: '업로드 완료',
+      className: 'uploaded'
+    },
+    RELEASED: {
+      label: '출시',
+      className: 'released'
+    },
+    PERMISSION_CHANGED: {
+      label: '이미지 정책 변경',
+      className: 'permission'
+    },
+    ERROR: {
+      label: '오류',
+      className: 'error'
+    }
+  }
+
+  return labels[normalized] || {
+    label: normalized,
+    className: 'other'
+  }
+}
+
+function renderEvents(events) {
+  const container = $('watcherEventList')
+  if (!container) return
+
+  if (!Array.isArray(events) || !events.length) {
+    container.innerHTML =
+      '<div class="admin-empty">' +
+        '표시할 WATCHER 이벤트가 없습니다.' +
+      '</div>'
+
+    return
+  }
+
+  container.innerHTML = events
+    .map(function (event) {
+      const info = eventInfo(event.event_type)
+      const isRead = Number(event.is_read) === 1
+      const articleUrl = safeUrl(event.source_url)
+
+      const linkHtml = articleUrl
+        ? '<a class="watcher-event-link" href="' +
+            escapeHtml(articleUrl) +
+            '" target="_blank" rel="noopener noreferrer">' +
+            '공식 원문 ↗' +
+          '</a>'
+        : ''
+
+      const readButton = !isRead
+        ? '<button type="button" ' +
+            'class="btn btn-sm watcher-event-read" ' +
+            'data-watcher-event-read="' +
+            escapeHtml(event.id) +
+            '">' +
+            '읽음' +
+          '</button>'
+        : '<span class="watcher-event-read-label">' +
+            '읽음' +
+          '</span>'
+
+      return (
+        '<article class="watcher-event-card' +
+          (isRead ? ' is-read' : '') +
+        '">' +
+          '<div class="watcher-event-main">' +
+            '<div class="watcher-event-top">' +
+              '<span class="watcher-badge watcher-event-' +
+                escapeHtml(info.className) +
+              '">' +
+                escapeHtml(info.label) +
+              '</span>' +
+
+              (event.source_name
+                ? '<span class="watcher-event-source">' +
+                    escapeHtml(event.source_name) +
+                  '</span>'
+                : '') +
+
+              (!isRead
+                ? '<span class="watcher-event-unread">' +
+                    'NEW' +
+                  '</span>'
+                : '') +
+            '</div>' +
+
+            '<strong class="watcher-event-title">' +
+              escapeHtml(event.title || '제목 없음') +
+            '</strong>' +
+
+            (event.message
+              ? '<p class="watcher-event-message">' +
+                  escapeHtml(event.message) +
+                '</p>'
+              : '') +
+
+            '<div class="watcher-event-meta">' +
+              '<span>' +
+                escapeHtml(event.created_at || '-') +
+              '</span>' +
+              linkHtml +
+            '</div>' +
+          '</div>' +
+
+          '<div class="watcher-event-action">' +
+            readButton +
+          '</div>' +
+        '</article>'
+      )
+    })
+    .join('')
+}
+
+async function readWatcherEvent(id) {
+  if (eventActionRunning) return
+
+  const eventId = Number(id)
+
+  if (
+    !Number.isInteger(eventId) ||
+    eventId <= 0
+  ) {
+    return
+  }
+
+  eventActionRunning = true
+
+  try {
+    await watcherApi(
+      '/admin/api/watcher/events/' +
+        eventId +
+        '/read',
+      {
+        method: 'POST'
+      }
+    )
+
+    watcherLoaded = false
+    await loadWatcher(true)
+
+    setStatus(
+      '이벤트를 읽음 처리했습니다.',
+      'ok'
+    )
+  } catch (error) {
+    setStatus(
+      error && error.message
+        ? error.message
+        : '이벤트 읽음 처리에 실패했습니다.',
+      'err'
+    )
+  } finally {
+    eventActionRunning = false
+  }
+}
+
+async function readAllWatcherEvents() {
+  const button = $('markAllWatcherEventsRead')
+
+  if (!button || eventActionRunning) return
+
+  const confirmed = window.confirm(
+    '읽지 않은 WATCHER 이벤트를 모두 읽음 처리할까요?\n\n' +
+    '기록은 삭제되지 않습니다.'
+  )
+
+  if (!confirmed) return
+
+  eventActionRunning = true
+  button.disabled = true
+  button.textContent = '처리 중...'
+
+  try {
+    const data = await watcherApi(
+      '/admin/api/watcher/events/read-all',
+      {
+        method: 'POST'
+      }
+    )
+
+    watcherLoaded = false
+    await loadWatcher(true)
+
+    setStatus(
+      '이벤트 ' +
+        Number(data.changed || 0) +
+        '개를 읽음 처리했습니다.',
+      'ok'
+    )
+  } catch (error) {
+    setStatus(
+      error && error.message
+        ? error.message
+        : '이벤트 읽음 처리에 실패했습니다.',
+      'err'
+    )
+  } finally {
+    eventActionRunning = false
+    button.disabled = false
+    button.textContent = '모두 읽음'
+  }
+}
+
+  
   function renderSummary(summary) {
     const data = summary || {}
 
@@ -527,12 +763,14 @@
       const results = await Promise.all([
         watcherApi('/admin/api/watcher/summary'),
         watcherApi('/admin/api/watcher/sources'),
-        watcherApi('/admin/api/watcher/items?limit=50')
+        watcherApi('/admin/api/watcher/items?limit=50'),
+        watcherApi('/admin/api/watcher/events?limit=100')
       ])
 
       renderSummary(results[0].summary)
       renderSources(results[1].sources)
       renderItems(results[2].items)
+      renderEvents(results[3].events)
 
       watcherLoaded = true
 
@@ -583,49 +821,88 @@
     )
   }
 
-  function init() {
-    const refreshButton = $('refreshWatcher')
-    const collectArcButton = $('collectArcWatcher')
+ function init() {
+  const refreshButton = $('refreshWatcher')
+  const collectArcButton = $('collectArcWatcher')
 
-    const watcherTab = document.querySelector(
-      '[data-admin-tab="watcher"]'
-    )
+  const markAllEventsButton =
+    $('markAllWatcherEventsRead')
 
-    if (refreshButton) {
-      refreshButton.addEventListener(
-        'click',
-        function () {
-          loadWatcher(true)
-        }
-      )
-    }
+  const eventList = $('watcherEventList')
 
-    if (collectArcButton) {
-      collectArcButton.addEventListener(
-        'click',
-        runArcCollector
-      )
-    }
+  const watcherTab = document.querySelector(
+    '[data-admin-tab="watcher"]'
+  )
 
-    if (watcherTab) {
-      watcherTab.addEventListener(
-        'click',
-        function () {
-          window.setTimeout(function () {
-            if (isWatcherPanelActive()) {
-              loadWatcher(false)
-            }
-          }, 0)
-        }
-      )
-    }
-
-    window.setTimeout(function () {
-      if (isWatcherPanelActive()) {
-        loadWatcher(false)
+  if (refreshButton) {
+    refreshButton.addEventListener(
+      'click',
+      function () {
+        loadWatcher(true)
       }
-    }, 100)
+    )
   }
+
+  if (collectArcButton) {
+    collectArcButton.addEventListener(
+      'click',
+      runArcCollector
+    )
+  }
+
+  if (markAllEventsButton) {
+    markAllEventsButton.addEventListener(
+      'click',
+      readAllWatcherEvents
+    )
+  }
+
+  if (eventList) {
+    eventList.addEventListener(
+      'click',
+      function (event) {
+        const target = event.target
+
+        if (!(target instanceof Element)) {
+          return
+        }
+
+        const button = target.closest(
+          '[data-watcher-event-read]'
+        )
+
+        if (!button || !eventList.contains(button)) {
+          return
+        }
+
+        readWatcherEvent(
+          button.getAttribute(
+            'data-watcher-event-read'
+          )
+        )
+      }
+    )
+  }
+
+  if (watcherTab) {
+    watcherTab.addEventListener(
+      'click',
+      function () {
+        window.setTimeout(function () {
+          if (isWatcherPanelActive()) {
+            loadWatcher(false)
+          }
+        }, 0)
+      }
+    )
+  }
+
+  window.setTimeout(function () {
+    if (isWatcherPanelActive()) {
+      loadWatcher(false)
+    }
+  }, 100)
+}
 
   if (document.readyState === 'loading') {
     document.addEventListener(
