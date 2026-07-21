@@ -16,6 +16,8 @@
   let watcherLoading = false
   let collectorRunning = false
   let eventActionRunning = false
+  let transformActionRunning = false
+
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -652,6 +654,358 @@ async function readAllWatcherEvents() {
     button.textContent = '모두 읽음'
   }
 }
+
+    function setTransformValue(id, value) {
+    const element = $(id)
+
+    if (element) {
+      element.value =
+        value == null ? '' : String(value)
+    }
+  }
+
+  function setTransformStatus(message, type) {
+    const element = $('watcherTransformStatus')
+    if (!element) return
+
+    element.textContent = message || ''
+    element.className = 'admin-status'
+
+    if (type) {
+      element.classList.add(type)
+    }
+  }
+
+  function closeWatcherTransform() {
+    const card = $('watcherTransformCard')
+
+    if (card) {
+      card.hidden = true
+    }
+
+    setTransformValue(
+      'watcherTransformItemId',
+      ''
+    )
+
+    setTransformStatus('', '')
+  }
+
+  function parseTransformDraft(value) {
+    if (!value) return {}
+
+    if (
+      typeof value === 'object' &&
+      !Array.isArray(value)
+    ) {
+      return value
+    }
+
+    try {
+      const parsed = JSON.parse(String(value))
+
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed)
+      ) {
+        return parsed
+      }
+    } catch (error) {
+      return {}
+    }
+
+    return {}
+  }
+
+  async function openWatcherTransform(itemId) {
+    const id = Number(itemId)
+    const card = $('watcherTransformCard')
+
+    if (
+      !card ||
+      !Number.isInteger(id) ||
+      id <= 0
+    ) {
+      setStatus(
+        '보도자료 항목 정보가 올바르지 않습니다.',
+        'err'
+      )
+
+      return
+    }
+
+    card.hidden = false
+
+    setTransformStatus(
+      '보도자료 상세 정보를 불러오는 중입니다.',
+      'info'
+    )
+
+    card.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/items/' + id
+      )
+
+      const item = data.item || {}
+      const draft = parseTransformDraft(
+        item.transformed_json
+      )
+
+      setTransformValue(
+        'watcherTransformItemId',
+        id
+      )
+
+      setTransformValue(
+        'watcherTransformTitle',
+        draft.title || item.title || ''
+      )
+
+      setTransformValue(
+        'watcherTransformPlatform',
+        draft.platform || 'switch'
+      )
+
+      setTransformValue(
+        'watcherTransformEditionName',
+        draft.editionName || ''
+      )
+
+      setTransformValue(
+        'watcherTransformGenre',
+        draft.genre || ''
+      )
+
+      setTransformValue(
+        'watcherTransformReleaseDate',
+        draft.releaseDate || ''
+      )
+
+      setTransformValue(
+        'watcherTransformPreorderStart',
+        draft.preorderStartDate || ''
+      )
+
+      setTransformValue(
+        'watcherTransformPreorderEnd',
+        draft.preorderEndDate || ''
+      )
+
+      setTransformValue(
+        'watcherTransformCandidatePrice',
+        draft.candidatePrice == null
+          ? ''
+          : draft.candidatePrice
+      )
+
+      setTransformValue(
+        'watcherTransformBonus',
+        draft.preorderBonus || ''
+      )
+
+      setTransformValue(
+        'watcherTransformBonusNote',
+        draft.preorderBonusNote || ''
+      )
+
+      setTransformValue(
+        'watcherTransformTrailer',
+        draft.trailerUrl || ''
+      )
+
+      const sourceTitle =
+        $('watcherTransformSourceTitle')
+
+      if (sourceTitle) {
+        sourceTitle.textContent =
+          item.title || '공식 보도자료'
+      }
+
+      const sourceLink =
+        $('watcherTransformSourceLink')
+
+      const sourceUrl = safeUrl(
+        item.source_url
+      )
+
+      if (sourceLink && sourceUrl) {
+        sourceLink.href = sourceUrl
+        sourceLink.hidden = false
+      } else if (sourceLink) {
+        sourceLink.removeAttribute('href')
+        sourceLink.hidden = true
+      }
+
+      setTransformStatus(
+        Object.keys(draft).length
+          ? '저장된 초안을 불러왔습니다.'
+          : '보도자료를 불러왔습니다. 게임 정보를 확인해 입력해 주세요.',
+        'ok'
+      )
+    } catch (error) {
+      setTransformStatus(
+        error && error.message
+          ? error.message
+          : '보도자료를 불러오지 못했습니다.',
+        'err'
+      )
+    }
+  }
+
+  async function saveWatcherTransform() {
+    if (transformActionRunning) return
+
+    const itemId = Number(
+      $('watcherTransformItemId')
+        ? $('watcherTransformItemId').value
+        : 0
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      setTransformStatus(
+        '보도자료를 먼저 선택해 주세요.',
+        'err'
+      )
+
+      return
+    }
+
+    const value = function (id) {
+      const element = $(id)
+
+      return element
+        ? String(element.value || '').trim()
+        : ''
+    }
+
+    const rawPrice = value(
+      'watcherTransformCandidatePrice'
+    )
+
+    const payload = {
+      title: value('watcherTransformTitle'),
+
+      platform: value(
+        'watcherTransformPlatform'
+      ),
+
+      editionName: value(
+        'watcherTransformEditionName'
+      ),
+
+      genre: value(
+        'watcherTransformGenre'
+      ),
+
+      releaseDate: value(
+        'watcherTransformReleaseDate'
+      ),
+
+      preorderStartDate: value(
+        'watcherTransformPreorderStart'
+      ),
+
+      preorderEndDate: value(
+        'watcherTransformPreorderEnd'
+      ),
+
+      candidatePrice:
+        rawPrice === ''
+          ? null
+          : Number(rawPrice),
+
+      preorderBonus: value(
+        'watcherTransformBonus'
+      ),
+
+      preorderBonusNote: value(
+        'watcherTransformBonusNote'
+      ),
+
+      trailerUrl: value(
+        'watcherTransformTrailer'
+      )
+    }
+
+    if (!payload.title) {
+      setTransformStatus(
+        '게임 제목을 입력해 주세요.',
+        'err'
+      )
+
+      return
+    }
+
+    if (!payload.releaseDate) {
+      setTransformStatus(
+        '패키지 발매일을 입력해 주세요.',
+        'err'
+      )
+
+      return
+    }
+
+    const button = $('saveWatcherTransform')
+
+    transformActionRunning = true
+
+    if (button) {
+      button.disabled = true
+      button.textContent = '저장 중...'
+    }
+
+    setTransformStatus(
+      '게임 등록 초안을 저장하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/items/' +
+          itemId +
+          '/transform',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }
+      )
+
+      watcherLoaded = false
+      await loadWatcher(true)
+
+      setTransformStatus(
+        '초안 저장 완료 — 검수 상태가 ' +
+          reviewStatusLabel(
+            data.reviewStatus || 'TRANSFORMED'
+          ) +
+          '로 변경되었습니다.',
+        'ok'
+      )
+    } catch (error) {
+      setTransformStatus(
+        error && error.message
+          ? error.message
+          : '게임 등록 초안 저장에 실패했습니다.',
+        'err'
+      )
+    } finally {
+      transformActionRunning = false
+
+      if (button) {
+        button.disabled = false
+        button.textContent = '초안 저장'
+      }
+    }
+  }
 
   
   function renderSummary(summary) {
