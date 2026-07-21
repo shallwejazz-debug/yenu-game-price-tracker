@@ -19,6 +19,7 @@
   let transformActionRunning = false
   let registerDraftRunning = false  
   let imageActionRunning = false
+  let imageStoreRunning = false
 
 
   function escapeHtml(value) {
@@ -1001,7 +1002,7 @@ async function readAllWatcherEvents() {
       selectedText &&
       selectedImage
     ) {
-      selectedText.textContent =
+          selectedText.textContent =
         '이미지 #' +
         Number(selectedImage.id || 0) +
         ' · ' +
@@ -1012,7 +1013,15 @@ async function readAllWatcherEvents() {
         String(
           selectedImage.permission_status ||
           'PENDING'
+        ) +
+        (
+          selectedImage.stored_image_url
+            ? ' · 비공개 R2 저장 완료'
+            : ' · R2 미저장'
         )
+
+
+      
     }
 
     if (!list.length) {
@@ -1044,6 +1053,12 @@ async function readAllWatcherEvents() {
             image.selected_for_publish || 0
           ) === 1
 
+        const stored = Boolean(
+          String(
+            image.stored_image_url || ''
+          ).trim()
+        )
+
         const permissionStatus = String(
           image.permission_status ||
           'PENDING'
@@ -1060,6 +1075,26 @@ async function readAllWatcherEvents() {
           Number.isInteger(imageId) &&
           imageId > 0
 
+        const localStorageAllowed =
+          Number(
+            policy &&
+            policy.local_storage_allowed != null
+              ? policy.local_storage_allowed
+              : (
+                item &&
+                item.local_storage_allowed != null
+                  ? item.local_storage_allowed
+                  : 0
+              )
+          ) === 1
+
+        const storable =
+          selected &&
+          selectable &&
+          permissionStatus === 'APPROVED' &&
+          localStorageAllowed
+
+        
         let hostName = '공식 이미지'
 
         if (sourceUrl) {
@@ -1123,8 +1158,16 @@ async function readAllWatcherEvents() {
                 ) +
               '</span>' +
 
-              '<span>개별 상태: ' +
+                            '<span>개별 상태: ' +
                 escapeHtml(permissionStatus) +
+              '</span>' +
+
+              '<span>비공개 저장: ' +
+                escapeHtml(
+                  stored
+                    ? 'R2 저장 완료'
+                    : '미저장'
+                ) +
               '</span>' +
 
               '<span>출처: ' +
@@ -1156,7 +1199,6 @@ async function readAllWatcherEvents() {
                 imageTypeOptions(currentType) +
               '</select>' +
             '</label>' +
-
             '<button ' +
               'type="button" ' +
               'class="btn btn-sm ' +
@@ -1176,6 +1218,27 @@ async function readAllWatcherEvents() {
                   )
               ) +
             '</button>' +
+
+            (
+              selected
+                ? (
+                  '<button ' +
+                    'type="button" ' +
+                    'class="btn btn-sm" ' +
+                    'data-watcher-image-store="' +
+                      escapeHtml(imageId) +
+                    '"' +
+                    (storable ? '' : ' disabled') +
+                  '>' +
+                    (
+                      stored
+                        ? '비공개 R2에 다시 저장'
+                        : '비공개 R2 저장'
+                    ) +
+                  '</button>'
+                )
+                : ''
+            ) +
           '</article>'
         )
       })
@@ -1191,11 +1254,21 @@ async function readAllWatcherEvents() {
         '출처의 이미지 사용 정책이 승인되지 않았습니다.',
         'err'
       )
-    } else if (selectedImage) {
+        } else if (selectedImage) {
+      const selectedStored = Boolean(
+        String(
+          selectedImage.stored_image_url ||
+          ''
+        ).trim()
+      )
+
       setTransformImageStatus(
-        '대표 이미지 후보가 선택되어 있습니다. 아직 다운로드하거나 공개하지 않았습니다.',
+        selectedStored
+          ? '대표 이미지가 비공개 R2에 저장되어 있습니다. 게임은 아직 공개되지 않았습니다.'
+          : '대표 이미지 후보가 선택되어 있습니다. 비공개 R2 저장을 진행할 수 있습니다.',
         'ok'
       )
+
     } else {
       setTransformImageStatus(
         '공식 원본을 확인하고 이미지 유형을 선택해 주세요.',
@@ -1374,6 +1447,156 @@ async function readAllWatcherEvents() {
       }
     } finally {
       imageActionRunning = false
+    }
+  }
+
+  async function storeWatcherImage(
+    imageIdValue
+  ) {
+    if (
+      imageStoreRunning ||
+      imageActionRunning
+    ) {
+      return
+    }
+
+    const imageId = Number(
+      imageIdValue
+    )
+
+    const itemIdElement =
+      $('watcherTransformItemId')
+
+    const itemId = Number(
+      itemIdElement
+        ? itemIdElement.value
+        : 0
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      setTransformImageStatus(
+        '보도자료 항목 정보가 올바르지 않습니다.',
+        'err'
+      )
+
+      return
+    }
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      setTransformImageStatus(
+        '이미지 후보 정보가 올바르지 않습니다.',
+        'err'
+      )
+
+      return
+    }
+
+    const imageList =
+      $('watcherTransformImageList')
+
+    if (!imageList) return
+
+    const button =
+      imageList.querySelector(
+        '[data-watcher-image-store="' +
+          imageId +
+        '"]'
+      )
+
+    const confirmed = window.confirm(
+      '선택된 대표 이미지 #' +
+        imageId +
+        '의 공식 원본을 비공개 R2에 저장할까요?\n\n' +
+        '파일 형식과 용량, 이미지 권한을 서버에서 다시 검증합니다.\n' +
+        '게임은 계속 DRAFT 상태이며 공개 이미지는 변경되지 않습니다.'
+    )
+
+    if (!confirmed) return
+
+    imageStoreRunning = true
+
+    if (button) {
+      button.disabled = true
+      button.textContent =
+        '비공개 저장 중...'
+    }
+
+    setTransformImageStatus(
+      '공식 이미지 원본을 확인하고 비공개 R2에 저장하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/items/' +
+          itemId +
+          '/images/' +
+          imageId +
+          '/store',
+        {
+          method: 'POST'
+        }
+      )
+
+      await openWatcherTransform(
+        itemId
+      )
+
+      const rawSize = Number(
+        data.size || 0
+      )
+
+      const sizeText =
+        rawSize >= 1024 * 1024
+          ? (
+            rawSize /
+            (1024 * 1024)
+          ).toFixed(2) + 'MB'
+          : rawSize >= 1024
+            ? (
+              rawSize / 1024
+            ).toFixed(1) + 'KB'
+            : String(rawSize) + 'B'
+
+      setTransformImageStatus(
+        (
+          data.alreadyStored
+            ? '이미 비공개 R2에 저장된 이미지입니다.'
+            : '대표 이미지를 비공개 R2에 저장했습니다.'
+        ) +
+          ' 이미지 #' +
+          imageId +
+          ' · ' +
+          String(
+            data.contentType ||
+            'image'
+          ) +
+          ' · ' +
+          sizeText +
+          ' · 게임은 계속 DRAFT 상태입니다.',
+        'ok'
+      )
+    } catch (error) {
+      setTransformImageStatus(
+        error && error.message
+          ? error.message
+          : '비공개 R2 저장에 실패했습니다.',
+        'err'
+      )
+
+      if (button) {
+        button.disabled = false
+        button.textContent =
+          '비공개 R2 저장'
+      }
+    } finally {
+      imageStoreRunning = false
     }
   }
 
@@ -2256,6 +2479,24 @@ async function readAllWatcherEvents() {
           return
         }
 
+        const storeButton =
+          target.closest(
+            '[data-watcher-image-store]'
+          )
+
+        if (
+          storeButton &&
+          imageList.contains(storeButton)
+        ) {
+          storeWatcherImage(
+            storeButton.getAttribute(
+              'data-watcher-image-store'
+            )
+          )
+
+          return
+        }
+
         const selectButton =
           target.closest(
             '[data-watcher-image-select]'
@@ -2276,6 +2517,8 @@ async function readAllWatcherEvents() {
       }
     )
   }
+
+   
 
   if (closeTransformButton) {
     closeTransformButton.addEventListener(
