@@ -733,6 +733,58 @@ export function AdminPage(): string {
       ></p>
     </div>
 
+        <div
+      id="watcherTransformPrivatePreview"
+      class="watcher-private-preview admin-notice"
+      hidden
+    >
+      <div class="admin-section-head">
+        <div>
+          <strong>🔒 비공개 R2 이미지 미리보기</strong>
+
+          <p class="admin-hint">
+            관리자 인증 API를 통해 비공개 R2 이미지를 임시로
+            불러옵니다. 이 미리보기는 공개 URL이 아닙니다.
+          </p>
+        </div>
+
+        <button
+          id="loadWatcherPrivatePreview"
+          class="btn btn-sm"
+          type="button"
+          disabled
+        >
+          관리자 미리보기 불러오기
+        </button>
+      </div>
+
+      <div
+        id="watcherTransformPreviewFrame"
+        class="watcher-private-preview-frame"
+        hidden
+      >
+        <img
+          id="watcherTransformPreviewImage"
+          class="watcher-private-preview-image"
+          alt="선택된 게임 대표 이미지 비공개 미리보기"
+        />
+      </div>
+
+      <p
+        id="watcherTransformPreviewInfo"
+        class="admin-hint"
+      >
+        저장된 대표 이미지를 선택해 주세요.
+      </p>
+
+      <p
+        id="watcherTransformPreviewStatus"
+        class="admin-status"
+        aria-live="polite"
+      ></p>
+    </div>
+
+
     <div
       id="watcherTransformImageList"
       class="watcher-transform-image-grid"
