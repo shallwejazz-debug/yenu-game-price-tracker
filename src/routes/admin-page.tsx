@@ -350,24 +350,7 @@ export function AdminPage(): string {
       </section>
     </section>
 
-      <button
-        type="button"
-        class="admin-tab"
-        data-admin-tab="watcher"
-        aria-selected="false"
-      >
-        <span class="admin-tab-icon">📡</span>
-        <span>예판 WATCHER</span>
-        <span
-          id="watcherTabBadge"
-          class="admin-tab-badge"
-          hidden
-        >
-          0
-        </span>
-      </button>
-
-    <!-- ====================================================
+      <!-- ====================================================
          탭 2: 예판 WATCHER
          ==================================================== -->
     <section
