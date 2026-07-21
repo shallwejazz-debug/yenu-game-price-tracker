@@ -1701,9 +1701,6 @@ async function readAllWatcherEvents() {
 
     const imageList =
       $('watcherTransformImageList')
-    const privatePreviewButton =
-    $('loadWatcherPrivatePreview')
-
 
     if (!imageList) return
 
@@ -2798,6 +2795,9 @@ async function readAllWatcherEvents() {
   const imageList =
     $('watcherTransformImageList')
 
+  const privatePreviewButton =
+    $('loadWatcherPrivatePreview')
+
   const saveTransformButton =
     $('saveWatcherTransform')
 
@@ -2909,7 +2909,6 @@ async function readAllWatcherEvents() {
   }
 
    
-
   if (closeTransformButton) {
     closeTransformButton.addEventListener(
       'click',
