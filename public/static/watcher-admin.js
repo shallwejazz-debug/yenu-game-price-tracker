@@ -21,7 +21,12 @@
   let imageActionRunning = false
   let imageStoreRunning = false
   let imagePreviewRunning = false
-  let watcherPreviewObjectUrl = ''
+  let watcherPreviewObjectUrl = ''  
+  let watcherFinalReviewContext = {
+    item: null,
+    selectedImage: null
+  }
+
 
 
 
@@ -759,6 +764,8 @@ async function readAllWatcherEvents() {
     setTransformImageStatus('', '')
     setRegisterDraftButton('', null)
     clearWatcherPrivatePreview(true)
+    clearWatcherFinalReview()
+
 
 
     const imageList =
@@ -939,6 +946,312 @@ async function readAllWatcherEvents() {
     }
   }
 
+    function watcherTransformFieldValue(id) {
+    const element = $(id)
+
+    return element
+      ? String(element.value || '').trim()
+      : ''
+  }
+
+  function watcherPlatformLabel(value) {
+    const labels = {
+      switch: 'Nintendo Switch',
+      ps5: 'PlayStation 5',
+      ps4: 'PlayStation 4',
+      xbox: 'Xbox',
+      pc: 'PC',
+      etc: '기타'
+    }
+
+    return labels[value] || value || '플랫폼 미입력'
+  }
+
+  function watcherWon(value) {
+    const price = Number(value)
+
+    if (
+      !Number.isInteger(price) ||
+      price <= 0
+    ) {
+      return '미확정'
+    }
+
+    return (
+      '₩' +
+      price.toLocaleString('ko-KR')
+    )
+  }
+
+  function clearWatcherFinalReview() {
+    watcherFinalReviewContext = {
+      item: null,
+      selectedImage: null
+    }
+
+    const panel = $('watcherFinalReview')
+    const image = $('watcherFinalImage')
+    const placeholder =
+      $('watcherFinalImagePlaceholder')
+
+    if (panel) {
+      panel.hidden = true
+    }
+
+    if (image) {
+      image.hidden = true
+      image.removeAttribute('src')
+    }
+
+    if (placeholder) {
+      placeholder.hidden = false
+    }
+  }
+
+  function renderWatcherFinalReview() {
+    const panel = $('watcherFinalReview')
+    if (!panel) return
+
+    const item =
+      watcherFinalReviewContext.item || {}
+
+    const gameId = Number(
+      item.linked_game_id || 0
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      panel.hidden = true
+      return
+    }
+
+    panel.hidden = false
+
+    const title =
+      watcherTransformFieldValue(
+        'watcherTransformTitle'
+      )
+
+    const platform =
+      watcherTransformFieldValue(
+        'watcherTransformPlatform'
+      )
+
+    const editionName =
+      watcherTransformFieldValue(
+        'watcherTransformEditionName'
+      )
+
+    const genre =
+      watcherTransformFieldValue(
+        'watcherTransformGenre'
+      )
+
+    const releaseDate =
+      watcherTransformFieldValue(
+        'watcherTransformReleaseDate'
+      )
+
+    const preorderStart =
+      watcherTransformFieldValue(
+        'watcherTransformPreorderStart'
+      )
+
+    const preorderEnd =
+      watcherTransformFieldValue(
+        'watcherTransformPreorderEnd'
+      )
+
+    const candidatePrice =
+      watcherTransformFieldValue(
+        'watcherTransformCandidatePrice'
+      )
+
+    const bonus =
+      watcherTransformFieldValue(
+        'watcherTransformBonus'
+      )
+
+    const bonusNote =
+      watcherTransformFieldValue(
+        'watcherTransformBonusNote'
+      )
+
+    const trailerUrl = safeUrl(
+      watcherTransformFieldValue(
+        'watcherTransformTrailer'
+      )
+    )
+
+    const sourceUrl = safeUrl(
+      item.source_url || ''
+    )
+
+    const sourceName = String(
+      item.source_name || ''
+    ).trim()
+
+    const credit = String(
+      item.required_credit || ''
+    ).trim()
+
+    const copyright = String(
+      item.required_copyright || ''
+    ).trim()
+
+    const preorderPeriod =
+      preorderStart && preorderEnd
+        ? preorderStart + ' ~ ' + preorderEnd
+        : (
+          preorderStart
+            ? preorderStart + '부터'
+            : (
+              preorderEnd
+                ? preorderEnd + '까지'
+                : '-'
+            )
+        )
+
+    const setReviewText = function (
+      id,
+      value
+    ) {
+      const element = $(id)
+
+      if (element) {
+        element.textContent = value
+      }
+    }
+
+    setReviewText(
+      'watcherFinalTitle',
+      title || '게임 제목 미입력'
+    )
+
+    setReviewText(
+      'watcherFinalPlatform',
+      watcherPlatformLabel(platform)
+    )
+
+    setReviewText(
+      'watcherFinalGameId',
+      '게임 #' + gameId + ' · DRAFT'
+    )
+
+    setReviewText(
+      'watcherFinalEdition',
+      editionName || '에디션 표시명 미입력'
+    )
+
+    setReviewText(
+      'watcherFinalReleaseDate',
+      releaseDate || '-'
+    )
+
+    setReviewText(
+      'watcherFinalPreorderPeriod',
+      preorderPeriod
+    )
+
+    setReviewText(
+      'watcherFinalPrice',
+      watcherWon(candidatePrice)
+    )
+
+    setReviewText(
+      'watcherFinalGenre',
+      genre || '-'
+    )
+
+    setReviewText(
+      'watcherFinalBonus',
+      bonus || '등록된 특전 정보가 없습니다.'
+    )
+
+    setReviewText(
+      'watcherFinalBonusNote',
+      bonusNote
+    )
+
+    setReviewText(
+      'watcherFinalCredit',
+      credit ||
+        (
+          sourceName
+            ? '이미지 및 정보 출처: ' +
+              sourceName
+            : '출처 정보를 확인해 주세요.'
+        )
+    )
+
+    setReviewText(
+      'watcherFinalCopyright',
+      copyright
+    )
+
+    const sourceLink =
+      $('watcherFinalSourceLink')
+
+    if (sourceLink) {
+      sourceLink.hidden = !sourceUrl
+
+      if (sourceUrl) {
+        sourceLink.href = sourceUrl
+      } else {
+        sourceLink.removeAttribute('href')
+      }
+    }
+
+    const trailerLink =
+      $('watcherFinalTrailerLink')
+
+    if (trailerLink) {
+      trailerLink.hidden = !trailerUrl
+
+      if (trailerUrl) {
+        trailerLink.href = trailerUrl
+      } else {
+        trailerLink.removeAttribute('href')
+      }
+    }
+
+    const reviewImage =
+      $('watcherFinalImage')
+
+    const placeholder =
+      $('watcherFinalImagePlaceholder')
+
+    if (
+      reviewImage &&
+      watcherPreviewObjectUrl
+    ) {
+      reviewImage.src =
+        watcherPreviewObjectUrl
+
+      reviewImage.alt =
+        (title || '게임') +
+        ' 대표 이미지 최종 검수'
+
+      reviewImage.hidden = false
+
+      if (placeholder) {
+        placeholder.hidden = true
+      }
+    } else {
+      if (reviewImage) {
+        reviewImage.hidden = true
+        reviewImage.removeAttribute('src')
+      }
+
+      if (placeholder) {
+        placeholder.hidden = false
+      }
+    }
+  }
+
+  
   
   function setTransformImageStatus(
     message,
@@ -1123,6 +1436,14 @@ async function readAllWatcherEvents() {
         )
       }
     )
+
+
+      watcherFinalReviewContext = {
+      item: item || null,
+      selectedImage: selectedImage || null
+    }
+
+    renderWatcherFinalReview()
 
     configureWatcherPrivatePreview(
       selectedImage || null
@@ -1598,6 +1919,8 @@ async function readAllWatcherEvents() {
       if (frame) {
         frame.hidden = false
       }
+
+      renderWatcherFinalReview()
 
       const sizeText =
         blob.size >= 1024 * 1024
@@ -2907,6 +3230,38 @@ async function readAllWatcherEvents() {
       loadWatcherPrivatePreview
     )
   }
+
+       const finalReviewFieldIds = [
+      'watcherTransformTitle',
+      'watcherTransformPlatform',
+      'watcherTransformEditionName',
+      'watcherTransformGenre',
+      'watcherTransformReleaseDate',
+      'watcherTransformPreorderStart',
+      'watcherTransformPreorderEnd',
+      'watcherTransformCandidatePrice',
+      'watcherTransformBonus',
+      'watcherTransformBonusNote',
+      'watcherTransformTrailer'
+    ]
+
+    finalReviewFieldIds.forEach(
+      function (id) {
+        const element = $(id)
+
+        if (!element) return
+
+        element.addEventListener(
+          'input',
+          renderWatcherFinalReview
+        )
+
+        element.addEventListener(
+          'change',
+          renderWatcherFinalReview
+        )
+      }
+    )
 
    
   if (closeTransformButton) {
