@@ -66,15 +66,44 @@
     button.textContent = busy ? '불러오는 중...' : '새로고침'
   }
 
-  async function watcherApi(path) {
+  async function watcherApi(path, options) {
     const token = localStorage.getItem(TOKEN_KEY) || ''
+    const requestOptions = options || {}
 
     const response = await fetch(path, {
-      method: 'GET',
+      method: requestOptions.method || 'GET',
       headers: {
-        'X-Admin-Token': token
-      }
+        'X-Admin-Token': token,
+        'Content-Type': 'application/json'
+      },
+      body: requestOptions.body
+        ? JSON.stringify(requestOptions.body)
+        : undefined
     })
+
+    let data
+
+    try {
+      data = await response.json()
+    } catch (error) {
+      throw new Error('WATCHER 응답을 읽을 수 없습니다.')
+    }
+
+    if (response.status === 401) {
+      throw new Error('관리자 인증이 만료되었습니다.')
+    }
+
+    if (!response.ok || !data || data.ok === false) {
+      throw new Error(
+        data && (data.error || data.message)
+          ? data.error || data.message
+          : 'WATCHER 요청에 실패했습니다.'
+      )
+    }
+
+    return data
+  }
+
 
     let data
 
@@ -381,6 +410,67 @@
       })
       .join('')
   }
+  async function runArcCollector() {
+    const button = $('collectArcWatcher')
+
+    if (!button || watcherLoading) return
+
+    const confirmed = window.confirm(
+      '아크시스템웍스아시아 공식 보도자료를 수집할까요?\n\n' +
+      '이미지는 공개하거나 다운로드하지 않고 공식 URL 후보만 기록합니다.'
+    )
+
+    if (!confirmed) return
+
+    watcherLoading = true
+    button.disabled = true
+    button.textContent = '수집 중...'
+
+    setStatus(
+      '아크시스템웍스아시아 보도자료를 확인하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/collect/arc-system-works',
+        {
+          method: 'POST'
+        }
+      )
+
+      const result = data.result || {}
+
+      watcherLoaded = false
+      watcherLoading = false
+
+      await loadWatcher(true)
+
+      setStatus(
+        '아크 수집 완료 — ' +
+        '신규 ' + Number(result.created || 0) + '개, ' +
+        '변경 ' + Number(result.updated || 0) + '개, ' +
+        '기존 ' + Number(result.unchanged || 0) + '개, ' +
+        '이미지 후보 ' +
+        Number(result.imagesCreated || 0) +
+        '개',
+        'ok'
+      )
+    } catch (error) {
+      watcherLoading = false
+
+      setStatus(
+        error && error.message
+          ? error.message
+          : '아크 수집에 실패했습니다.',
+        'err'
+      )
+    } finally {
+      button.disabled = false
+      button.textContent = '아크 수집 실행'
+    }
+  }
+
 
   async function loadWatcher(force) {
     if (watcherLoading) return
@@ -439,6 +529,8 @@
 
   function init() {
     const refreshButton = $('refreshWatcher')
+    const collectArcButton = $('collectArcWatcher')
+
     const watcherTab = document.querySelector(
       '[data-admin-tab="watcher"]'
     )
@@ -448,6 +540,14 @@
         loadWatcher(true)
       })
     }
+
+    if (collectArcButton) {
+      collectArcButton.addEventListener(
+        'click',
+        runArcCollector
+      )
+    }
+
 
     if (watcherTab) {
       watcherTab.addEventListener('click', function () {
