@@ -775,6 +775,401 @@ watcherAdmin.get('/items/:id', async (c) => {
 })
 
 // ------------------------------------------------------------
+// WATCHER 항목을 게임 등록 초안으로 변환
+//
+// 초안만 저장하며 실제 games 테이블에는 등록하지 않음
+// 이미지 선택·다운로드·공개도 하지 않음
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/items/:id/transform',
+  async (c) => {
+    const id = Number(c.req.param('id'))
+
+    if (
+      !Number.isInteger(id) ||
+      id <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    const body = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => null)
+
+    if (!body) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid JSON body',
+        },
+        400
+      )
+    }
+
+    const text = (
+      value: unknown
+    ): string => {
+      return String(value ?? '').trim()
+    }
+
+    const isDate = (
+      value: string
+    ): boolean => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return false
+      }
+
+      const parts = value
+        .split('-')
+        .map(Number)
+
+      const year = parts[0]
+      const month = parts[1]
+      const day = parts[2]
+
+      const date = new Date(
+        Date.UTC(year, month - 1, day)
+      )
+
+      return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() === month - 1 &&
+        date.getUTCDate() === day
+      )
+    }
+
+    const isHttpUrl = (
+      value: string
+    ): boolean => {
+      if (!value) return true
+
+      try {
+        const url = new URL(value)
+
+        return (
+          url.protocol === 'http:' ||
+          url.protocol === 'https:'
+        )
+      } catch (error) {
+        return false
+      }
+    }
+
+    const title = text(body.title)
+    const platform = text(body.platform)
+      .toLowerCase()
+
+    const editionName =
+      text(body.editionName)
+
+    const genre = text(body.genre)
+
+    const releaseDate =
+      text(body.releaseDate)
+
+    const preorderStartDate =
+      text(body.preorderStartDate)
+
+    const preorderEndDate =
+      text(body.preorderEndDate)
+
+    const preorderBonus =
+      text(body.preorderBonus)
+
+    const preorderBonusNote =
+      text(body.preorderBonusNote)
+
+    const trailerUrl =
+      text(body.trailerUrl)
+
+    const rawCandidatePrice =
+      body.candidatePrice
+
+    const candidatePrice =
+      rawCandidatePrice == null ||
+      rawCandidatePrice === ''
+        ? null
+        : Number(rawCandidatePrice)
+
+    const allowedPlatforms = new Set([
+      'pc',
+      'ps5',
+      'ps4',
+      'xbox',
+      'switch',
+      'etc',
+    ])
+
+    if (!title) {
+      return c.json(
+        {
+          ok: false,
+          error: 'title is required',
+        },
+        400
+      )
+    }
+
+    if (!allowedPlatforms.has(platform)) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid platform',
+        },
+        400
+      )
+    }
+
+    if (
+      !releaseDate ||
+      !isDate(releaseDate)
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'releaseDate must be YYYY-MM-DD',
+        },
+        400
+      )
+    }
+
+    if (
+      preorderStartDate &&
+      !isDate(preorderStartDate)
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'preorderStartDate must be YYYY-MM-DD',
+        },
+        400
+      )
+    }
+
+    if (
+      preorderEndDate &&
+      !isDate(preorderEndDate)
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'preorderEndDate must be YYYY-MM-DD',
+        },
+        400
+      )
+    }
+
+    if (
+      preorderStartDate &&
+      preorderEndDate &&
+      preorderStartDate > preorderEndDate
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'preorder start date cannot be after end date',
+        },
+        400
+      )
+    }
+
+    if (!isHttpUrl(trailerUrl)) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid trailer URL',
+        },
+        400
+      )
+    }
+
+    if (
+      candidatePrice != null &&
+      (
+        !Number.isInteger(candidatePrice) ||
+        candidatePrice <= 0
+      )
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'candidatePrice must be a positive integer',
+        },
+        400
+      )
+    }
+
+    const item = await c.env.DB.prepare(`
+      SELECT
+        wi.id,
+        wi.source_id,
+        wi.source_url,
+        wi.title AS source_title,
+        wi.published_at,
+
+        ws.source_key,
+        ws.source_name,
+
+        p.permission_status,
+        p.required_credit,
+        p.required_copyright
+
+      FROM watch_items wi
+
+      INNER JOIN watch_sources ws
+        ON ws.id = wi.source_id
+
+      LEFT JOIN source_image_policies p
+        ON p.source_id = wi.source_id
+
+      WHERE wi.id = ?
+
+      LIMIT 1
+    `)
+      .bind(id)
+      .first<{
+        id: number
+        source_id: number
+        source_url: string
+        source_title: string
+        published_at: string | null
+        source_key: string
+        source_name: string
+        permission_status: string | null
+        required_credit: string | null
+        required_copyright: string | null
+      }>()
+
+    if (!item) {
+      return c.json(
+        {
+          ok: false,
+          error: 'watcher item not found',
+        },
+        404
+      )
+    }
+
+    const sourceCredit =
+      text(item.required_credit) ||
+      (
+        '이미지 및 정보 출처: ' +
+        item.source_name
+      )
+
+    const draft = {
+      schemaVersion: 1,
+
+      watchItemId: item.id,
+
+      title,
+      platform,
+      editionName,
+      genre,
+
+      releaseDate,
+
+      preorderStartDate:
+        preorderStartDate || null,
+
+      preorderEndDate:
+        preorderEndDate || null,
+
+      preorderBonus:
+        preorderBonus || null,
+
+      preorderBonusNote:
+        preorderBonusNote || null,
+
+      trailerUrl:
+        trailerUrl || null,
+
+      officialSourceUrl:
+        item.source_url,
+
+      sourceTitle:
+        item.source_title,
+
+      sourcePublishedAt:
+        item.published_at,
+
+      sourceKey:
+        item.source_key,
+
+      sourceName:
+        item.source_name,
+
+      sourceCredit,
+
+      requiredCopyright:
+        item.required_copyright || null,
+
+      sourcePermissionStatus:
+        item.permission_status || 'PENDING',
+
+      priceStatus:
+        candidatePrice == null
+          ? 'UNCONFIRMED'
+          : 'CANDIDATE',
+
+      candidatePrice,
+
+      selectedImageId: null,
+
+      imagePermissionStatus: 'PENDING',
+
+      publishStatus: 'DRAFT',
+
+      transformedAt:
+        new Date().toISOString(),
+    }
+
+    const result = await c.env.DB.prepare(`
+      UPDATE watch_items
+
+      SET
+        transformed_json = ?,
+        transform_confidence = ?,
+        review_status = 'TRANSFORMED',
+        reviewed_at = NULL,
+        error_message = NULL,
+        updated_at = CURRENT_TIMESTAMP
+
+      WHERE id = ?
+    `)
+      .bind(
+        JSON.stringify(draft),
+        1,
+        id
+      )
+      .run()
+
+    return c.json({
+      ok: true,
+      itemId: id,
+      changed: Number(
+        result.meta.changes || 0
+      ),
+      reviewStatus: 'TRANSFORMED',
+      draft,
+    })
+  }
+)
+
+
+// ------------------------------------------------------------
 // 아크시스템웍스아시아 수동 수집 실행
 // ------------------------------------------------------------
 
