@@ -14,6 +14,7 @@
 
   let watcherLoaded = false
   let watcherLoading = false
+  let collectorRunning = false
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -26,9 +27,15 @@
 
   function safeUrl(value) {
     try {
-      const url = new URL(String(value || ''), window.location.origin)
+      const url = new URL(
+        String(value || ''),
+        window.location.origin
+      )
 
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      if (
+        url.protocol !== 'http:' &&
+        url.protocol !== 'https:'
+      ) {
         return ''
       }
 
@@ -42,7 +49,9 @@
     const element = $(id)
 
     if (element) {
-      element.textContent = String(value == null ? 0 : value)
+      element.textContent = String(
+        value == null ? 0 : value
+      )
     }
   }
 
@@ -63,49 +72,129 @@
     if (!button) return
 
     button.disabled = busy
-    button.textContent = busy ? '불러오는 중...' : '새로고침'
+    button.textContent = busy
+      ? '불러오는 중...'
+      : '새로고침'
   }
 
   async function watcherApi(path, options) {
-    const token = localStorage.getItem(TOKEN_KEY) || ''
-    const requestOptions = options || {}
+    const token =
+      window.localStorage.getItem(TOKEN_KEY) || ''
 
-    const response = await fetch(path, {
-      method: requestOptions.method || 'GET',
-      headers: {
-        'X-Admin-Token': token,
-        'Content-Type': 'application/json'
-      },
-      body: requestOptions.body
-        ? JSON.stringify(requestOptions.body)
-        : undefined
+    if (!token) {
+      throw new Error(
+        '관리자 토큰이 없습니다. 관리자 로그인을 다시 확인해 주세요.'
+      )
+    }
+
+    const requestOptions = options || {}
+    const headers = new Headers(
+      requestOptions.headers || {}
+    )
+
+    headers.set('X-Admin-Token', token)
+
+    if (
+      requestOptions.body &&
+      !headers.has('Content-Type')
+    ) {
+      headers.set('Content-Type', 'application/json')
+    }
+
+    const response = await window.fetch(path, {
+      ...requestOptions,
+      headers
     })
 
-    let data
+    let data = {}
 
     try {
       data = await response.json()
     } catch (error) {
-      throw new Error('WATCHER 응답을 읽을 수 없습니다.')
+      data = {}
     }
 
-    if (response.status === 401) {
-      throw new Error('관리자 인증이 만료되었습니다.')
-    }
-
-    if (!response.ok || !data || data.ok === false) {
+    if (!response.ok || data.ok === false) {
       throw new Error(
-        data && (data.error || data.message)
-          ? data.error || data.message
-          : 'WATCHER 요청에 실패했습니다.'
+        data.error ||
+        data.message ||
+        'WATCHER 요청에 실패했습니다. (' +
+          response.status +
+          ')'
       )
     }
 
     return data
   }
 
+  async function runArcCollector() {
+    const button = $('collectArcWatcher')
+
+    if (!button || collectorRunning) return
+
+    const confirmed = window.confirm(
+      '아크시스템웍스아시아 공식 보도자료를 수집할까요?\n\n' +
+      '이미지는 공개하거나 다운로드하지 않고 공식 URL 후보만 기록합니다.'
+    )
+
+    if (!confirmed) return
+
+    collectorRunning = true
+    button.disabled = true
+    button.textContent = '수집 중...'
+
+    setStatus(
+      '아크시스템웍스아시아 보도자료를 확인하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const data = await watcherApi(
+        '/admin/api/watcher/collect/arc-system-works',
+        {
+          method: 'POST'
+        }
+      )
+
+      const result = data.result || {}
+
+      watcherLoaded = false
+      await loadWatcher(true)
+
+      setStatus(
+        '아크 수집 완료 — ' +
+        '신규 ' +
+        Number(result.created || 0) +
+        '개, ' +
+        '변경 ' +
+        Number(result.updated || 0) +
+        '개, ' +
+        '기존 ' +
+        Number(result.unchanged || 0) +
+        '개, ' +
+        '이미지 후보 ' +
+        Number(result.imagesCreated || 0) +
+        '개',
+        'ok'
+      )
+    } catch (error) {
+      setStatus(
+        error && error.message
+          ? error.message
+          : '아크 수집에 실패했습니다.',
+        'err'
+      )
+    } finally {
+      collectorRunning = false
+      button.disabled = false
+      button.textContent = '아크 수집 실행'
+    }
+  }
+
   function permissionInfo(status) {
-    const normalized = String(status || 'PENDING').toUpperCase()
+    const normalized = String(
+      status || 'PENDING'
+    ).toUpperCase()
 
     const labels = {
       PENDING: {
@@ -158,17 +247,38 @@
   function renderSummary(summary) {
     const data = summary || {}
 
-    setText('watcherEnabledSources', data.enabled_sources || 0)
-    setText('watcherDiscoveredItems', data.discovered_items || 0)
-    setText('watcherTransformedItems', data.transformed_items || 0)
-    setText('watcherReviewingItems', data.reviewing_items || 0)
+    setText(
+      'watcherEnabledSources',
+      data.enabled_sources || 0
+    )
+
+    setText(
+      'watcherDiscoveredItems',
+      data.discovered_items || 0
+    )
+
+    setText(
+      'watcherTransformedItems',
+      data.transformed_items || 0
+    )
+
+    setText(
+      'watcherReviewingItems',
+      data.reviewing_items || 0
+    )
+
     setText(
       'watcherPendingPermissions',
       data.pending_permissions || 0
     )
-    setText('watcherUnreadEvents', data.unread_events || 0)
+
+    setText(
+      'watcherUnreadEvents',
+      data.unread_events || 0
+    )
 
     const badge = $('watcherTabBadge')
+
     const count =
       Number(data.discovered_items || 0) +
       Number(data.reviewing_items || 0) +
@@ -189,6 +299,7 @@
         '<div class="admin-empty">' +
           '등록된 수집 출처가 없습니다.' +
         '</div>'
+
       return
     }
 
@@ -237,6 +348,7 @@
                   escapeHtml(source.source_key) +
                 '</span>' +
               '</div>' +
+
               '<div class="watcher-source-badges">' +
                 enabled +
                 '<span class="watcher-badge watcher-permission-' +
@@ -252,8 +364,9 @@
                 '<dt>수집 방식</dt>' +
                 '<dd>' +
                   escapeHtml(
-                    String(source.collection_mode || 'manual')
-                      .toUpperCase()
+                    String(
+                      source.collection_mode || 'manual'
+                    ).toUpperCase()
                   ) +
                 '</dd>' +
               '</div>' +
@@ -273,7 +386,9 @@
                 '<dt>자체 저장</dt>' +
                 '<dd>' +
                   escapeHtml(
-                    booleanLabel(source.local_storage_allowed)
+                    booleanLabel(
+                      source.local_storage_allowed
+                    )
                   ) +
                 '</dd>' +
               '</div>' +
@@ -281,7 +396,9 @@
               '<div>' +
                 '<dt>리사이즈</dt>' +
                 '<dd>' +
-                  escapeHtml(booleanLabel(source.resize_allowed)) +
+                  escapeHtml(
+                    booleanLabel(source.resize_allowed)
+                  ) +
                 '</dd>' +
               '</div>' +
             '</dl>' +
@@ -315,8 +432,9 @@
       container.innerHTML =
         '<div class="admin-empty">' +
           '아직 발견된 보도자료가 없습니다.<br>' +
-          '다음 단계에서 수집기를 연결하면 여기에 자동으로 표시됩니다.' +
+          '수집기를 실행하면 여기에 자동으로 표시됩니다.' +
         '</div>'
+
       return
     }
 
@@ -341,7 +459,9 @@
             '<div class="watcher-item-main">' +
               '<div class="watcher-item-top">' +
                 '<span class="watcher-badge">' +
-                  escapeHtml(item.source_name || item.source_key) +
+                  escapeHtml(
+                    item.source_name || item.source_key
+                  ) +
                 '</span>' +
 
                 '<span class="watcher-badge watcher-review-status">' +
@@ -360,7 +480,11 @@
               '</div>' +
 
               '<strong class="watcher-item-title">' +
-                escapeHtml(item.title || item.raw_title || '제목 없음') +
+                escapeHtml(
+                  item.title ||
+                  item.raw_title ||
+                  '제목 없음'
+                ) +
               '</strong>' +
 
               '<div class="watcher-item-meta">' +
@@ -370,7 +494,7 @@
 
                 '<span>이미지 후보: ' +
                   escapeHtml(item.image_count || 0) +
-                '개</span>' +
+                  '개</span>' +
 
                 '<span>유형: ' +
                   escapeHtml(item.event_type || '-') +
@@ -386,67 +510,6 @@
       })
       .join('')
   }
-  async function runArcCollector() {
-    const button = $('collectArcWatcher')
-
-    if (!button || watcherLoading) return
-
-    const confirmed = window.confirm(
-      '아크시스템웍스아시아 공식 보도자료를 수집할까요?\n\n' +
-      '이미지는 공개하거나 다운로드하지 않고 공식 URL 후보만 기록합니다.'
-    )
-
-    if (!confirmed) return
-
-    watcherLoading = true
-    button.disabled = true
-    button.textContent = '수집 중...'
-
-    setStatus(
-      '아크시스템웍스아시아 보도자료를 확인하고 있습니다.',
-      'info'
-    )
-
-    try {
-      const data = await watcherApi(
-        '/admin/api/watcher/collect/arc-system-works',
-        {
-          method: 'POST'
-        }
-      )
-
-      const result = data.result || {}
-
-      watcherLoaded = false
-      watcherLoading = false
-
-      await loadWatcher(true)
-
-      setStatus(
-        '아크 수집 완료 — ' +
-        '신규 ' + Number(result.created || 0) + '개, ' +
-        '변경 ' + Number(result.updated || 0) + '개, ' +
-        '기존 ' + Number(result.unchanged || 0) + '개, ' +
-        '이미지 후보 ' +
-        Number(result.imagesCreated || 0) +
-        '개',
-        'ok'
-      )
-    } catch (error) {
-      watcherLoading = false
-
-      setStatus(
-        error && error.message
-          ? error.message
-          : '아크 수집에 실패했습니다.',
-        'err'
-      )
-    } finally {
-      button.disabled = false
-      button.textContent = '아크 수집 실행'
-    }
-  }
-
 
   async function loadWatcher(force) {
     if (watcherLoading) return
@@ -454,7 +517,11 @@
 
     watcherLoading = true
     setBusy(true)
-    setStatus('WATCHER 현황을 불러오는 중입니다.', 'info')
+
+    setStatus(
+      'WATCHER 현황을 불러오는 중입니다.',
+      'info'
+    )
 
     try {
       const results = await Promise.all([
@@ -468,19 +535,32 @@
       renderItems(results[2].items)
 
       watcherLoaded = true
-      setStatus('WATCHER 현황을 불러왔습니다.', 'ok')
-    } catch (error) {
-      setStatus(error.message, 'err')
 
-      if ($('watcherSourceList')) {
-        $('watcherSourceList').innerHTML =
+      setStatus(
+        'WATCHER 현황을 불러왔습니다.',
+        'ok'
+      )
+    } catch (error) {
+      const message =
+        error && error.message
+          ? error.message
+          : 'WATCHER 현황을 불러오지 못했습니다.'
+
+      setStatus(message, 'err')
+
+      const sourceList = $('watcherSourceList')
+
+      if (sourceList) {
+        sourceList.innerHTML =
           '<div class="admin-empty">' +
-            escapeHtml(error.message) +
+            escapeHtml(message) +
           '</div>'
       }
 
-      if ($('watcherItemList')) {
-        $('watcherItemList').innerHTML =
+      const itemList = $('watcherItemList')
+
+      if (itemList) {
+        itemList.innerHTML =
           '<div class="admin-empty">' +
             '수집 항목을 불러오지 못했습니다.' +
           '</div>'
@@ -512,9 +592,12 @@
     )
 
     if (refreshButton) {
-      refreshButton.addEventListener('click', function () {
-        loadWatcher(true)
-      })
+      refreshButton.addEventListener(
+        'click',
+        function () {
+          loadWatcher(true)
+        }
+      )
     }
 
     if (collectArcButton) {
@@ -524,15 +607,17 @@
       )
     }
 
-
     if (watcherTab) {
-      watcherTab.addEventListener('click', function () {
-        window.setTimeout(function () {
-          if (isWatcherPanelActive()) {
-            loadWatcher(false)
-          }
-        }, 0)
-      })
+      watcherTab.addEventListener(
+        'click',
+        function () {
+          window.setTimeout(function () {
+            if (isWatcherPanelActive()) {
+              loadWatcher(false)
+            }
+          }, 0)
+        }
+      )
     }
 
     window.setTimeout(function () {
@@ -543,7 +628,10 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init)
+    document.addEventListener(
+      'DOMContentLoaded',
+      init
+    )
   } else {
     init()
   }
