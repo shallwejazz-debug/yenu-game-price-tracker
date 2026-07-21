@@ -2306,3 +2306,162 @@
     width: 100%;
   }
 }
+
+/* ============================================================
+   WATCHER 공식 이미지 후보 선택
+   ============================================================ */
+
+.watcher-transform-images {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #303543;
+}
+
+.watcher-transform-images .admin-section-head {
+  margin-bottom: 12px;
+}
+
+.watcher-transform-images .admin-section-head h3 {
+  margin: 0 0 6px;
+}
+
+.watcher-transform-image-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.watcher-transform-image-grid > .admin-empty {
+  grid-column: 1 / -1;
+}
+
+.watcher-transform-image-card {
+  min-width: 0;
+  padding: 14px;
+  background: #151821;
+  border: 1px solid #343947;
+  border-radius: 10px;
+  box-sizing: border-box;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.watcher-transform-image-card:hover {
+  background: #191d27;
+  border-color: #485064;
+}
+
+.watcher-transform-image-card.is-selected {
+  background: rgba(65, 105, 187, 0.12);
+  border-color: #6681db;
+  box-shadow:
+    0 0 0 2px rgba(102, 129, 219, 0.12);
+}
+
+.watcher-transform-image-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.watcher-transform-image-head > strong {
+  color: #eef1f5;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.watcher-transform-image-meta {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin-bottom: 10px;
+  color: #9098a5;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.watcher-transform-image-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.watcher-transform-image-alt {
+  margin: 9px 0;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+  color: #aeb5c0;
+  background: #11141b;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.watcher-transform-image-card .watcher-item-link {
+  margin: 2px 0 12px;
+}
+
+.watcher-transform-image-card .admin-field {
+  margin: 0 0 10px;
+}
+
+.watcher-transform-image-card
+  .admin-field select {
+  min-height: 38px;
+  font-size: 0.8rem;
+}
+
+.watcher-image-select {
+  width: 100%;
+  justify-content: center;
+}
+
+.watcher-transform-image-card.is-selected
+  .watcher-image-select {
+  color: #dce5ff;
+  background: rgba(82, 112, 196, 0.2);
+  border-color: rgba(111, 143, 229, 0.5);
+}
+
+#watcherTransformSelectedImage {
+  border-color: rgba(89, 139, 221, 0.48);
+  background: rgba(70, 111, 190, 0.14);
+}
+
+#watcherTransformSelectedImageText {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+#watcherTransformImageStatus {
+  margin-top: 12px;
+}
+
+
+/* ------------------------------------------------------------
+   WATCHER 이미지 후보 모바일
+   ------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+  .watcher-transform-image-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .watcher-transform-image-card {
+    padding: 12px;
+  }
+
+  .watcher-transform-image-meta {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
