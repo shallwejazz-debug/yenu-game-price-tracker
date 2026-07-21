@@ -435,6 +435,27 @@ function renderEvents(groups) {
           '</button>'
       }
     }
+    const reviewStatus = String(
+      group.review_status || ''
+    ).toUpperCase()
+
+    const transformControl =
+      Number.isInteger(watchItemId) &&
+      watchItemId > 0
+        ? (
+          '<button type="button" ' +
+            'class="btn btn-sm watcher-transform-open" ' +
+            'data-watcher-transform-open="' +
+              escapeHtml(watchItemId) +
+            '">' +
+            (
+              reviewStatus === 'TRANSFORMED'
+                ? '초안 수정'
+                : '초안 작성'
+            ) +
+          '</button>'
+        )
+        : ''
 
     html +=
       '<article class="watcher-event-card' +
@@ -495,6 +516,7 @@ function renderEvents(groups) {
         '</div>' +
 
         '<div class="watcher-event-action">' +
+          transformControl +
           readControl +
         '</div>' +
       '</article>'
@@ -1358,6 +1380,15 @@ async function readAllWatcherEvents() {
 
   const eventList = $('watcherEventList')
 
+  const saveTransformButton =
+    $('saveWatcherTransform')
+
+  const closeTransformButton =
+    $('closeWatcherTransform')
+
+  const cancelTransformButton =
+    $('cancelWatcherTransform')
+
   const watcherTab = document.querySelector(
     '[data-admin-tab="watcher"]'
   )
@@ -1384,7 +1415,28 @@ async function readAllWatcherEvents() {
       readAllWatcherEvents
     )
   }
+   
+  if (saveTransformButton) {
+    saveTransformButton.addEventListener(
+      'click',
+      saveWatcherTransform
+    )
+  }
 
+  if (closeTransformButton) {
+    closeTransformButton.addEventListener(
+      'click',
+      closeWatcherTransform
+    )
+  }
+
+  if (cancelTransformButton) {
+    cancelTransformButton.addEventListener(
+      'click',
+      closeWatcherTransform
+    )
+  }
+   
   if (eventList) {
     eventList.addEventListener(
       'click',
@@ -1392,6 +1444,22 @@ async function readAllWatcherEvents() {
         const target = event.target
 
         if (!(target instanceof Element)) {
+          return
+        }
+        const transformButton = target.closest(
+          '[data-watcher-transform-open]'
+        )
+
+        if (
+          transformButton &&
+          eventList.contains(transformButton)
+        ) {
+          openWatcherTransform(
+            transformButton.getAttribute(
+              'data-watcher-transform-open'
+            )
+          )
+
           return
         }
 
