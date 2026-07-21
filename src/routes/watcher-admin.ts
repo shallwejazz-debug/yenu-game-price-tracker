@@ -1757,6 +1757,438 @@ watcherAdmin.post(
   }
 )
 
+// ------------------------------------------------------------
+// WATCHER 게임 DRAFT 대표 이미지 후보 선택
+//
+// 처리:
+//   - 관리자가 이미지 유형을 확인하여 지정
+//   - 개별 이미지 상태를 APPROVED로 변경
+//   - 같은 보도자료의 다른 이미지 선택 해제
+//   - edition_preorders.selected_image_id 연결
+//
+// 하지 않는 처리:
+//   - 이미지 다운로드
+//   - R2 저장
+//   - games.image_url 변경
+//   - 게임 공개
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/items/:id/images/:imageId/select',
+  async (c) => {
+    const itemId = Number(
+      c.req.param('id')
+    )
+
+    const imageId = Number(
+      c.req.param('imageId')
+    )
+
+    if (
+      !Number.isInteger(itemId) ||
+      itemId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher image id',
+        },
+        400
+      )
+    }
+
+    const body = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => null)
+
+    if (!body) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid JSON body',
+        },
+        400
+      )
+    }
+
+    const imageType = String(
+      body.imageType ?? ''
+    )
+      .trim()
+      .toUpperCase()
+
+    const allowedImageTypes = new Set([
+      'PACKAGE',
+      'LIMITED_EDITION',
+      'PREORDER_BONUS',
+      'FIRST_PRINT_BONUS',
+      'STORE_BONUS',
+      'KEY_VISUAL',
+      'SCREENSHOT',
+    ])
+
+    if (!allowedImageTypes.has(imageType)) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '대표 이미지 유형을 선택해 주세요.',
+        },
+        400
+      )
+    }
+
+    const record = await c.env.DB.prepare(`
+      SELECT
+        wi.id AS watch_item_id,
+        wi.source_id,
+        wi.review_status,
+        wi.linked_game_id,
+
+        g.publish_status
+          AS game_publish_status,
+
+        image.id AS image_id,
+        image.watch_item_id
+          AS image_watch_item_id,
+
+        image.source_image_url,
+        image.stored_image_url,
+        image.image_type,
+        image.permission_status
+          AS image_permission_status,
+
+        policy.permission_status
+          AS source_permission_status,
+
+        policy.package_image_allowed,
+        policy.limited_edition_image_allowed,
+        policy.preorder_bonus_image_allowed,
+        policy.key_visual_allowed,
+        policy.screenshot_allowed,
+        policy.local_storage_allowed,
+        policy.resize_allowed,
+        policy.hotlink_allowed
+
+      FROM watch_items wi
+
+      INNER JOIN games g
+        ON g.id = wi.linked_game_id
+
+      INNER JOIN watch_item_images image
+        ON image.watch_item_id = wi.id
+
+      LEFT JOIN source_image_policies policy
+        ON policy.source_id = wi.source_id
+
+      WHERE
+        wi.id = ?
+        AND image.id = ?
+
+      LIMIT 1
+    `)
+      .bind(
+        itemId,
+        imageId
+      )
+      .first<{
+        watch_item_id: number
+        source_id: number
+        review_status: string
+        linked_game_id: number | null
+        game_publish_status: string
+
+        image_id: number
+        image_watch_item_id: number
+        source_image_url: string
+        stored_image_url: string | null
+        image_type: string
+        image_permission_status: string
+
+        source_permission_status: string | null
+
+        package_image_allowed: number | null
+        limited_edition_image_allowed:
+          number | null
+        preorder_bonus_image_allowed:
+          number | null
+        key_visual_allowed: number | null
+        screenshot_allowed: number | null
+        local_storage_allowed: number | null
+        resize_allowed: number | null
+        hotlink_allowed: number | null
+      }>()
+
+    if (!record) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이미지 후보 또는 WATCHER 항목을 찾을 수 없습니다.',
+        },
+        404
+      )
+    }
+
+    const gameId = Number(
+      record.linked_game_id || 0
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '비공개 게임 DRAFT를 먼저 등록해 주세요.',
+        },
+        409
+      )
+    }
+
+    if (
+      record.game_publish_status !== 'DRAFT'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '대표 이미지 후보 선택은 DRAFT 게임에서만 가능합니다.',
+        },
+        409
+      )
+    }
+
+    const sourcePermissionStatus = String(
+      record.source_permission_status ||
+      'PENDING'
+    ).toUpperCase()
+
+    if (
+      sourcePermissionStatus !== 'APPROVED' &&
+      sourcePermissionStatus !== 'CONDITIONAL'
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    let imageTypeAllowed = false
+
+    if (imageType === 'PACKAGE') {
+      imageTypeAllowed =
+        Number(
+          record.package_image_allowed
+        ) === 1
+    }
+
+    if (imageType === 'LIMITED_EDITION') {
+      imageTypeAllowed =
+        Number(
+          record.limited_edition_image_allowed
+        ) === 1
+    }
+
+    if (
+      imageType === 'PREORDER_BONUS' ||
+      imageType === 'FIRST_PRINT_BONUS' ||
+      imageType === 'STORE_BONUS'
+    ) {
+      imageTypeAllowed =
+        Number(
+          record.preorder_bonus_image_allowed
+        ) === 1
+    }
+
+    if (imageType === 'KEY_VISUAL') {
+      imageTypeAllowed =
+        Number(
+          record.key_visual_allowed
+        ) === 1
+    }
+
+    if (imageType === 'SCREENSHOT') {
+      imageTypeAllowed =
+        Number(
+          record.screenshot_allowed
+        ) === 1
+    }
+
+    if (!imageTypeAllowed) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '이 출처에서는 선택한 이미지 유형의 사용이 허용되지 않았습니다.',
+        },
+        409
+      )
+    }
+
+    const preorder = await c.env.DB.prepare(`
+      SELECT
+        ep.id,
+        ep.publish_status
+
+      FROM edition_preorders ep
+
+      INNER JOIN editions e
+        ON e.id = ep.edition_id
+
+      INNER JOIN game_official_sources gos
+        ON gos.id = ep.official_source_id
+
+      WHERE
+        e.game_id = ?
+        AND gos.game_id = ?
+        AND gos.watch_item_id = ?
+
+      LIMIT 1
+    `)
+      .bind(
+        gameId,
+        gameId,
+        itemId
+      )
+      .first<{
+        id: number
+        publish_status: string
+      }>()
+
+    if (!preorder) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '연결된 예약판매 DRAFT를 찾을 수 없습니다.',
+        },
+        404
+      )
+    }
+
+    if (preorder.publish_status !== 'DRAFT') {
+      return c.json(
+        {
+          ok: false,
+          error:
+            'DRAFT 상태의 예약판매 정보에서만 이미지를 선택할 수 있습니다.',
+        },
+        409
+      )
+    }
+
+    await c.env.DB.batch([
+      c.env.DB.prepare(`
+        UPDATE watch_item_images
+
+        SET
+          selected_for_publish = 0,
+          updated_at = CURRENT_TIMESTAMP
+
+        WHERE watch_item_id = ?
+      `)
+        .bind(itemId),
+
+      c.env.DB.prepare(`
+        UPDATE watch_item_images
+
+        SET
+          image_type = ?,
+          permission_status = 'APPROVED',
+          selected_for_publish = 1,
+          reviewed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+
+        WHERE
+          id = ?
+          AND watch_item_id = ?
+      `)
+        .bind(
+          imageType,
+          imageId,
+          itemId
+        ),
+
+      c.env.DB.prepare(`
+        UPDATE edition_preorders
+
+        SET
+          selected_image_id = ?,
+          updated_at = CURRENT_TIMESTAMP
+
+        WHERE id = ?
+      `)
+        .bind(
+          imageId,
+          preorder.id
+        ),
+    ])
+
+    return c.json({
+      ok: true,
+
+      itemId,
+      gameId,
+
+      preorderId:
+        Number(preorder.id),
+
+      selectedImageId:
+        imageId,
+
+      imageType,
+
+      imagePermissionStatus:
+        'APPROVED',
+
+      sourcePermissionStatus,
+
+      sourceImageUrl:
+        record.source_image_url,
+
+      storedImageUrl:
+        record.stored_image_url,
+
+      gamePublishStatus:
+        'DRAFT',
+
+      preorderPublishStatus:
+        'DRAFT',
+
+      gameImageUrlChanged:
+        false,
+
+      imageDownloaded:
+        false,
+
+      imagePublished:
+        false,
+
+      message:
+        '대표 이미지 후보를 선택했습니다. 아직 다운로드하거나 공개하지 않았습니다.',
+    })
+  }
+)
 
 
 // ------------------------------------------------------------
