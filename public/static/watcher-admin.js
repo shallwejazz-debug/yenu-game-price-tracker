@@ -298,11 +298,11 @@
   }
 }
 
-function renderEvents(events) {
+function renderEvents(groups) {
   const container = $('watcherEventList')
   if (!container) return
 
-  if (!Array.isArray(events) || !events.length) {
+  if (!Array.isArray(groups) || !groups.length) {
     container.innerHTML =
       '<div class="admin-empty">' +
         '표시할 WATCHER 이벤트가 없습니다.' +
@@ -311,83 +311,196 @@ function renderEvents(events) {
     return
   }
 
-  container.innerHTML = events
-    .map(function (event) {
-      const info = eventInfo(event.event_type)
-      const isRead = Number(event.is_read) === 1
-      const articleUrl = safeUrl(event.source_url)
+  let currentDate = ''
+  let html = ''
 
-      const linkHtml = articleUrl
-        ? '<a class="watcher-event-link" href="' +
-            escapeHtml(articleUrl) +
-            '" target="_blank" rel="noopener noreferrer">' +
-            '공식 원문 ↗' +
-          '</a>'
-        : ''
+  groups.forEach(function (group) {
+    const eventDate =
+      String(group.event_date || '날짜 미확인')
 
-      const readButton = !isRead
-        ? '<button type="button" ' +
+    const watchItemId =
+      Number(group.watch_item_id || 0)
+
+    const representativeEventId =
+      Number(group.representative_event_id || 0)
+
+    const eventCount =
+      Number(group.event_count || 0)
+
+    const unreadCount =
+      Number(group.unread_count || 0)
+
+    const sourceNewCount =
+      Number(group.source_new_count || 0)
+
+    const sourceChangedCount =
+      Number(group.source_changed_count || 0)
+
+    const imageNewCount =
+      Number(group.image_new_count || 0)
+
+    const errorCount =
+      Number(group.error_count || 0)
+
+    const isRead = unreadCount < 1
+    const articleUrl = safeUrl(group.source_url)
+
+    if (eventDate !== currentDate) {
+      currentDate = eventDate
+
+      html +=
+        '<div class="watcher-event-date">' +
+          escapeHtml(eventDate) +
+        '</div>'
+    }
+
+    let badgeHtml = ''
+
+    if (sourceNewCount > 0) {
+      badgeHtml +=
+        '<span class="watcher-badge watcher-event-source-new">' +
+          '신규 보도자료 ' +
+          escapeHtml(sourceNewCount) +
+        '</span>'
+    }
+
+    if (sourceChangedCount > 0) {
+      badgeHtml +=
+        '<span class="watcher-badge watcher-event-source-changed">' +
+          '보도자료 변경 ' +
+          escapeHtml(sourceChangedCount) +
+        '</span>'
+    }
+
+    if (imageNewCount > 0) {
+      badgeHtml +=
+        '<span class="watcher-badge watcher-event-image-new">' +
+          '이미지 후보 ' +
+          escapeHtml(imageNewCount) +
+        '</span>'
+    }
+
+    if (errorCount > 0) {
+      badgeHtml +=
+        '<span class="watcher-badge watcher-event-error">' +
+          '오류 ' +
+          escapeHtml(errorCount) +
+        '</span>'
+    }
+
+    const linkHtml = articleUrl
+      ? '<a class="watcher-event-link" href="' +
+          escapeHtml(articleUrl) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          '공식 원문 ↗' +
+        '</a>'
+      : ''
+
+    let readControl =
+
+      '<span class="watcher-event-read-label">' +
+        '읽음' +
+      '</span>'
+
+    if (!isRead) {
+      if (
+        Number.isInteger(watchItemId) &&
+        watchItemId > 0
+      ) {
+        readControl =
+          '<button type="button" ' +
+            'class="btn btn-sm watcher-event-read" ' +
+            'data-watcher-event-group-read="1" ' +
+            'data-event-date="' +
+              escapeHtml(eventDate) +
+            '" ' +
+            'data-watch-item-id="' +
+              escapeHtml(watchItemId) +
+            '">' +
+            '그룹 읽음' +
+          '</button>'
+      } else if (
+        Number.isInteger(representativeEventId) &&
+        representativeEventId > 0
+      ) {
+        readControl =
+          '<button type="button" ' +
             'class="btn btn-sm watcher-event-read" ' +
             'data-watcher-event-read="' +
-            escapeHtml(event.id) +
+              escapeHtml(representativeEventId) +
             '">' +
             '읽음' +
           '</button>'
-        : '<span class="watcher-event-read-label">' +
-            '읽음' +
-          '</span>'
+      }
+    }
 
-      return (
-        '<article class="watcher-event-card' +
-          (isRead ? ' is-read' : '') +
-        '">' +
-          '<div class="watcher-event-main">' +
-            '<div class="watcher-event-top">' +
-              '<span class="watcher-badge watcher-event-' +
-                escapeHtml(info.className) +
-              '">' +
-                escapeHtml(info.label) +
-              '</span>' +
+    html +=
+      '<article class="watcher-event-card' +
+        (isRead ? ' is-read' : '') +
+      '">' +
+        '<div class="watcher-event-main">' +
+          '<div class="watcher-event-top">' +
+            badgeHtml +
 
-              (event.source_name
-                ? '<span class="watcher-event-source">' +
-                    escapeHtml(event.source_name) +
-                  '</span>'
-                : '') +
-
-              (!isRead
-                ? '<span class="watcher-event-unread">' +
-                    'NEW' +
-                  '</span>'
-                : '') +
-            '</div>' +
-
-            '<strong class="watcher-event-title">' +
-              escapeHtml(event.title || '제목 없음') +
-            '</strong>' +
-
-            (event.message
-              ? '<p class="watcher-event-message">' +
-                  escapeHtml(event.message) +
-                '</p>'
+            (group.source_name
+              ? '<span class="watcher-event-source">' +
+                  escapeHtml(group.source_name) +
+                '</span>'
               : '') +
 
-            '<div class="watcher-event-meta">' +
-              '<span>' +
-                escapeHtml(event.created_at || '-') +
-              '</span>' +
-              linkHtml +
-            '</div>' +
+            (!isRead
+              ? '<span class="watcher-event-unread">' +
+                  'NEW' +
+                '</span>'
+              : '') +
           '</div>' +
 
-          '<div class="watcher-event-action">' +
-            readButton +
+          '<strong class="watcher-event-title">' +
+            escapeHtml(group.title || '제목 없음') +
+          '</strong>' +
+
+          (group.latest_message
+            ? '<p class="watcher-event-message">' +
+                escapeHtml(group.latest_message) +
+              '</p>'
+            : '') +
+
+          '<div class="watcher-event-meta">' +
+            '<span>상세 이벤트 ' +
+              escapeHtml(eventCount) +
+              '개</span>' +
+
+            '<span>읽지 않음 ' +
+              escapeHtml(unreadCount) +
+              '개</span>' +
+
+            '<span>' +
+              escapeHtml(group.latest_at || '-') +
+            '</span>' +
+
+            (group.review_status
+              ? '<span>검수 상태: ' +
+                  escapeHtml(
+                    reviewStatusLabel(
+                      group.review_status
+                    )
+                  ) +
+                '</span>'
+              : '') +
+
+            linkHtml +
           '</div>' +
-        '</article>'
-      )
-    })
-    .join('')
+        '</div>' +
+
+        '<div class="watcher-event-action">' +
+          readControl +
+        '</div>' +
+      '</article>'
+  })
+
+  container.innerHTML = html
 }
+
 
 async function readWatcherEvent(id) {
   if (eventActionRunning) return
@@ -425,6 +538,67 @@ async function readWatcherEvent(id) {
       error && error.message
         ? error.message
         : '이벤트 읽음 처리에 실패했습니다.',
+      'err'
+    )
+  } finally {
+    eventActionRunning = false
+  }
+}
+async function readWatcherEventGroup(
+  eventDate,
+  watchItemId
+) {
+  if (eventActionRunning) return
+
+  const normalizedDate =
+    String(eventDate || '').trim()
+
+  const normalizedItemId =
+    Number(watchItemId)
+
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(
+      normalizedDate
+    ) ||
+    !Number.isInteger(normalizedItemId) ||
+    normalizedItemId <= 0
+  ) {
+    setStatus(
+      '이벤트 그룹 정보가 올바르지 않습니다.',
+      'err'
+    )
+
+    return
+  }
+
+  eventActionRunning = true
+
+  try {
+    const data = await watcherApi(
+      '/admin/api/watcher/events/group/read',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          eventDate: normalizedDate,
+          watchItemId: normalizedItemId
+        })
+      }
+    )
+
+    watcherLoaded = false
+    await loadWatcher(true)
+
+    setStatus(
+      '그룹의 상세 이벤트 ' +
+        Number(data.changed || 0) +
+        '개를 읽음 처리했습니다.',
+      'ok'
+    )
+  } catch (error) {
+    setStatus(
+      error && error.message
+        ? error.message
+        : '이벤트 그룹 읽음 처리에 실패했습니다.',
       'err'
     )
   } finally {
@@ -770,7 +944,7 @@ async function readAllWatcherEvents() {
       renderSummary(results[0].summary)
       renderSources(results[1].sources)
       renderItems(results[2].items)
-      renderEvents(results[3].events)
+      renderEvents(results[3].groups)
 
       watcherLoaded = true
 
@@ -867,22 +1041,44 @@ async function readAllWatcherEvents() {
           return
         }
 
-        const button = target.closest(
-          '[data-watcher-event-read]'
+        const groupButton = target.closest(
+          '[data-watcher-event-group-read]'
         )
 
-        if (!button || !eventList.contains(button)) {
+        if (
+          groupButton &&
+          eventList.contains(groupButton)
+        ) {
+          readWatcherEventGroup(
+            groupButton.getAttribute(
+              'data-event-date'
+            ),
+            groupButton.getAttribute(
+              'data-watch-item-id'
+            )
+          )
+
           return
         }
 
-        readWatcherEvent(
-          button.getAttribute(
-            'data-watcher-event-read'
-          )
+        const eventButton = target.closest(
+          '[data-watcher-event-read]'
         )
+
+        if (
+          eventButton &&
+          eventList.contains(eventButton)
+        ) {
+          readWatcherEvent(
+            eventButton.getAttribute(
+              'data-watcher-event-read'
+            )
+          )
+        }
       }
     )
   }
+
 
   if (watcherTab) {
     watcherTab.addEventListener(
