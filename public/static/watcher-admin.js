@@ -2901,6 +2901,13 @@ async function readAllWatcherEvents() {
     )
   }
 
+  if (privatePreviewButton) {
+    privatePreviewButton.addEventListener(
+      'click',
+      loadWatcherPrivatePreview
+    )
+  }
+
    
 
   if (closeTransformButton) {
