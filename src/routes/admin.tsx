@@ -1298,8 +1298,6 @@ admin.post(
 
           totalSearchItems:
             classified.totalItems,
-          totalSearchItems:
-            classified.totalItems,
           skipped:
             classified.skipped,
           imageUrl: image,
