@@ -1306,7 +1306,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-events-1"></script>
+    <script src="/static/watcher-admin.js?v=20260721-event-groups-1"></script>
 </body>
 </html>`
 }
