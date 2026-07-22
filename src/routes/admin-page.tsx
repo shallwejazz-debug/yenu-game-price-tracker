@@ -2214,7 +2214,7 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260721-watcher-tab"></script>
 	<script src="/static/watcher-admin.js?v=20260722-watcher-script-fix-1"></script>
-	<script src="/static/preorder-admin.js?v=20260722-preorder-v2-1"></script>
+	<script src="/static/preorder-admin.js?v=20260722-preorder-approval-1"></script>
 </body>
 </html>`
 }
