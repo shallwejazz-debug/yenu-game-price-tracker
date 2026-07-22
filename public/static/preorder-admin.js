@@ -982,7 +982,7 @@
         error && error.message
           ? error.message
           : '검토 승인에 실패했습니다.',
-        'error'
+        'err'
       )
 
       if (button) {
