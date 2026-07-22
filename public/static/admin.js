@@ -356,6 +356,7 @@
     const validTabs = [
       'dashboard',
       'watcher',
+      'preorder-v2',
       'candidates',
       'import',
       'games',

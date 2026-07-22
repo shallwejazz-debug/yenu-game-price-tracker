@@ -94,3 +94,99 @@ export const SOURCE_LABELS: Record<string, string> = {
   naver: '네이버',
   etc: '기타몰',
 }
+
+
+// ============================================================
+// 사전예약 V2
+// games → editions(플랫폼) → product_variants(상품 에디션)
+// ============================================================
+
+export type ProductVariantKind =
+  | 'STANDARD'
+  | 'DELUXE'
+  | 'ULTIMATE'
+  | 'LIMITED'
+  | 'COLLECTORS'
+  | 'OTHER'
+
+export type ProductPackageType =
+  | 'PACKAGE'
+  | 'DIGITAL'
+  | 'BOTH'
+
+export type ProductVariantPublishStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'ARCHIVED'
+
+export interface ProductVariant {
+  id: number
+  edition_id: number
+  variant_code: string
+  variant_name: string
+  variant_kind: ProductVariantKind
+  package_type: ProductPackageType
+  is_default: number
+  display_order: number
+  publish_status: ProductVariantPublishStatus
+  created_at: string
+  updated_at: string
+}
+
+export type VariantPreorderStatus =
+  | 'UNKNOWN'
+  | 'UPCOMING'
+  | 'OPEN'
+  | 'CLOSED'
+  | 'CANCELLED'
+
+export type VariantPreorderPriceStatus =
+  | 'UNCONFIRMED'
+  | 'CANDIDATE'
+  | 'CONFIRMED'
+
+export type VariantPreorderPublishStatus =
+  | 'DRAFT'
+  | 'APPROVED'
+  | 'PUBLISHED'
+  | 'ARCHIVED'
+
+export interface VariantPreorder {
+  id: number
+  variant_id: number
+  official_source_id: number
+  release_date: string
+  preorder_start_date: string | null
+  preorder_end_date: string | null
+  preorder_status: VariantPreorderStatus
+  preorder_bonus: string | null
+  preorder_bonus_note: string | null
+  contents_text: string | null
+  candidate_price: number | null
+  confirmed_price: number | null
+  price_status: VariantPreorderPriceStatus
+  publish_status: VariantPreorderPublishStatus
+  display_order: number
+  approved_at: string | null
+  published_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type VariantPreorderImageRole =
+  | 'REPRESENTATIVE'
+  | 'PACKAGE'
+  | 'BONUS'
+  | 'CONTENTS'
+  | 'GALLERY'
+
+export interface VariantPreorderImage {
+  id: number
+  preorder_id: number
+  image_id: number
+  display_role: VariantPreorderImageRole
+  display_order: number
+  alt_text: string | null
+  created_at: string
+  updated_at: string
+}

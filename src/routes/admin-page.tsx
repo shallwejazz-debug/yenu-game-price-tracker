@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260721-watcher-final-review-1"
+    href="/static/admin.css?v=20260722-preorder-v2-1"
     rel="stylesheet"
   />
 </head>
@@ -139,6 +139,24 @@ export function AdminPage(): string {
                 0
               </span>
             </button>
+
+      <button
+        type="button"
+        class="admin-tab"
+        data-admin-tab="preorder-v2"
+        aria-selected="false"
+      >
+        <span class="admin-tab-icon">🛒</span>
+        <span>사전예약 V2</span>
+        <span
+          id="preorderV2TabBadge"
+          class="admin-tab-badge"
+          hidden
+        >
+          0
+        </span>
+      </button>
+
 
       <button
         type="button"
@@ -1051,6 +1069,394 @@ export function AdminPage(): string {
       </section>
     </section>
 
+
+    <!-- ====================================================
+         사전예약 V2
+         플랫폼 → 상품 에디션 → 예약판매
+         ==================================================== -->
+    <section
+      class="admin-panel"
+      data-admin-panel="preorder-v2"
+      hidden
+    >
+      <section class="admin-card">
+        <div class="admin-section-head">
+          <div>
+            <h2>🛒 사전예약 V2</h2>
+            <p class="admin-hint">
+              WATCHER가 생성한 비공개 DRAFT 게임에 플랫폼별
+              통상판·한정판·디럭스 에디션을 등록합니다.
+              기존 Legacy 가격과 네이버 수집기는 변경하지 않습니다.
+            </p>
+          </div>
+
+          <button
+            id="refreshPreorderV2"
+            class="btn btn-sm"
+            type="button"
+          >
+            새로고침
+          </button>
+        </div>
+
+        <div class="admin-notice">
+          이 화면에서 저장하는 게임·상품 에디션·예약판매 정보는
+          모두 DRAFT입니다. 저장만으로 메인이나 공개 게임 화면에
+          표시되지 않습니다.
+        </div>
+
+        <label class="admin-field">
+          <span>비공개 DRAFT 게임</span>
+          <select id="preorderV2Game">
+            <option value="">
+              게임을 선택해 주세요.
+            </option>
+          </select>
+        </label>
+
+        <p
+          id="preorderV2Status"
+          class="admin-status"
+          aria-live="polite"
+        ></p>
+      </section>
+
+      <section
+        id="preorderV2Editor"
+        class="admin-card"
+        hidden
+      >
+        <div class="admin-section-head">
+          <div>
+            <h2 id="preorderV2GameTitle">
+              상품 에디션 등록
+            </h2>
+
+            <p
+              id="preorderV2GameMeta"
+              class="admin-hint"
+            ></p>
+          </div>
+
+          <button
+            id="resetPreorderV2Form"
+            class="btn btn-sm"
+            type="button"
+          >
+            새 에디션
+          </button>
+        </div>
+
+        <form id="preorderV2Form">
+          <div class="preorder-v2-section">
+            <h3>1. 플랫폼</h3>
+
+            <div class="preorder-v2-grid preorder-v2-grid-2">
+              <label class="admin-field">
+                <span>플랫폼</span>
+                <select
+                  id="preorderV2Platform"
+                  required
+                >
+                  <option value="switch">
+                    Nintendo Switch
+                  </option>
+                  <option value="switch2">
+                    Nintendo Switch 2
+                  </option>
+                  <option value="ps5">
+                    PlayStation 5
+                  </option>
+                  <option value="ps4">
+                    PlayStation 4
+                  </option>
+                  <option value="xbox">
+                    Xbox
+                  </option>
+                  <option value="pc">
+                    PC
+                  </option>
+                  <option value="etc">
+                    기타
+                  </option>
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>플랫폼판 표시명</span>
+                <input
+                  type="text"
+                  id="preorderV2PlatformEditionName"
+                  placeholder="예: Nintendo Switch 한국어 패키지판"
+                  maxlength="100"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="preorder-v2-section">
+            <h3>2. 상품 에디션</h3>
+
+            <div class="preorder-v2-grid preorder-v2-grid-2">
+              <label class="admin-field">
+                <span>에디션 종류</span>
+                <select
+                  id="preorderV2VariantKind"
+                  required
+                >
+                  <option value="STANDARD">통상판</option>
+                  <option value="DELUXE">디럭스</option>
+                  <option value="ULTIMATE">얼티밋</option>
+                  <option value="LIMITED">한정판</option>
+                  <option value="COLLECTORS">컬렉터스</option>
+                  <option value="OTHER">기타</option>
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>상품 형태</span>
+                <select
+                  id="preorderV2PackageType"
+                  required
+                >
+                  <option value="PACKAGE">패키지</option>
+                  <option value="DIGITAL">디지털</option>
+                  <option value="BOTH">패키지·디지털 공통</option>
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>에디션 코드</span>
+                <input
+                  type="text"
+                  id="preorderV2VariantCode"
+                  value="STANDARD"
+                  placeholder="STANDARD"
+                  maxlength="40"
+                  required
+                />
+              </label>
+
+              <label class="admin-field">
+                <span>에디션 표시명</span>
+                <input
+                  type="text"
+                  id="preorderV2VariantName"
+                  value="통상판"
+                  placeholder="예: 한국 한정판"
+                  maxlength="100"
+                  required
+                />
+              </label>
+            </div>
+
+            <div class="preorder-v2-inline-options">
+              <label class="preorder-v2-check">
+                <input
+                  type="checkbox"
+                  id="preorderV2IsDefault"
+                  checked
+                />
+                <span>
+                  이 플랫폼의 기본 에디션
+                </span>
+              </label>
+
+              <label class="admin-field preorder-v2-order">
+                <span>표시 순서</span>
+                <input
+                  type="number"
+                  id="preorderV2DisplayOrder"
+                  value="0"
+                  step="1"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="preorder-v2-section">
+            <h3>3. 공식 출처 및 일정</h3>
+
+            <label class="admin-field">
+              <span>공식 보도자료</span>
+              <select
+                id="preorderV2OfficialSource"
+                required
+              >
+                <option value="">
+                  공식 출처를 선택해 주세요.
+                </option>
+              </select>
+            </label>
+
+            <div class="preorder-v2-grid preorder-v2-grid-3">
+              <label class="admin-field">
+                <span>출시일</span>
+                <input
+                  type="date"
+                  id="preorderV2ReleaseDate"
+                  required
+                />
+              </label>
+
+              <label class="admin-field">
+                <span>예약판매 시작일</span>
+                <input
+                  type="date"
+                  id="preorderV2StartDate"
+                />
+              </label>
+
+              <label class="admin-field">
+                <span>예약판매 종료일</span>
+                <input
+                  type="date"
+                  id="preorderV2EndDate"
+                />
+              </label>
+            </div>
+
+            <label class="admin-field">
+              <span>예약판매 상태</span>
+              <select id="preorderV2PreorderStatus">
+                <option value="UNKNOWN">확인 전</option>
+                <option value="UPCOMING">예정</option>
+                <option value="OPEN">진행 중</option>
+                <option value="CLOSED">종료</option>
+                <option value="CANCELLED">취소</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="preorder-v2-section">
+            <h3>4. 공식 가격</h3>
+
+            <div class="preorder-v2-grid preorder-v2-grid-3">
+              <label class="admin-field">
+                <span>가격 상태</span>
+                <select id="preorderV2PriceStatus">
+                  <option value="UNCONFIRMED">
+                    미확정
+                  </option>
+                  <option value="CANDIDATE">
+                    가격 후보
+                  </option>
+                  <option value="CONFIRMED">
+                    공식 확정
+                  </option>
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>가격 후보</span>
+                <input
+                  type="number"
+                  id="preorderV2CandidatePrice"
+                  min="1"
+                  step="1"
+                  placeholder="예: 59800"
+                />
+              </label>
+
+              <label class="admin-field">
+                <span>확정 가격</span>
+                <input
+                  type="number"
+                  id="preorderV2ConfirmedPrice"
+                  min="1"
+                  step="1"
+                  placeholder="공식 확정 후 입력"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="preorder-v2-section">
+            <h3>5. 구성품 및 예약 특전</h3>
+
+            <label class="admin-field">
+              <span>에디션 구성품</span>
+              <textarea
+                id="preorderV2Contents"
+                rows="5"
+                placeholder="예: 게임 본편, 아트북, 사운드트랙, 아크릴 스탠드"
+              ></textarea>
+            </label>
+
+            <label class="admin-field">
+              <span>예약 구매 특전</span>
+              <textarea
+                id="preorderV2Bonus"
+                rows="4"
+                placeholder="예약 구매자에게 제공되는 공식 특전"
+              ></textarea>
+            </label>
+
+            <label class="admin-field">
+              <span>특전 참고사항</span>
+              <textarea
+                id="preorderV2BonusNote"
+                rows="3"
+                placeholder="수량 한정, 판매처별 차이 등"
+              ></textarea>
+            </label>
+          </div>
+
+          <div class="preorder-v2-section">
+            <div class="admin-section-head">
+              <div>
+                <h3>6. 에디션 이미지</h3>
+                <p class="admin-hint">
+                  선택한 공식 출처에서 승인되고 비공개 R2에
+                  저장된 이미지만 연결할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            <div
+              id="preorderV2Images"
+              class="preorder-v2-images"
+            >
+              <div class="admin-empty">
+                공식 출처를 선택해 주세요.
+              </div>
+            </div>
+          </div>
+
+          <div class="preorder-v2-actions">
+            <button
+              id="savePreorderV2"
+              class="btn btn-primary"
+              type="submit"
+            >
+              DRAFT 저장
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section
+        id="preorderV2ExistingSection"
+        class="admin-card"
+        hidden
+      >
+        <div class="admin-section-head">
+          <div>
+            <h2>등록된 상품 에디션</h2>
+            <p class="admin-hint">
+              플랫폼과 에디션별로 분리된 사전예약 DRAFT입니다.
+            </p>
+          </div>
+        </div>
+
+        <div
+          id="preorderV2Existing"
+          class="preorder-v2-existing"
+        ></div>
+      </section>
+    </section>
+
+
     <!-- ====================================================
          탭 3: 후보 선별
          ==================================================== -->
@@ -1807,7 +2213,7 @@ export function AdminPage(): string {
   </main>
 
     <script src="/static/admin.js?v=20260721-watcher-tab"></script>
-    <script src="/static/watcher-admin.js?v=20260721-watcher-final-review-1"></script>
+    <script src="/static/preorder-admin.js?v=20260722-preorder-v2-1"></script>
 </body>
 </html>`
 }
