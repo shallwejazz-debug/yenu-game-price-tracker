@@ -1269,9 +1269,11 @@ preorderAdmin.post(
 
             WHERE
               watch_item_id = ?
-              AND permission_status = 'APPROVED'
-              AND r2_object_key IS NOT NULL
-              AND id IN (${placeholders})
+		AND permission_status = 'APPROVED'
+		AND stored_image_url IS NOT NULL
+		AND TRIM(stored_image_url) <> ''
+		AND id IN (${placeholders})
+
           `)
             .bind(
               officialSource.watch_item_id,

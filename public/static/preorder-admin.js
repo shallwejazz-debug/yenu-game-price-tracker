@@ -621,9 +621,12 @@
             String(
               image.permission_status || ''
             ) === 'APPROVED' &&
-            String(
-              image.r2_object_key || ''
-            ).trim()
+		String(
+		  image.stored_image_url ||
+		  image.stored_url ||
+		  image.r2_object_key ||
+		  ''
+		).trim()
           )
         }
       )
