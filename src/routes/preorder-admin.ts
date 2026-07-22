@@ -872,6 +872,47 @@ preorderAdmin.post(
       )
     }
 
+    const preflightLockedPreorder =
+      await c.env.DB.prepare(`
+        SELECT
+          vp.id,
+          vp.publish_status
+
+        FROM editions e
+
+        INNER JOIN product_variants pv
+          ON pv.edition_id = e.id
+
+        INNER JOIN variant_preorders vp
+          ON vp.variant_id = pv.id
+
+        WHERE
+          e.game_id = ?
+          AND e.platform = ?
+          AND pv.variant_code = ?
+          AND vp.publish_status <> 'DRAFT'
+
+        LIMIT 1
+      `)
+        .bind(
+          gameId,
+          platform,
+          variantCode
+        )
+        .first<{
+          id: number
+          publish_status: string
+        }>()
+
+    if (preflightLockedPreorder) {
+      return jsonError(
+        c,
+        '검토 승인된 예약판매는 DRAFT 저장으로 수정할 수 없습니다.',
+        409
+      )
+    }
+
+
     const edition = await c.env.DB.prepare(`
       INSERT INTO editions (
         game_id,

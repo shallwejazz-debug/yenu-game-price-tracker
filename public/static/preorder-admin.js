@@ -894,7 +894,7 @@
     ) {
       setStatus(
         '승인할 게임 또는 상품 에디션 정보가 올바르지 않습니다.',
-        'error'
+        'err'
       )
       return
     }
@@ -913,7 +913,7 @@
     if (!variant) {
       setStatus(
         '승인할 상품 에디션을 찾지 못했습니다.',
-        'error'
+        'err'
       )
       return
     }
@@ -926,7 +926,7 @@
     if (publishStatus !== 'DRAFT') {
       setStatus(
         'DRAFT 상태의 예약판매만 검토 승인할 수 있습니다.',
-        'error'
+        'err'
       )
       return
     }
@@ -952,7 +952,7 @@
 
     setStatus(
       '예약판매 정보를 검토 승인하고 있습니다.',
-      ''
+      'info'
     )
 
     try {
@@ -975,7 +975,7 @@
         result.alreadyApproved
           ? '이미 검토 승인된 예약판매입니다.'
           : '예약판매 검토 승인이 완료되었습니다. 아직 공개 상태는 아닙니다.',
-        'success'
+        'ok'
       )
     } catch (error) {
       setStatus(
