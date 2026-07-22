@@ -15,6 +15,7 @@
   let loaded = false
   let loading = false
   let saving = false
+  let approving = false
 
   let games = []
   let detail = null
@@ -418,6 +419,15 @@
           ? variant.confirmed_price
           : variant.candidate_price
 
+      const preorderPublishStatus =
+        String(
+          variant.preorder_publish_status ||
+          'DRAFT'
+        ).toUpperCase()
+
+
+
+
       html +=
         '<article class="preorder-v2-card">' +
           '<div class="preorder-v2-card-head">' +
@@ -435,14 +445,47 @@
                 ) +
               '</h3>' +
             '</div>' +
-            '<button ' +
-              'type="button" ' +
-              'class="btn btn-sm" ' +
-              'data-preorder-v2-edit="' +
-                escapeHtml(variant.id) +
-              '">' +
-              '수정' +
-            '</button>' +
+
+            (
+              preorderPublishStatus ===
+              'DRAFT'
+                ? (
+                    '<button ' +
+                      'type="button" ' +
+                      'class="btn btn-sm" ' +
+                      'data-preorder-v2-edit="' +
+                        escapeHtml(
+                          variant.id
+                        ) +
+                      '">' +
+                      '수정' +
+                    '</button>' +
+
+                    '<button ' +
+                      'type="button" ' +
+                      'class="btn btn-sm" ' +
+                      'data-preorder-v2-approve="' +
+                        escapeHtml(
+                          variant.id
+                        ) +
+                      '">' +
+                      '검토 승인' +
+                    '</button>'
+                  )
+                : (
+                    '<button ' +
+                      'type="button" ' +
+                      'class="btn btn-sm" ' +
+                      'disabled ' +
+                      'title="승인된 예약판매는 수정할 수 없습니다.">' +
+                      '수정 불가' +
+                    '</button>'
+                  )
+            ) +
+
+
+
+
           '</div>' +
 
           '<div class="preorder-v2-badges">' +
@@ -460,8 +503,7 @@
             '</span>' +
             '<span>' +
               escapeHtml(
-                variant.preorder_publish_status ||
-                'DRAFT'
+                preorderPublishStatus
               ) +
             '</span>' +
           '</div>' +
@@ -828,6 +870,130 @@
       }
     }
   }
+
+  async function approveVariant(
+    variantId,
+    button
+  ) {
+    if (approving) return
+
+    const gameId = Number(
+      fieldValue('preorderV2Game')
+    )
+
+    const normalizedVariantId =
+      Number(variantId)
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0 ||
+      !Number.isInteger(
+        normalizedVariantId
+      ) ||
+      normalizedVariantId <= 0
+    ) {
+      setStatus(
+        '승인할 게임 또는 상품 에디션 정보가 올바르지 않습니다.',
+        'err'
+      )
+      return
+    }
+
+    const variant =
+      detail &&
+      Array.isArray(detail.variants)
+        ? detail.variants.find(
+            function (item) {
+              return String(item.id) ===
+                String(normalizedVariantId)
+            }
+          )
+        : null
+
+    if (!variant) {
+      setStatus(
+        '승인할 상품 에디션을 찾지 못했습니다.',
+        'err'
+      )
+      return
+    }
+
+    const publishStatus = String(
+      variant.preorder_publish_status ||
+      'DRAFT'
+    ).toUpperCase()
+
+    if (publishStatus !== 'DRAFT') {
+      setStatus(
+        'DRAFT 상태의 예약판매만 검토 승인할 수 있습니다.',
+        'err'
+      )
+      return
+    }
+
+    const confirmed = window.confirm(
+      (
+        variant.variant_name ||
+        '선택한 상품 에디션'
+      ) +
+      '을 검토 승인할까요?\n\n' +
+      '승인 후에는 DRAFT 저장으로 내용을 수정할 수 없습니다.\n' +
+      '아직 공개되지는 않습니다.'
+    )
+
+    if (!confirmed) return
+
+    approving = true
+
+    if (button) {
+      button.disabled = true
+      button.textContent = '승인 중...'
+    }
+
+    setStatus(
+      '예약판매 정보를 검토 승인하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const result = await api(
+        '/admin/api/preorders/games/' +
+          encodeURIComponent(gameId) +
+          '/variants/' +
+          encodeURIComponent(
+            normalizedVariantId
+          ) +
+          '/approve',
+        {
+          method: 'POST'
+        }
+      )
+
+      await loadGameDetail(gameId)
+
+      setStatus(
+        result.alreadyApproved
+          ? '이미 검토 승인된 예약판매입니다.'
+          : '예약판매 검토 승인이 완료되었습니다. 아직 공개 상태는 아닙니다.',
+        'ok'
+      )
+    } catch (error) {
+      setStatus(
+        error && error.message
+          ? error.message
+          : '검토 승인에 실패했습니다.',
+        'err'
+      )
+
+      if (button) {
+        button.disabled = false
+        button.textContent = '검토 승인'
+      }
+    } finally {
+      approving = false
+    }
+  }
+
 
   async function editVariant(variantId) {
     if (
@@ -1304,20 +1470,40 @@
     if (existing) {
       existing.addEventListener(
         'click',
-        function (event) {
-          const button =
+              function (event) {
+          const approveButton =
+            event.target.closest(
+              '[data-preorder-v2-approve]'
+            )
+
+          if (approveButton) {
+            approveVariant(
+              approveButton.getAttribute(
+                'data-preorder-v2-approve'
+              ),
+              approveButton
+            )
+            return
+          }
+
+          const editButton =
             event.target.closest(
               '[data-preorder-v2-edit]'
             )
 
-          if (!button) return
+          if (!editButton) return
 
           editVariant(
-            button.getAttribute(
+            editButton.getAttribute(
               'data-preorder-v2-edit'
             )
           )
         }
+
+
+
+
+
       )
     }
   }
