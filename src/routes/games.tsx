@@ -1352,6 +1352,209 @@ function PlatformSwitch({
   )
 }
 
+// ---------- 공개 예약판매 이미지 ----------
+//
+// 비공개 R2 객체를 직접 공개하지 않고,
+// 공개 완료된 V2 예약판매에 연결된 승인 이미지만 전달한다.
+// ------------------------------------------------------------
+
+games.get(
+  '/preorder-images/:imageId',
+  async (c) => {
+    const imageId = Number(
+      c.req.param('imageId')
+    )
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      return c.notFound()
+    }
+
+    const record =
+      await c.env.DB.prepare(`
+        SELECT
+          g.id AS game_id,
+
+          gos.watch_item_id,
+
+          wii.id AS image_id,
+          wii.stored_image_url,
+          wii.image_hash,
+          wii.permission_status
+            AS image_permission_status,
+
+          sip.permission_status
+            AS source_permission_status,
+          sip.local_storage_allowed
+
+        FROM variant_preorder_images vpi
+
+        INNER JOIN variant_preorders vp
+          ON vp.id = vpi.preorder_id
+
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        INNER JOIN games g
+          ON g.id = e.game_id
+
+        INNER JOIN watch_item_images wii
+          ON wii.id = vpi.image_id
+
+        INNER JOIN game_official_sources gos
+          ON gos.id = vp.official_source_id
+
+        LEFT JOIN source_image_policies sip
+          ON sip.source_id = gos.source_id
+
+        WHERE
+          wii.id = ?
+          AND wii.watch_item_id =
+            gos.watch_item_id
+          AND g.publish_status =
+            'PUBLISHED'
+          AND pv.publish_status =
+            'ACTIVE'
+          AND vp.publish_status =
+            'PUBLISHED'
+          AND wii.permission_status =
+            'APPROVED'
+
+        LIMIT 1
+      `)
+        .bind(imageId)
+        .first<{
+          game_id: number
+          watch_item_id: number
+          image_id: number
+          stored_image_url: string | null
+          image_hash: string | null
+          image_permission_status: string
+          source_permission_status:
+            string | null
+          local_storage_allowed:
+            number | null
+        }>()
+
+    if (!record) {
+      return c.notFound()
+    }
+
+    const sourcePermissionStatus =
+      String(
+        record.source_permission_status ||
+        'PENDING'
+      ).toUpperCase()
+
+    if (
+      sourcePermissionStatus !==
+        'APPROVED' &&
+      sourcePermissionStatus !==
+        'CONDITIONAL'
+    ) {
+      return c.notFound()
+    }
+
+    if (
+      Number(
+        record.local_storage_allowed
+      ) !== 1
+    ) {
+      return c.notFound()
+    }
+
+    const objectKey =
+      `watcher/games/${record.game_id}/` +
+      `images/${record.image_id}/original`
+
+    const expectedStoredImageUrl =
+      `r2://GAME_IMAGES/${objectKey}`
+
+    if (
+      record.stored_image_url !==
+        expectedStoredImageUrl ||
+      !record.image_hash
+    ) {
+      return c.notFound()
+    }
+
+    const object =
+      await c.env.GAME_IMAGES.get(
+        objectKey
+      )
+
+    if (!object) {
+      return c.notFound()
+    }
+
+    const metadata =
+      object.customMetadata || {}
+
+    if (
+      metadata.watchItemId !==
+        String(record.watch_item_id) ||
+      metadata.imageId !==
+        String(record.image_id) ||
+      metadata.gameId !==
+        String(record.game_id) ||
+      metadata.sha256 !==
+        record.image_hash
+    ) {
+      return c.notFound()
+    }
+
+    const contentType =
+      object.httpMetadata
+        ?.contentType || ''
+
+    if (
+      contentType !== 'image/jpeg' &&
+      contentType !== 'image/png' &&
+      contentType !== 'image/webp'
+    ) {
+      return c.notFound()
+    }
+
+    const headers = new Headers()
+
+    object.writeHttpMetadata(headers)
+
+    headers.set(
+      'Content-Type',
+      contentType
+    )
+
+    headers.set(
+      'Cache-Control',
+      'public, max-age=3600, s-maxage=86400'
+    )
+
+    headers.set(
+      'X-Content-Type-Options',
+      'nosniff'
+    )
+
+    headers.set(
+      'ETag',
+      object.httpEtag
+    )
+
+    return new Response(
+      object.body,
+      {
+        status: 200,
+        headers,
+      }
+    )
+  }
+)
+
+
 // ---------- 플랫폼 미지정 상세 ----------
 games.get('/:gameId', async (c) => {
   const gameId = Number(
