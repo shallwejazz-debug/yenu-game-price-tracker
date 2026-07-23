@@ -1522,8 +1522,6 @@ games.get(
 
     const headers = new Headers()
 
-    object.writeHttpMetadata(headers)
-
     headers.set(
       'Content-Type',
       contentType
