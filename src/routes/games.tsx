@@ -1567,6 +1567,21 @@ games.get('/:gameId', async (c) => {
     )
   }
 
+  const publishedGame = await c.env.DB
+    .prepare(`
+      SELECT id
+      FROM games
+      WHERE id = ?
+        AND publish_status = 'PUBLISHED'
+      LIMIT 1
+    `)
+    .bind(gameId)
+    .first<{ id: number }>()
+
+  if (!publishedGame) {
+    return c.notFound()
+  }
+
   const editions =
     await listEditionsByGame(
       c.env.DB,
@@ -1622,6 +1637,21 @@ games.get(
           <h1>잘못된 게임 ID</h1>
         </main>
       )
+    }
+
+    const publishedGame = await c.env.DB
+      .prepare(`
+        SELECT id
+        FROM games
+        WHERE id = ?
+          AND publish_status = 'PUBLISHED'
+        LIMIT 1
+      `)
+      .bind(gameId)
+      .first<{ id: number }>()
+
+    if (!publishedGame) {
+      return c.notFound()
     }
 
     const game = await getGameById(

@@ -47,7 +47,7 @@ export const renderer = jsxRenderer(
           />
 
           <link
-            href="/static/style.css?v=20260720-pagination-v2"
+            href="/static/style.css?v=20260723-preorder-home-news-v1"
             rel="stylesheet"
           />
         </head>

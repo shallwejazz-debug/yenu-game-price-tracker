@@ -10,6 +10,10 @@ import {
   getTrackingCounts,
   getRecentGames,
 } from '../db'
+import {
+  getHomePreorderNews,
+  HomePreorderNewsSection,
+} from './home-preorders'
 
 const home = new Hono<{ Bindings: Bindings }>()
 
@@ -35,11 +39,13 @@ home.get('/', async (c) => {
     platformCounts,
     lastUpdatedUtc,
     recentGames,
+    preorderNews,
   ] = await Promise.all([
     getTrackingCounts(c.env.DB),
     getPlatformCounts(c.env.DB),
     getLastUpdated(c.env.DB),
     getRecentGames(c.env.DB, 8),
+    getHomePreorderNews(c.env.DB),
   ])
 
   const lastUpdated = toKstLabel(lastUpdatedUtc)
@@ -172,6 +178,10 @@ home.get('/', async (c) => {
       </header>
 
       <main class="home-content">
+        <HomePreorderNewsSection
+          news={preorderNews}
+        />
+
         <section class="home-section">
           <div class="home-section-heading">
             <div>

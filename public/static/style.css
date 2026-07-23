@@ -2377,3 +2377,248 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
     width: 100%;
   }
 }
+
+/* =========================================================
+   HOME PREORDER NEWS
+   ========================================================= */
+
+.home-preorder-section {
+  position: relative;
+}
+
+.home-preorder-eyebrow {
+  margin: 0 0 0.35rem;
+  color: #e4542f;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.home-preorder-news-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.home-preorder-news {
+  display: grid;
+  grid-template-columns: minmax(260px, 42%) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #e7e2da;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(45, 38, 30, 0.08);
+}
+
+.home-preorder-news-image {
+  display: flex;
+  min-height: 310px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, #f6f2eb, #ebe4d9);
+  color: #777;
+  font-size: 3rem;
+}
+
+.home-preorder-news-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #f5f1eb;
+  transition: transform 180ms ease;
+}
+
+.home-preorder-news-image:hover img {
+  transform: scale(1.02);
+}
+
+.home-preorder-news-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem;
+  color: #28231e;
+}
+
+.home-preorder-news-status {
+  width: fit-content;
+  margin-bottom: 0.8rem;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  background: #fff0e9;
+  color: #c94320;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.home-preorder-news h3 {
+  margin: 0;
+  font-size: clamp(1.45rem, 3vw, 2.1rem);
+  line-height: 1.25;
+}
+
+.home-preorder-news h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-preorder-news h3 a:hover {
+  color: #d94f2b;
+}
+
+.home-preorder-editions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.home-preorder-editions span {
+  padding: 0.35rem 0.62rem;
+  border: 1px solid #ded8cf;
+  border-radius: 999px;
+  background: #faf8f4;
+  color: #5f584f;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.home-preorder-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 1.4rem 0 0;
+}
+
+.home-preorder-summary div {
+  min-width: 0;
+  padding: 0.85rem;
+  border-radius: 13px;
+  background: #f7f5f1;
+}
+
+.home-preorder-summary dt {
+  margin-bottom: 0.35rem;
+  color: #81796f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.home-preorder-summary dd {
+  margin: 0;
+  color: #28231e;
+  font-size: 0.9rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.home-preorder-bonus {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0.9rem 1rem;
+  border-left: 4px solid #ef6a42;
+  border-radius: 0 12px 12px 0;
+  background: #fff8f4;
+  color: #4a4038;
+}
+
+.home-preorder-bonus strong {
+  flex: 0 0 auto;
+  color: #c94320;
+}
+
+.home-preorder-bonus span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-preorder-edition-note {
+  margin: 0.8rem 0 0;
+  color: #746c62;
+  font-size: 0.82rem;
+}
+
+.home-preorder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.home-preorder-actions a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.home-preorder-detail-link {
+  background: #26211d;
+  color: #fff;
+}
+
+.home-preorder-detail-link:hover {
+  background: #e4542f;
+  color: #fff;
+}
+
+.home-preorder-source-link {
+  border: 1px solid #d8d1c7;
+  background: #fff;
+  color: #443d36;
+}
+
+.home-preorder-source-link:hover {
+  border-color: #e4542f;
+  color: #c94320;
+}
+
+.home-preorder-source {
+  margin: 0.8rem 0 0;
+  color: #8a8278;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  .home-preorder-news {
+    grid-template-columns: 1fr;
+    border-radius: 17px;
+  }
+
+  .home-preorder-news-image {
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+  }
+
+  .home-preorder-news-body {
+    padding: 1.2rem;
+  }
+
+  .home-preorder-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .home-preorder-bonus {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .home-preorder-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .home-preorder-actions {
+    grid-template-columns: 1fr;
+  }
+}
