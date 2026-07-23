@@ -89,9 +89,16 @@ app.get('/sitemap.xml', async (c) => {
   // 기존처럼 게임마다 editions를 조회하지 않고 한 번에 모두 가져옴
   try {
     const { results } = await c.env.DB.prepare(`
-      SELECT DISTINCT game_id, platform
-      FROM editions
-      ORDER BY game_id, platform
+	SELECT DISTINCT
+	  e.game_id,
+	  e.platform
+	FROM editions e
+	INNER JOIN games g
+	  ON g.id = e.game_id
+	WHERE g.publish_status = 'PUBLISHED'
+	ORDER BY
+	  e.game_id,
+	  e.platform
     `).all<{ game_id: number; platform: string }>()
 
     for (const edition of results ?? []) {

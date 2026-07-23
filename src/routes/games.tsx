@@ -1352,6 +1352,207 @@ function PlatformSwitch({
   )
 }
 
+// ---------- 공개 예약판매 이미지 ----------
+//
+// 비공개 R2 객체를 직접 공개하지 않고,
+// 공개 완료된 V2 예약판매에 연결된 승인 이미지만 전달한다.
+// ------------------------------------------------------------
+
+games.get(
+  '/preorder-images/:imageId',
+  async (c) => {
+    const imageId = Number(
+      c.req.param('imageId')
+    )
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      return c.notFound()
+    }
+
+    const record =
+      await c.env.DB.prepare(`
+        SELECT
+          g.id AS game_id,
+
+          gos.watch_item_id,
+
+          wii.id AS image_id,
+          wii.stored_image_url,
+          wii.image_hash,
+          wii.permission_status
+            AS image_permission_status,
+
+          sip.permission_status
+            AS source_permission_status,
+          sip.local_storage_allowed
+
+        FROM variant_preorder_images vpi
+
+        INNER JOIN variant_preorders vp
+          ON vp.id = vpi.preorder_id
+
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        INNER JOIN games g
+          ON g.id = e.game_id
+
+        INNER JOIN watch_item_images wii
+          ON wii.id = vpi.image_id
+
+        INNER JOIN game_official_sources gos
+          ON gos.id = vp.official_source_id
+
+        LEFT JOIN source_image_policies sip
+          ON sip.source_id = gos.source_id
+
+        WHERE
+          wii.id = ?
+          AND wii.watch_item_id =
+            gos.watch_item_id
+          AND g.publish_status =
+            'PUBLISHED'
+          AND pv.publish_status =
+            'ACTIVE'
+          AND vp.publish_status =
+            'PUBLISHED'
+          AND wii.permission_status =
+            'APPROVED'
+
+        LIMIT 1
+      `)
+        .bind(imageId)
+        .first<{
+          game_id: number
+          watch_item_id: number
+          image_id: number
+          stored_image_url: string | null
+          image_hash: string | null
+          image_permission_status: string
+          source_permission_status:
+            string | null
+          local_storage_allowed:
+            number | null
+        }>()
+
+    if (!record) {
+      return c.notFound()
+    }
+
+    const sourcePermissionStatus =
+      String(
+        record.source_permission_status ||
+        'PENDING'
+      ).toUpperCase()
+
+    if (
+      sourcePermissionStatus !==
+        'APPROVED' &&
+      sourcePermissionStatus !==
+        'CONDITIONAL'
+    ) {
+      return c.notFound()
+    }
+
+    if (
+      Number(
+        record.local_storage_allowed
+      ) !== 1
+    ) {
+      return c.notFound()
+    }
+
+    const objectKey =
+      `watcher/games/${record.game_id}/` +
+      `images/${record.image_id}/original`
+
+    const expectedStoredImageUrl =
+      `r2://GAME_IMAGES/${objectKey}`
+
+    if (
+      record.stored_image_url !==
+        expectedStoredImageUrl ||
+      !record.image_hash
+    ) {
+      return c.notFound()
+    }
+
+    const object =
+      await c.env.GAME_IMAGES.get(
+        objectKey
+      )
+
+    if (!object) {
+      return c.notFound()
+    }
+
+    const metadata =
+      object.customMetadata || {}
+
+    if (
+      metadata.watchItemId !==
+        String(record.watch_item_id) ||
+      metadata.imageId !==
+        String(record.image_id) ||
+      metadata.gameId !==
+        String(record.game_id) ||
+      metadata.sha256 !==
+        record.image_hash
+    ) {
+      return c.notFound()
+    }
+
+    const contentType =
+      object.httpMetadata
+        ?.contentType || ''
+
+    if (
+      contentType !== 'image/jpeg' &&
+      contentType !== 'image/png' &&
+      contentType !== 'image/webp'
+    ) {
+      return c.notFound()
+    }
+
+    const headers = new Headers()
+
+    headers.set(
+      'Content-Type',
+      contentType
+    )
+
+    headers.set(
+      'Cache-Control',
+      'public, max-age=3600, s-maxage=86400'
+    )
+
+    headers.set(
+      'X-Content-Type-Options',
+      'nosniff'
+    )
+
+    headers.set(
+      'ETag',
+      object.httpEtag
+    )
+
+    return new Response(
+      object.body,
+      {
+        status: 200,
+        headers,
+      }
+    )
+  }
+)
+
+
 // ---------- 플랫폼 미지정 상세 ----------
 games.get('/:gameId', async (c) => {
   const gameId = Number(
@@ -1491,6 +1692,289 @@ games.get(
         edition.id
       )
 
+    // PUBLIC_PREORDER_V2_QUERY
+    type PublicPreorderImage = {
+      id: number
+      displayRole: string
+      displayOrder: number
+      altText: string
+    }
+
+    type PublicPreorder = {
+      id: number
+      variantId: number
+      variantName: string
+      variantKind: string
+      packageType: string
+      releaseDate: string
+      preorderStartDate: string | null
+      preorderEndDate: string | null
+      preorderStatus: string
+      preorderBonus: string | null
+      preorderBonusNote: string | null
+      contentsText: string | null
+      candidatePrice: number | null
+      confirmedPrice: number | null
+      priceStatus: string
+      sourceTitle: string
+      officialSourceUrl: string
+      sourceCredit: string
+      requiredCopyright: string | null
+      images: PublicPreorderImage[]
+    }
+
+    const publicPreorderResult =
+      await c.env.DB.prepare(`
+        SELECT
+          vp.id AS preorder_id,
+
+          pv.id AS variant_id,
+          pv.variant_name,
+          pv.variant_kind,
+          pv.package_type,
+
+          vp.release_date,
+          vp.preorder_start_date,
+          vp.preorder_end_date,
+          vp.preorder_status,
+          vp.preorder_bonus,
+          vp.preorder_bonus_note,
+          vp.contents_text,
+          vp.candidate_price,
+          vp.confirmed_price,
+          vp.price_status,
+
+          gos.source_title,
+          gos.official_source_url,
+          gos.source_credit,
+          gos.required_copyright,
+
+          wii.id AS image_id,
+          vpi.display_role,
+          vpi.display_order
+            AS image_display_order,
+
+          COALESCE(
+            vpi.alt_text,
+            wii.alt_text,
+            wii.title,
+            pv.variant_name
+          ) AS image_alt_text
+
+        FROM variant_preorders vp
+
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
+
+        INNER JOIN editions preorder_edition
+          ON preorder_edition.id =
+            pv.edition_id
+
+        INNER JOIN games preorder_game
+          ON preorder_game.id =
+            preorder_edition.game_id
+
+        INNER JOIN game_official_sources gos
+          ON gos.id =
+            vp.official_source_id
+
+        INNER JOIN source_image_policies sip
+          ON sip.source_id =
+            gos.source_id
+
+        LEFT JOIN variant_preorder_images vpi
+          ON vpi.preorder_id =
+            vp.id
+
+        LEFT JOIN watch_item_images wii
+          ON wii.id =
+            vpi.image_id
+          AND wii.watch_item_id =
+            gos.watch_item_id
+          AND wii.permission_status =
+            'APPROVED'
+          AND wii.stored_image_url
+            IS NOT NULL
+          AND TRIM(
+            wii.stored_image_url
+          ) <> ''
+          AND wii.image_hash
+            IS NOT NULL
+          AND TRIM(
+            wii.image_hash
+          ) <> ''
+
+        WHERE
+          preorder_edition.id = ?
+          AND preorder_game.id = ?
+          AND preorder_game.publish_status =
+            'PUBLISHED'
+          AND pv.publish_status =
+            'ACTIVE'
+          AND vp.publish_status =
+            'PUBLISHED'
+          AND gos.permission_status_snapshot
+            IN (
+              'APPROVED',
+              'CONDITIONAL'
+            )
+          AND TRIM(
+            gos.official_source_url
+          ) <> ''
+          AND sip.permission_status
+            IN (
+              'APPROVED',
+              'CONDITIONAL'
+            )
+          AND sip.local_storage_allowed = 1
+
+        ORDER BY
+          vp.display_order ASC,
+          pv.display_order ASC,
+          vp.id ASC,
+          CASE vpi.display_role
+            WHEN 'REPRESENTATIVE' THEN 0
+            WHEN 'PACKAGE' THEN 1
+            WHEN 'BONUS' THEN 2
+            WHEN 'CONTENTS' THEN 3
+            ELSE 4
+          END ASC,
+          vpi.display_order ASC,
+          wii.id ASC
+      `)
+        .bind(
+          edition.id,
+          gameId
+        )
+        .all<{
+          preorder_id: number
+          variant_id: number
+          variant_name: string
+          variant_kind: string
+          package_type: string
+          release_date: string
+          preorder_start_date:
+            string | null
+          preorder_end_date:
+            string | null
+          preorder_status: string
+          preorder_bonus:
+            string | null
+          preorder_bonus_note:
+            string | null
+          contents_text:
+            string | null
+          candidate_price:
+            number | null
+          confirmed_price:
+            number | null
+          price_status: string
+          source_title: string
+          official_source_url: string
+          source_credit: string
+          required_copyright:
+            string | null
+          image_id:
+            number | null
+          display_role:
+            string | null
+          image_display_order:
+            number | null
+          image_alt_text:
+            string | null
+        }>()
+
+    const publicPreorderMap =
+      new Map<number, PublicPreorder>()
+
+    for (
+      const row of
+      publicPreorderResult.results
+    ) {
+      let preorder =
+        publicPreorderMap.get(
+          row.preorder_id
+        )
+
+      if (!preorder) {
+        preorder = {
+          id: row.preorder_id,
+          variantId: row.variant_id,
+          variantName:
+            row.variant_name,
+          variantKind:
+            row.variant_kind,
+          packageType:
+            row.package_type,
+          releaseDate:
+            row.release_date,
+          preorderStartDate:
+            row.preorder_start_date,
+          preorderEndDate:
+            row.preorder_end_date,
+          preorderStatus:
+            row.preorder_status,
+          preorderBonus:
+            row.preorder_bonus,
+          preorderBonusNote:
+            row.preorder_bonus_note,
+          contentsText:
+            row.contents_text,
+          candidatePrice:
+            row.candidate_price,
+          confirmedPrice:
+            row.confirmed_price,
+          priceStatus:
+            row.price_status,
+          sourceTitle:
+            row.source_title,
+          officialSourceUrl:
+            row.official_source_url,
+          sourceCredit:
+            row.source_credit,
+          requiredCopyright:
+            row.required_copyright,
+          images: [],
+        }
+
+        publicPreorderMap.set(
+          row.preorder_id,
+          preorder
+        )
+      }
+
+      const imageId =
+        Number(row.image_id || 0)
+
+      if (
+        imageId > 0 &&
+        !preorder.images.some(
+          (image) =>
+            image.id === imageId
+        )
+      ) {
+        preorder.images.push({
+          id: imageId,
+          displayRole:
+            row.display_role ||
+            'GALLERY',
+          displayOrder:
+            Number(
+              row.image_display_order ||
+              0
+            ),
+          altText:
+            row.image_alt_text ||
+            `${row.variant_name} 예약판매 이미지`,
+        })
+      }
+    }
+
+    const publicPreorders =
+      Array.from(
+        publicPreorderMap.values()
+      )
+
     const platformLabel =
       PLATFORM_LABELS[platform] ??
       platform
@@ -1595,6 +2079,237 @@ games.get(
           active={platform}
         />
 
+        {publicPreorders.length > 0 && (
+          <section
+            class="preorder-public-section"
+            aria-labelledby="preorder-public-title"
+          >
+            <div class="preorder-public-heading">
+              <div>
+                <p class="preorder-public-eyebrow">
+                  PRE-ORDER
+                </p>
+
+                <h2 id="preorder-public-title">
+                  예약판매 정보
+                </h2>
+              </div>
+
+              <span class="preorder-public-safe-badge">
+                공식 출처 확인
+              </span>
+            </div>
+
+            <div class="preorder-public-list">
+              {publicPreorders.map(
+                (preorder) => {
+                  const statusLabel =
+                    preorder.preorderStatus ===
+                    'OPEN'
+                      ? '예약판매 진행 중'
+                      : preorder.preorderStatus ===
+                        'UPCOMING'
+                        ? '예약판매 예정'
+                        : preorder.preorderStatus ===
+                          'CLOSED'
+                          ? '예약판매 종료'
+                          : '예약판매 정보'
+
+                  const periodLabel =
+                    preorder.preorderStartDate &&
+                    preorder.preorderEndDate
+                      ? `${preorder.preorderStartDate} ~ ${preorder.preorderEndDate}`
+                      : preorder.preorderStartDate
+                        ? `${preorder.preorderStartDate}부터`
+                        : preorder.preorderEndDate
+                          ? `${preorder.preorderEndDate}까지`
+                          : '공식 출처에서 기간 확인'
+
+                  const priceLabel =
+                    preorder.priceStatus ===
+                    'CONFIRMED'
+                      ? won(
+                          Number(
+                            preorder.confirmedPrice
+                          )
+                        )
+                      : preorder.priceStatus ===
+                        'CANDIDATE'
+                        ? `${won(
+                            Number(
+                              preorder.candidatePrice
+                            )
+                          )} (확정 전)`
+                        : '가격 미정'
+
+                  return (
+                    <article
+                      class="preorder-public-card"
+                      key={preorder.id}
+                    >
+                      <div class="preorder-public-card-head">
+                        <div>
+                          <span
+                            class={
+                              'preorder-public-status ' +
+                              (
+                                preorder.preorderStatus ===
+                                'OPEN'
+                                  ? 'is-open'
+                                  : ''
+                              )
+                            }
+                          >
+                            {statusLabel}
+                          </span>
+
+                          <h3>
+                            {preorder.variantName}
+                          </h3>
+
+                          <p class="preorder-public-kind">
+                            {preorder.variantKind}
+                            {' · '}
+                            {preorder.packageType}
+                          </p>
+                        </div>
+
+                        <strong class="preorder-public-price">
+                          {priceLabel}
+                        </strong>
+                      </div>
+
+                      {preorder.images.length > 0 && (
+                        <div class="preorder-public-images">
+                          {preorder.images.map(
+                            (
+                              image,
+                              imageIndex
+                            ) => (
+                              <figure
+                                class={
+                                  'preorder-public-image ' +
+                                  (
+                                    imageIndex === 0
+                                      ? 'is-representative'
+                                      : ''
+                                  )
+                                }
+                                key={image.id}
+                              >
+                                <img
+                                  src={`/games/preorder-images/${image.id}`}
+                                  alt={image.altText}
+                                  loading={
+                                    imageIndex === 0
+                                      ? 'eager'
+                                      : 'lazy'
+                                  }
+                                />
+
+                                {image.displayRole ===
+                                  'BONUS' && (
+                                  <figcaption>
+                                    예약 특전
+                                  </figcaption>
+                                )}
+                              </figure>
+                            )
+                          )}
+                        </div>
+                      )}
+
+                      <dl class="preorder-public-meta">
+                        <div>
+                          <dt>예약판매 기간</dt>
+                          <dd>{periodLabel}</dd>
+                        </div>
+
+                        <div>
+                          <dt>출시일</dt>
+                          <dd>
+                            {preorder.releaseDate}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt>가격</dt>
+                          <dd>{priceLabel}</dd>
+                        </div>
+                      </dl>
+
+                      {preorder.preorderBonus && (
+                        <div class="preorder-public-info">
+                          <h4>예약 특전</h4>
+                          <p>
+                            {preorder.preorderBonus}
+                          </p>
+
+                          {preorder.preorderBonusNote && (
+                            <p class="preorder-public-note">
+                              {
+                                preorder.preorderBonusNote
+                              }
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {preorder.contentsText && (
+                        <div class="preorder-public-info">
+                          <h4>구성품</h4>
+                          <p>
+                            {preorder.contentsText}
+                          </p>
+                        </div>
+                      )}
+
+                      <div class="preorder-public-source">
+                        <div>
+                          <span>공식 출처</span>
+                          <strong>
+                            {preorder.sourceTitle}
+                          </strong>
+                        </div>
+
+                        <a
+                          href={
+                            preorder.officialSourceUrl
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          공식 정보 확인 ↗
+                        </a>
+                      </div>
+
+                      <p class="preorder-public-credit">
+                        출처: {
+                          preorder.sourceCredit
+                        }
+                      </p>
+
+                      {preorder.requiredCopyright && (
+                        <p class="preorder-public-copyright">
+                          {
+                            preorder.requiredCopyright
+                          }
+                        </p>
+                      )}
+                    </article>
+                  )
+                }
+              )}
+            </div>
+
+            <p class="preorder-public-disclaimer">
+              예약판매 기간·가격·특전은 공식
+              발표 이후 변경될 수 있습니다.
+              구매 전 공식 출처에서 최신 정보를
+              확인해 주세요.
+            </p>
+          </section>
+        )}
         <div class="price-sections">
           <PriceSection
             title="디지털"

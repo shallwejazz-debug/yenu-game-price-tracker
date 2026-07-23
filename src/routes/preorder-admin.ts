@@ -1704,5 +1704,633 @@ preorderAdmin.post(
   }
 )
 
+// ------------------------------------------------------------
+// 예약판매 V2 공개
+// game: DRAFT → PUBLISHED
+// variant: DRAFT → ACTIVE
+// preorder: APPROVED → PUBLISHED
+// ------------------------------------------------------------
+
+preorderAdmin.post(
+  '/games/:gameId/variants/:variantId/publish',
+  async (c) => {
+    const gameId = Number(c.req.param('gameId'))
+    const variantId = Number(c.req.param('variantId'))
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0 ||
+      !Number.isInteger(variantId) ||
+      variantId <= 0
+    ) {
+      return jsonError(
+        c,
+        '게임 ID와 상품 에디션 ID를 확인해 주세요.',
+        400
+      )
+    }
+
+    try {
+      const target = await c.env.DB.prepare(`
+        SELECT
+          g.id AS game_id,
+          g.publish_status
+            AS game_publish_status,
+
+          pv.id AS variant_id,
+          pv.publish_status
+            AS variant_publish_status,
+
+          vp.id AS preorder_id,
+          vp.release_date,
+          vp.preorder_start_date,
+          vp.preorder_end_date,
+          vp.preorder_status,
+          vp.price_status,
+          vp.candidate_price,
+          vp.confirmed_price,
+          vp.publish_status
+            AS preorder_publish_status,
+
+          gos.id AS official_source_id,
+          gos.watch_item_id,
+          gos.official_source_url,
+          gos.permission_status_snapshot,
+
+          sip.permission_status
+            AS source_permission_status,
+          sip.local_storage_allowed,
+
+          (
+            SELECT COUNT(*)
+            FROM variant_preorder_images vpi
+            WHERE vpi.preorder_id = vp.id
+          ) AS image_count,
+
+          (
+            SELECT COUNT(*)
+            FROM variant_preorder_images vpi
+            WHERE
+              vpi.preorder_id = vp.id
+              AND vpi.display_role =
+                'REPRESENTATIVE'
+          ) AS representative_count,
+
+          (
+            SELECT COUNT(*)
+
+            FROM variant_preorder_images vpi
+
+            INNER JOIN watch_item_images wii
+              ON wii.id = vpi.image_id
+
+            WHERE
+              vpi.preorder_id = vp.id
+              AND wii.watch_item_id =
+                gos.watch_item_id
+              AND wii.permission_status =
+                'APPROVED'
+              AND wii.stored_image_url
+                IS NOT NULL
+              AND TRIM(
+                wii.stored_image_url
+              ) <> ''
+              AND wii.image_hash
+                IS NOT NULL
+              AND TRIM(
+                wii.image_hash
+              ) <> ''
+          ) AS valid_image_count
+
+        FROM variant_preorders vp
+
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        INNER JOIN games g
+          ON g.id = e.game_id
+
+        INNER JOIN game_official_sources gos
+          ON gos.id = vp.official_source_id
+
+        LEFT JOIN source_image_policies sip
+          ON sip.source_id = gos.source_id
+
+        WHERE
+          g.id = ?
+          AND pv.id = ?
+
+        LIMIT 1
+      `)
+        .bind(gameId, variantId)
+        .first<{
+          game_id: number
+          game_publish_status: string
+          variant_id: number
+          variant_publish_status: string
+          preorder_id: number
+          release_date: string
+          preorder_start_date: string | null
+          preorder_end_date: string | null
+          preorder_status: string
+          price_status: string
+          candidate_price: number | null
+          confirmed_price: number | null
+          preorder_publish_status: string
+          official_source_id: number
+          watch_item_id: number
+          official_source_url: string
+          permission_status_snapshot: string
+          source_permission_status: string | null
+          local_storage_allowed: number | null
+          image_count: number
+          representative_count: number
+          valid_image_count: number
+        }>()
+
+      if (!target) {
+        return jsonError(
+          c,
+          '공개할 예약판매 정보를 찾지 못했습니다.',
+          404
+        )
+      }
+
+      if (
+        target.game_publish_status ===
+          'PUBLISHED' &&
+        target.variant_publish_status ===
+          'ACTIVE' &&
+        target.preorder_publish_status ===
+          'PUBLISHED'
+      ) {
+        return c.json({
+          ok: true,
+          alreadyPublished: true,
+          gameId,
+          variantId,
+          preorderId: target.preorder_id,
+          publishStatus: 'PUBLISHED',
+        })
+      }
+
+      if (
+        target.game_publish_status !==
+          'DRAFT' &&
+        target.game_publish_status !==
+          'PUBLISHED'
+      ) {
+        return jsonError(
+          c,
+          '공개할 수 없는 게임 상태입니다.',
+          409
+        )
+      }
+
+      if (
+        target.variant_publish_status !==
+        'DRAFT'
+      ) {
+        return jsonError(
+          c,
+          'DRAFT 상태의 상품 에디션만 공개할 수 있습니다.',
+          409
+        )
+      }
+
+      if (
+        target.preorder_publish_status !==
+        'APPROVED'
+      ) {
+        return jsonError(
+          c,
+          '검토 승인된 예약판매만 공개할 수 있습니다.',
+          409
+        )
+      }
+
+      const releaseDate =
+        text(target.release_date, 10)
+
+      const preorderStartDate =
+        text(target.preorder_start_date, 10)
+
+      const preorderEndDate =
+        text(target.preorder_end_date, 10)
+
+      if (!isValidDate(releaseDate)) {
+        return jsonError(
+          c,
+          '출시일을 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        preorderStartDate &&
+        !isValidDate(preorderStartDate)
+      ) {
+        return jsonError(
+          c,
+          '예약판매 시작일을 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        preorderEndDate &&
+        !isValidDate(preorderEndDate)
+      ) {
+        return jsonError(
+          c,
+          '예약판매 종료일을 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        preorderStartDate &&
+        preorderEndDate &&
+        preorderStartDate >
+          preorderEndDate
+      ) {
+        return jsonError(
+          c,
+          '예약판매 기간을 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        target.preorder_status ===
+          'UNKNOWN' ||
+        target.preorder_status ===
+          'CANCELLED'
+      ) {
+        return jsonError(
+          c,
+          '예약판매 진행 상태를 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        !text(target.official_source_url)
+      ) {
+        return jsonError(
+          c,
+          '공식 출처 URL을 확인해 주세요.',
+          409
+        )
+      }
+
+      const sourceSnapshot =
+        String(
+          target.permission_status_snapshot ||
+          'PENDING'
+        ).toUpperCase()
+
+      if (
+        sourceSnapshot !== 'APPROVED' &&
+        sourceSnapshot !== 'CONDITIONAL'
+      ) {
+        return jsonError(
+          c,
+          '게임에 연결된 출처 권한을 확인해 주세요.',
+          409
+        )
+      }
+
+      const sourcePermissionStatus =
+        String(
+          target.source_permission_status ||
+          'PENDING'
+        ).toUpperCase()
+
+      if (
+        sourcePermissionStatus !==
+          'APPROVED' &&
+        sourcePermissionStatus !==
+          'CONDITIONAL'
+      ) {
+        return jsonError(
+          c,
+          '현재 출처 이미지 정책이 공개를 허용하지 않습니다.',
+          409
+        )
+      }
+
+      if (
+        Number(
+          target.local_storage_allowed
+        ) !== 1
+      ) {
+        return jsonError(
+          c,
+          '현재 출처는 이미지 로컬 저장을 허용하지 않습니다.',
+          409
+        )
+      }
+
+      const imageCount =
+        Number(target.image_count || 0)
+
+      const representativeCount =
+        Number(
+          target.representative_count || 0
+        )
+
+      const validImageCount =
+        Number(
+          target.valid_image_count || 0
+        )
+
+      if (
+        imageCount < 1 ||
+        representativeCount !== 1 ||
+        validImageCount !== imageCount
+      ) {
+        return jsonError(
+          c,
+          '공개 이미지의 승인·저장·대표 이미지 상태를 확인해 주세요.',
+          409
+        )
+      }
+
+      const linkedImages =
+        await c.env.DB.prepare(`
+          SELECT
+            wii.id AS image_id,
+            wii.watch_item_id,
+            wii.stored_image_url,
+            wii.image_hash
+
+          FROM variant_preorder_images vpi
+
+          INNER JOIN watch_item_images wii
+            ON wii.id = vpi.image_id
+
+          WHERE vpi.preorder_id = ?
+
+          ORDER BY
+            vpi.display_order ASC,
+            wii.id ASC
+        `)
+          .bind(target.preorder_id)
+          .all<{
+            image_id: number
+            watch_item_id: number
+            stored_image_url: string | null
+            image_hash: string | null
+          }>()
+
+      if (
+        linkedImages.results.length !==
+        imageCount
+      ) {
+        return jsonError(
+          c,
+          '공개 이미지 연결 정보를 확인해 주세요.',
+          409
+        )
+      }
+
+      for (
+        const image of
+        linkedImages.results
+      ) {
+        const objectKey =
+          `watcher/games/${gameId}/` +
+          `images/${image.image_id}/original`
+
+        const expectedStoredImageUrl =
+          `r2://GAME_IMAGES/${objectKey}`
+
+        const imageHash =
+          text(image.image_hash)
+
+        if (
+          image.watch_item_id !==
+            target.watch_item_id ||
+          image.stored_image_url !==
+            expectedStoredImageUrl ||
+          !imageHash
+        ) {
+          return jsonError(
+            c,
+            '공개 이미지의 R2 저장 정보를 확인해 주세요.',
+            409
+          )
+        }
+
+        const object =
+          await c.env.GAME_IMAGES.head(
+            objectKey
+          )
+
+        if (!object) {
+          return jsonError(
+            c,
+            '공개 이미지의 R2 객체를 찾지 못했습니다.',
+            409
+          )
+        }
+
+        const metadata =
+          object.customMetadata || {}
+
+        if (
+          metadata.watchItemId !==
+            String(target.watch_item_id) ||
+          metadata.imageId !==
+            String(image.image_id) ||
+          metadata.gameId !==
+            String(gameId) ||
+          metadata.sha256 !== imageHash
+        ) {
+          return jsonError(
+            c,
+            '공개 이미지의 R2 메타데이터가 일치하지 않습니다.',
+            409
+          )
+        }
+
+        const contentType =
+          object.httpMetadata
+            ?.contentType || ''
+
+        if (
+          contentType !== 'image/jpeg' &&
+          contentType !== 'image/png' &&
+          contentType !== 'image/webp'
+        ) {
+          return jsonError(
+            c,
+            '공개 이미지 형식을 확인해 주세요.',
+            409
+          )
+        }
+      }
+
+      const allowedPriceStatuses =
+        new Set([
+          'UNCONFIRMED',
+          'CANDIDATE',
+          'CONFIRMED',
+        ])
+
+      if (
+        !allowedPriceStatuses.has(
+          target.price_status
+        )
+      ) {
+        return jsonError(
+          c,
+          '가격 상태를 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        target.price_status ===
+          'CONFIRMED' &&
+        (
+          !Number.isInteger(
+            Number(target.confirmed_price)
+          ) ||
+          Number(
+            target.confirmed_price
+          ) <= 0
+        )
+      ) {
+        return jsonError(
+          c,
+          '확정 가격을 확인해 주세요.',
+          409
+        )
+      }
+
+      if (
+        target.price_status ===
+          'CANDIDATE' &&
+        (
+          !Number.isInteger(
+            Number(target.candidate_price)
+          ) ||
+          Number(
+            target.candidate_price
+          ) <= 0
+        )
+      ) {
+        return jsonError(
+          c,
+          '후보 가격을 확인해 주세요.',
+          409
+        )
+      }
+
+      const results =
+        await c.env.DB.batch([
+          c.env.DB.prepare(`
+            UPDATE games
+
+            SET
+              publish_status =
+                'PUBLISHED',
+              published_at =
+                COALESCE(
+                  published_at,
+                  CURRENT_TIMESTAMP
+                )
+
+            WHERE
+              id = ?
+              AND publish_status IN (
+                'DRAFT',
+                'PUBLISHED'
+              )
+          `).bind(gameId),
+
+          c.env.DB.prepare(`
+            UPDATE product_variants
+
+            SET
+              publish_status = 'ACTIVE',
+              updated_at =
+                CURRENT_TIMESTAMP
+
+            WHERE
+              id = ?
+              AND publish_status = 'DRAFT'
+          `).bind(variantId),
+
+          c.env.DB.prepare(`
+            UPDATE variant_preorders
+
+            SET
+              publish_status =
+                'PUBLISHED',
+              published_at =
+                CURRENT_TIMESTAMP,
+              updated_at =
+                CURRENT_TIMESTAMP
+
+            WHERE
+              id = ?
+              AND publish_status =
+                'APPROVED'
+          `).bind(target.preorder_id),
+        ])
+
+      const changed = results.map(
+        (result) =>
+          Number(
+            result.meta.changes || 0
+          )
+      )
+
+      if (
+        changed.length !== 3 ||
+        changed.some(
+          (count) => count !== 1
+        )
+      ) {
+        return jsonError(
+          c,
+          '공개 상태 전환 결과를 확인할 수 없습니다.',
+          500
+        )
+      }
+
+      return c.json({
+        ok: true,
+        alreadyPublished: false,
+        gameId,
+        variantId,
+        preorderId: target.preorder_id,
+        gamePublishStatus: 'PUBLISHED',
+        variantPublishStatus: 'ACTIVE',
+        preorderPublishStatus: 'PUBLISHED',
+        publishedAt:
+          new Date().toISOString(),
+      })
+    } catch (error) {
+      console.error(
+        'preorder publication failed',
+        error
+      )
+
+      return jsonError(
+        c,
+        '예약판매 공개 처리 중 오류가 발생했습니다.',
+        500
+      )
+    }
+  }
+)
+
 
 export default preorderAdmin
