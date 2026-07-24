@@ -1736,7 +1736,7 @@ function renderGames() {
               escapeHtml(game.title) +
               ' 선택"' +
             '>' +
-            
+
             thumbHtml +
 
             '<div class="game-info">' +
@@ -1758,8 +1758,20 @@ function renderGames() {
               ' class="game-edit"' +
               ' data-edit-url-game="' + escapeHtml(game.id) + '"' +
               ' data-edit-url-current="' + escapeHtml(game.imageUrl) + '"' +
-              ' style="margin-right: 8px;"' + 
+              ' style="margin-right: 8px;"' +
             '>URL 수정</button>' +
+
+            '<button' +
+              ' type="button"' +
+              ' class="game-edit"' +
+              ' data-fetch-price-game="' +
+                escapeHtml(game.id) +
+              '"' +
+              ' data-fetch-price-title="' +
+                escapeHtml(game.title) +
+              '"' +
+              ' style="margin-right: 8px;"' +
+            '>가격 수집</button>' +
 
             '<button' +
               ' type="button"' +
@@ -1788,6 +1800,22 @@ function renderGames() {
       })
 
     list
+      .querySelectorAll('[data-fetch-price-game]')
+      .forEach(function (button) {
+        button.addEventListener(
+          'click',
+          function () {
+            fetchGamePrices(
+              Number(
+                button.dataset.fetchPriceGame
+              ),
+              button.dataset.fetchPriceTitle || ''
+            )
+          }
+        )
+      })
+
+    list
       .querySelectorAll('[data-edit-url-game]')
       .forEach(function (button) {
         button.addEventListener('click', function () {
@@ -1800,9 +1828,143 @@ function renderGames() {
     updateGameSelection()
   }
 
+  async function fetchGamePrices(
+    gameId,
+    gameTitle
+  ) {
+    try {
+      const data = await api(
+        '/admin/api/games/' +
+          encodeURIComponent(gameId) +
+          '/editions'
+      )
+
+      const editions =
+        Array.isArray(data.editions)
+          ? data.editions
+          : []
+
+      if (!editions.length) {
+        throw new Error(
+          '가격을 수집할 에디션이 없습니다.'
+        )
+      }
+
+      let edition = editions[0]
+
+      if (editions.length > 1) {
+        const guide = editions
+          .map(function (item) {
+            return (
+              item.id +
+              ' : ' +
+              platformLabel(item.platform) +
+              ' · ' +
+              (item.editionName || '기본판') +
+              ' · 검색어: ' +
+              (item.searchQuery || '미설정')
+            )
+          })
+          .join('\n')
+
+        const selectedId = window.prompt(
+          gameTitle +
+            '의 가격을 수집할 에디션 ID를 입력하세요.\n\n' +
+            guide,
+          String(editions[0].id)
+        )
+
+        if (selectedId === null) return
+
+        edition = editions.find(
+          function (item) {
+            return String(item.id) ===
+              String(selectedId).trim()
+          }
+        )
+
+        if (!edition) {
+          throw new Error(
+            '선택한 에디션을 찾을 수 없습니다.'
+          )
+        }
+      }
+
+      if (!edition.searchQuery) {
+        throw new Error(
+          '선택한 에디션에 네이버 검색어가 설정되어 있지 않습니다.'
+        )
+      }
+
+      if (
+        !window.confirm(
+          gameTitle +
+            '\n' +
+            platformLabel(edition.platform) +
+            '\n검색어: ' +
+            edition.searchQuery +
+            '\n\n네이버 가격을 다시 수집할까요?' +
+            '\n새 상품이 발견되면 기존 가격 목록이 교체됩니다.'
+        )
+      ) {
+        return
+      }
+
+      setStatus(
+        $('gameListStatus'),
+        gameTitle +
+          '의 네이버 가격을 수집하는 중입니다.',
+        'info'
+      )
+
+      const result = await api(
+        '/admin/editions/' +
+          encodeURIComponent(edition.id) +
+          '/fetch-prices',
+        {
+          method: 'POST'
+        }
+      )
+
+      const message =
+        result.message ||
+        (
+          '검색 ' +
+          Number(result.found || 0) +
+          '건, 저장 ' +
+          Number(result.saved || 0) +
+          '건'
+        )
+
+      setStatus(
+        $('gameListStatus'),
+        message,
+        Number(result.saved || 0) > 0
+          ? 'ok'
+          : 'info'
+      )
+
+      showToast(
+        message,
+        Number(result.saved || 0) > 0
+          ? 'ok'
+          : 'info'
+      )
+    } catch (error) {
+      setStatus(
+        $('gameListStatus'),
+        error.message,
+        'err'
+      )
+
+      showToast(error.message, 'err')
+    }
+  }
+
+
   async function updateGameImage(gameId, currentUrl) {
     const newUrl = window.prompt('새로운 이미지 URL을 입력하세요:', currentUrl || '')
-    
+
     if (newUrl === null || newUrl.trim() === (currentUrl || '').trim()) {
       return
     }
@@ -2397,7 +2559,7 @@ function renderGames() {
     }
   }
 
-  
+
     function renderPasteResults(results) {
     const original = $('importResult')
     const paste = $('pasteResult')

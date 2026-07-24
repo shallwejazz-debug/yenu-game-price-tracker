@@ -491,13 +491,13 @@ export function AdminPage(): string {
         <div class="admin-section-head">
           <div>
             <h2>🔔 WATCHER 이벤트</h2>
-      
+
             <p class="admin-hint">
               보도자료와 이미지 후보 발견 이력을 표시합니다.
               읽음 처리해도 기록은 삭제되지 않습니다.
             </p>
           </div>
-      
+
           <button
             id="markAllWatcherEventsRead"
             class="btn btn-sm"
@@ -506,7 +506,7 @@ export function AdminPage(): string {
             모두 읽음
           </button>
         </div>
-      
+
         <div
           id="watcherEventList"
           class="watcher-event-list"
@@ -982,7 +982,7 @@ export function AdminPage(): string {
           </div>
         </section>
 
-     
+
         <div class="admin-row admin-row-wrap">
           <button
             id="saveWatcherTransform"
@@ -2212,9 +2212,9 @@ export function AdminPage(): string {
     ></div>
   </main>
 
-	<script src="/static/admin.js?v=20260721-watcher-tab"></script>
+	<script src="/static/admin.js?v=20260724-published-price-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260722-watcher-script-fix-1"></script>
-	<script src="/static/preorder-admin.js?v=20260722-preorder-approval-1"></script>
+	<script src="/static/preorder-admin.js?v=20260724-published-price-v1"></script>
 </body>
 </html>`
 }
