@@ -2808,12 +2808,67 @@ admin.post(
         bucket?.prices ?? []
 
       if (!prices.length) {
+        const rejectionCounts =
+          classified.rejected.reduce<
+            Record<string, number>
+          >((counts, item) => {
+            const reason =
+              String(item.reason || '')
+                .split(':')[0] ||
+              'unknown'
+
+            counts[reason] =
+              (counts[reason] ?? 0) + 1
+
+            return counts
+          }, {})
+
+        const reasonLabels:
+          Record<string, string> = {
+            excluded: '제외어',
+            goodsBlock: '굿즈',
+            notGameTitle: '본편판정',
+            blacklisted: '블랙리스트',
+            catalog: '카탈로그',
+            used: '중고·차단몰',
+            outOfRange: '가격범위',
+            wlOutOfRange: '가격범위',
+            noPlatform: '플랫폼',
+            platformMismatch: '플랫폼불일치',
+            unknown: '기타',
+          }
+
+        const reasonSummary =
+          Object.entries(rejectionCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(
+              ([reason, count]) =>
+                `${reasonLabels[reason] ?? reason} ${count}건`
+            )
+            .join(' · ')
+
         return c.json({
           ok: true,
+          query:
+            edition.search_query,
           found: 0,
           saved: 0,
+          totalItems:
+            classified.totalItems,
+          skipped:
+            classified.skipped,
+          rejectionCounts,
+          rejected:
+            classified.rejected.slice(0, 10),
           message:
-            '게임 본품 가격을 찾지 못했습니다.',
+            '게임 본품 가격을 찾지 못했습니다.' +
+            ` 네이버 ${classified.totalItems}건 검색` +
+            (
+              reasonSummary
+                ? ` · ${reasonSummary}`
+                : ''
+            ),
         })
       }
 

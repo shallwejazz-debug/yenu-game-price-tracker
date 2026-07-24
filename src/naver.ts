@@ -286,7 +286,6 @@ const EDITION_REGEX = [
   /스페셜\s*에디션|special\s*edition/i,
   /스페셜리스트|specialist/i,
   /한정|리미티드|limited/i,
-  /예약|예구|선주문|pre[\s-]?order/i,
 ];
 
 function isSpecialEdition(title: string): boolean {
@@ -311,8 +310,50 @@ function isExcludedTitle(normTitle: string, excludeKeywords: string[]): boolean 
   });
 }
 
+// 예약특전이 포함된 게임 본편과 굿즈 단품을 구분한다.
+const RESERVATION_BONUS_RE =
+  /예약|예구|선주문|pre[\s-]?order|특전|증정|사은품|포함/i;
+
+const STANDALONE_GOODS_RE =
+  /(?:특전|굿즈|클리너|키링|스틸북|아트북|ost|사운드트랙)\s*(?:단품|만\s*판매|별도\s*판매)|(?:게임|게임팩|본편|소프트|카트리지)\s*(?:미포함|없음|제외)|게임팩\s*[xｘ]/i;
+
+function matchesAllGameKeywords(
+  title: string,
+  gameKeywords: string[]
+): boolean {
+  if (gameKeywords.length === 0) {
+    return false;
+  }
+
+  const normTitle = normalizeTitleForMatch(
+    stripTags(title).toLowerCase()
+  );
+
+  return gameKeywords.every((keyword) => {
+    const normalizedKeyword = keyword
+      .toLowerCase()
+      .replace(/\s+/g, '');
+
+    return (
+      normalizedKeyword.length > 0 &&
+      normTitle.includes(normalizedKeyword)
+    );
+  });
+}
+
+function isBundledGameWithReservationBonus(
+  title: string,
+  gameKeywords: string[]
+): boolean {
+  return (
+    RESERVATION_BONUS_RE.test(title) &&
+    !STANDALONE_GOODS_RE.test(title) &&
+    matchesAllGameKeywords(title, gameKeywords)
+  );
+}
+
 // 화이트리스트 몰은 특수판/예약 및 일반 banned 필터를 완화한다.
-// 단, 키워드 AND·제외어·카테고리·WL_HARD_BLOCK 검사는 유지한다.
+// 단, 키워드 AND·제외어·카테고리 검사는 유지한다.
 function isLikelyGameTitle(
   item: NaverShopItem,
   gameKeywords: string[],
@@ -379,7 +420,13 @@ function isLikelyGameTitle(
       '호환용',
     ];
 
-    if (banned.some((word) => title.includes(word))) {
+    if (
+      banned.some((word) => title.includes(word)) &&
+      !isBundledGameWithReservationBonus(
+        title,
+        gameKeywords
+      )
+    ) {
       return false;
     }
 
@@ -754,8 +801,15 @@ export async function searchAndClassify(
         }
       }
 
-      // 굿즈 단품은 화이트리스트여도 무조건 차단
-      if (WL_HARD_BLOCK_RE.test(title)) {
+      // 굿즈 단품은 차단하되, 게임 본편과 함께 제공되는
+      // 예약특전은 정상 패키지 상품으로 허용한다.
+      if (
+        WL_HARD_BLOCK_RE.test(title) &&
+        !isBundledGameWithReservationBonus(
+          title,
+          keywords
+        )
+      ) {
         skipped.notGameTitle++;
         reject('goodsBlock', item, title, null, wl);
         continue;
