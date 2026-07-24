@@ -38,15 +38,25 @@ home.get('/', async (c) => {
     trackingCounts,
     platformCounts,
     lastUpdatedUtc,
-    recentGames,
+    recentGameCandidates,
     preorderNews,
   ] = await Promise.all([
     getTrackingCounts(c.env.DB),
     getPlatformCounts(c.env.DB),
     getLastUpdated(c.env.DB),
-    getRecentGames(c.env.DB, 8),
+    getRecentGames(c.env.DB, 12),
     getHomePreorderNews(c.env.DB),
   ])
+
+  const preorderGameIds = new Set(
+    preorderNews.map((item) => item.gameId)
+  )
+
+  const recentGames = recentGameCandidates
+    .filter(
+      (game) => !preorderGameIds.has(game.id)
+    )
+    .slice(0, 8)
 
   const lastUpdated = toKstLabel(lastUpdatedUtc)
 
@@ -232,8 +242,9 @@ home.get('/', async (c) => {
               </h2>
 
               <p>
-                여누딜에 새로 등록된 게임
-                8개입니다.
+                {recentGames.length > 0
+                  ? `여누딜에 새로 등록된 게임 ${recentGames.length}개입니다.`
+                  : '새로 등록된 게임을 준비하고 있습니다.'}
               </p>
             </div>
         </div>
