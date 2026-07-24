@@ -18,6 +18,8 @@ type HomePreorderRow = {
   candidate_price: number | null
   preorder_bonus: string | null
   source_title: string
+  source_credit: string
+  required_copyright: string | null
   official_source_url: string
   trailer_url: string | null
   representative_image_id: number | null
@@ -43,6 +45,8 @@ export type HomePreorderNews = {
   title: string
   platform: string
   sourceTitle: string
+  sourceCredit: string
+  requiredCopyright: string | null
   officialSourceUrl: string
   trailerUrl: string | null
   representativeImageId: number | null
@@ -110,6 +114,23 @@ function getStatusLabel(status: string): string {
   return '예약판매 소식'
 }
 
+function normalizeSourceCredit(
+  value: string
+): string {
+  return (
+    String(value || '')
+      .replace(
+        /^\s*(?:출처\s*:\s*)?/i,
+        ''
+      )
+      .replace(
+        /\s*\(\s*공식\s*보도자료\s*\)\s*$/i,
+        ''
+      )
+      .trim() || '공식 출처'
+  )
+}
+
 export async function getHomePreorderNews(
   db: Bindings['DB']
 ): Promise<HomePreorderNews[]> {
@@ -133,6 +154,8 @@ export async function getHomePreorderNews(
         vp.candidate_price,
         vp.preorder_bonus,
         gos.source_title,
+        gos.source_credit,
+        gos.required_copyright,
         gos.official_source_url,
         gos.trailer_url,
 
@@ -174,6 +197,17 @@ export async function getHomePreorderNews(
       WHERE g.publish_status = 'PUBLISHED'
         AND pv.publish_status = 'ACTIVE'
         AND vp.publish_status = 'PUBLISHED'
+        AND vp.preorder_status NOT IN (
+          'CLOSED',
+          'CANCELLED'
+        )
+        AND (
+          vp.preorder_end_date IS NULL
+          OR DATE(vp.preorder_end_date) >= DATE(
+            'now',
+            '+9 hours'
+          )
+        )
         AND gos.permission_status_snapshot
           IN ('APPROVED', 'CONDITIONAL')
         AND sip.permission_status
@@ -204,6 +238,9 @@ export async function getHomePreorderNews(
         title: row.game_title,
         platform: row.platform,
         sourceTitle: row.source_title,
+        sourceCredit: row.source_credit,
+        requiredCopyright:
+          row.required_copyright,
         officialSourceUrl:
           row.official_source_url,
         trailerUrl: row.trailer_url,
@@ -387,8 +424,17 @@ export function HomePreorderNewsSection({
                 </div>
 
                 <p class="home-preorder-source">
-                  출처: {item.sourceTitle}
+                  출처:{' '}
+                  {normalizeSourceCredit(
+                    item.sourceCredit
+                  )}
                 </p>
+
+                {item.requiredCopyright && (
+                  <p class="home-preorder-copyright">
+                    {item.requiredCopyright}
+                  </p>
+                )}
               </div>
             </article>
           )
