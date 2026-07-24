@@ -1845,6 +1845,19 @@ games.get(
             'ACTIVE'
           AND vp.publish_status =
             'PUBLISHED'
+          AND vp.preorder_status NOT IN (
+            'CLOSED',
+            'CANCELLED'
+          )
+          AND (
+            vp.preorder_end_date IS NULL
+            OR DATE(
+              vp.preorder_end_date
+            ) >= DATE(
+              'now',
+              '+9 hours'
+            )
+          )
           AND gos.permission_status_snapshot
             IN (
               'APPROVED',
@@ -2302,7 +2315,19 @@ games.get(
                         <div>
                           <span>공식 출처</span>
                           <strong>
-                            {preorder.sourceTitle}
+                            {
+                              preorder.sourceCredit
+                                .replace(
+                                  /^\s*(?:이미지\s*및\s*정보\s*)?출처\s*:\s*/i,
+                                  ''
+                                )
+                                .replace(
+                                  /\s*\(공식\s*보도자료\s*링크\)\s*$/i,
+                                  ''
+                                )
+                                .trim() ||
+                              '공식 정보 제공처'
+                            }
                           </strong>
                         </div>
 
@@ -2330,12 +2355,6 @@ games.get(
                           </a>
                         </div>
                       </div>
-
-                      <p class="preorder-public-credit">
-                        출처: {
-                          preorder.sourceCredit
-                        }
-                      </p>
 
                       {preorder.requiredCopyright && (
                         <p class="preorder-public-copyright">
