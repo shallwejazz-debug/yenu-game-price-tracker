@@ -48,7 +48,7 @@ export const renderer = jsxRenderer(
           />
 
           <link
-            href="/static/style.css?v=20260724-desktop-nav-v5"
+            href="/static/style.css?v=20260725-preorder-image-v1"
             rel="stylesheet"
           />
         </head>
