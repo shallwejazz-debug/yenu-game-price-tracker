@@ -620,7 +620,7 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
     line-height: 1.45;
   }
 
-   
+
   /* ---------- 콘솔 탭: 가로 스크롤 한 줄 (줄바꿈 방지) ---------- */
   .console-tabs {
     flex-wrap: nowrap;
@@ -2620,5 +2620,878 @@ h1 { font-size: 1.8rem; margin-bottom: 8px; }
 @media (max-width: 420px) {
   .home-preorder-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+/* PREORDER PUBLIC LAYOUT TRAILER V2 */
+
+.home-preorder-news,
+.home-preorder-news h3,
+.home-preorder-news h3 a,
+.home-preorder-news-status,
+.home-preorder-editions {
+  word-break: keep-all;
+}
+
+.home-preorder-news h3 {
+  overflow-wrap: break-word;
+}
+
+.home-preorder-actions {
+  flex-wrap: wrap;
+}
+
+.home-preorder-trailer-link,
+.preorder-public-trailer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.home-preorder-trailer-link {
+  min-height: 42px;
+  padding: 0.7rem 1rem;
+  border: 1px solid #28231e;
+  background: #28231e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.home-preorder-trailer-link:hover {
+  border-color: #d94f2b;
+  background: #d94f2b;
+  color: #fff;
+}
+
+.preorder-public-trailer-link {
+  padding: 0.68rem 1rem;
+  border: 1px solid #28231e;
+  background: #28231e;
+  color: #fff;
+  font-weight: 700;
+}
+
+.preorder-public-trailer-link:hover {
+  border-color: #d94f2b;
+  background: #d94f2b;
+  color: #fff;
+}
+
+@media (min-width: 761px) {
+  .home-preorder-news--featured {
+    grid-template-columns:
+      minmax(360px, 50%)
+      minmax(0, 1fr);
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image {
+    min-height: 420px;
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image img {
+    transform: scale(1.08);
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image:hover img {
+    transform: scale(1.11);
+  }
+
+  .home-preorder-news--compact {
+    grid-template-columns:
+      minmax(190px, 28%)
+      minmax(0, 1fr);
+    border-radius: 18px;
+  }
+
+  .home-preorder-news--compact
+  .home-preorder-news-image {
+    min-height: 230px;
+  }
+
+  .home-preorder-news--compact
+  .home-preorder-news-body {
+    padding: 1.35rem 1.5rem;
+  }
+
+  .home-preorder-news--compact h3 {
+    font-size: clamp(1.2rem, 2vw, 1.55rem);
+  }
+
+  .home-preorder-news--compact
+  .home-preorder-summary {
+    gap: 0.7rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-preorder-news--featured,
+  .home-preorder-news--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image,
+  .home-preorder-news--compact
+  .home-preorder-news-image {
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image img,
+  .home-preorder-news--featured
+  .home-preorder-news-image:hover img {
+    transform: none;
+  }
+
+  .home-preorder-news--compact
+  .home-preorder-news-body {
+    padding: 1.2rem;
+  }
+}
+
+
+/* PREORDER PUBLIC SOURCE ACTION GROUP V3 */
+
+.preorder-public-source-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.preorder-public-source-actions
+.preorder-public-trailer-link,
+.preorder-public-source-actions
+.preorder-public-official-link {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.68rem 1rem;
+  border-radius: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.preorder-public-source-actions
+.preorder-public-trailer-link {
+  border: 1px solid #6579f6;
+  background: #6579f6;
+  color: #fff;
+}
+
+.preorder-public-source-actions
+.preorder-public-trailer-link:hover {
+  border-color: #7c8cff;
+  background: #7c8cff;
+  color: #fff;
+}
+
+.preorder-public-source-actions
+.preorder-public-official-link {
+  border: 1px solid #6579f6;
+  background: transparent;
+  color: #aab4ff;
+}
+
+.preorder-public-source-actions
+.preorder-public-official-link:hover {
+  background: rgba(101, 121, 246, 0.14);
+  color: #fff;
+}
+
+@media (max-width: 760px) {
+  .preorder-public-source-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .preorder-public-source-actions
+  .preorder-public-trailer-link,
+  .preorder-public-source-actions
+  .preorder-public-official-link {
+    width: 100%;
+    padding-right: 0.7rem;
+    padding-left: 0.7rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .preorder-public-source-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+/* MOBILE HOME PREORDER CLEAN V5 */
+
+@media (max-width: 760px) {
+  /* 홈 상단 영역 압축 */
+  .home-hero {
+    padding-top: 1.8rem;
+    padding-bottom: 1.4rem;
+  }
+
+  .home-brand {
+    margin-bottom: 0.7rem;
+  }
+
+  .home-hero h1 {
+    margin-top: 0.5rem;
+    margin-bottom: 0.65rem;
+    font-size: clamp(1.8rem, 9vw, 2.3rem);
+    line-height: 1.18;
+  }
+
+  .home-description {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    line-height: 1.55;
+  }
+
+  .home-search {
+    margin-top: 0.8rem;
+  }
+
+  /* 예약판매 섹션 */
+  .home-preorder-section {
+    padding: 1rem;
+    border-radius: 17px;
+  }
+
+  .home-preorder-eyebrow {
+    margin-bottom: 0.35rem;
+    font-size: 0.68rem;
+  }
+
+  .home-preorder-section h2 {
+    margin-top: 0;
+    margin-bottom: 0.3rem;
+    font-size: 1.22rem;
+  }
+
+  .home-preorder-section
+  > p:not(.home-preorder-eyebrow) {
+    margin-top: 0;
+    margin-bottom: 0.85rem;
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .home-preorder-news-list {
+    gap: 0.8rem;
+  }
+
+  /* 모바일에서는 대표/목록 카드 동일 구조 */
+  .home-preorder-news--featured,
+  .home-preorder-news--compact {
+    grid-template-columns: 1fr;
+    border-radius: 14px;
+  }
+
+  /* 이미지 영역 */
+  .home-preorder-news--featured
+  .home-preorder-news-image,
+  .home-preorder-news--compact
+  .home-preorder-news-image {
+    min-height: 0;
+    height: 128px;
+    max-height: 128px;
+    aspect-ratio: auto;
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image img,
+  .home-preorder-news--featured
+  .home-preorder-news-image:hover img,
+  .home-preorder-news--compact
+  .home-preorder-news-image img,
+  .home-preorder-news--compact
+  .home-preorder-news-image:hover img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform: none;
+  }
+
+  /* 카드 본문 간격 통일 */
+  .home-preorder-news-body,
+  .home-preorder-news--compact
+  .home-preorder-news-body {
+    gap: 0.58rem;
+    padding: 0.82rem;
+  }
+
+  .home-preorder-news-status {
+    align-self: flex-start;
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.66rem;
+  }
+
+  .home-preorder-news h3,
+  .home-preorder-news--compact h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.28;
+  }
+
+  .home-preorder-editions {
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  .home-preorder-editions span {
+    padding: 0.3rem 0.48rem;
+    font-size: 0.62rem;
+  }
+
+  /* 예약 기간 전체 + 출시일/가격 2열 */
+  .home-preorder-summary {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1fr);
+    gap: 0.42rem;
+    margin: 0;
+  }
+
+  .home-preorder-summary > div {
+    min-height: 0;
+    padding: 0.58rem 0.62rem;
+    border-radius: 9px;
+  }
+
+  .home-preorder-summary > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .home-preorder-summary dt {
+    margin: 0 0 0.2rem;
+    font-size: 0.62rem;
+    line-height: 1.2;
+  }
+
+  .home-preorder-summary dd {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  /* 특전 */
+  .home-preorder-bonus {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.62rem 0.68rem;
+    border-radius: 9px;
+  }
+
+  .home-preorder-bonus strong,
+  .home-preorder-bonus span {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .home-preorder-edition-note {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.35;
+  }
+
+  /* 버튼 3개를 한 줄로 */
+  .home-preorder-actions {
+    display: grid;
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  .home-preorder-news
+  .home-preorder-actions > a {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0.48rem 0.2rem;
+    border-radius: 8px;
+    font-size: 0.64rem;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .home-preorder-actions
+  > a:last-child:nth-child(3) {
+    grid-column: auto;
+  }
+
+  /* 출처 한 줄 */
+  .home-preorder-source {
+    overflow: hidden;
+    margin: 0;
+    font-size: 0.6rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 350px) {
+  .home-preorder-news
+  .home-preorder-actions > a {
+    font-size: 0.58rem;
+  }
+
+  .home-preorder-summary dd {
+    font-size: 0.68rem;
+  }
+}
+
+
+/* MOBILE HERO TITLE IMAGE V6 */
+
+.home-hero-title-rest {
+  display: inline;
+}
+
+@media (max-width: 760px) {
+  .home-hero-title-rest {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image,
+  .home-preorder-news--compact
+  .home-preorder-news-image {
+    height: 165px;
+    max-height: 165px;
+  }
+}
+
+@media (max-width: 350px) {
+  .home-hero-title-rest {
+    font-size: 0.92em;
+  }
+
+  .home-preorder-news--featured
+  .home-preorder-news-image,
+  .home-preorder-news--compact
+  .home-preorder-news-image {
+    height: 150px;
+    max-height: 150px;
+  }
+}
+
+/* ============================================================
+   YEONUDEAL BRAND HEADER LOGO V1
+   가로형 SVG 공통 헤더 적용
+   ============================================================ */
+
+.global-nav {
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid #e3e8f0;
+}
+
+.global-nav-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  max-width: 1180px;
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.global-brand {
+  grid-column: 2;
+  display: block;
+  width: 160px;
+  height: 40px;
+  padding: 0;
+  color: inherit;
+  line-height: 0;
+  justify-self: center;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+}
+
+.global-brand:hover {
+  color: inherit;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.global-brand:focus-visible {
+  outline: 3px solid rgba(40, 124, 255, 0.35);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.global-brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.global-nav-links {
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
+.global-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 7px 13px;
+  color: #506078;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.global-nav-link:hover {
+  color: #092453;
+  background: #eef3fa;
+}
+
+.global-nav-link:focus-visible {
+  color: #092453;
+  background: #eef3fa;
+  outline: 3px solid rgba(40, 124, 255, 0.28);
+  outline-offset: 2px;
+}
+
+.home-hero {
+  padding-top: 56px;
+}
+
+@media (max-width: 700px) {
+  .global-nav-inner {
+    min-height: 60px;
+    padding: 0 14px;
+  }
+
+  .global-brand {
+    width: 132px;
+    height: 33px;
+  }
+
+  .global-nav-links {
+    gap: 2px;
+  }
+
+  .global-nav-link {
+    min-height: 36px;
+    padding: 7px 9px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .global-nav-inner {
+    min-height: 58px;
+    padding: 0 12px;
+  }
+
+  .global-brand {
+    width: 120px;
+    height: 30px;
+  }
+
+  .global-nav-link {
+    padding: 6px 7px;
+    font-size: 0.76rem;
+  }
+
+  .home-hero {
+    padding-top: 40px;
+  }
+}
+
+@media (max-width: 360px) {
+  .global-nav-inner {
+    padding: 0 8px;
+  }
+
+  .global-brand {
+    width: 108px;
+    height: 27px;
+  }
+
+  .global-nav-link {
+    padding: 6px 5px;
+    font-size: 0.72rem;
+  }
+}
+
+/* ============================================================
+   YEONUDEAL DARK HEADER V2
+   사이트 다크 테마와 헤더 색상을 통일하고 홈 메뉴를 복구한다.
+   ============================================================ */
+
+.global-nav {
+  background: #0f1117;
+  border-bottom: 1px solid #242936;
+}
+
+.global-nav-inner {
+  background: transparent;
+}
+
+/*
+ * 원본 로고의 모양은 유지하고,
+ * 다크 배경용 반전 SVG 파일을 사용한다.
+ */
+.global-brand {
+  background: transparent;
+}
+
+.global-brand:hover {
+  opacity: 0.92;
+}
+
+.global-brand-logo {
+  background: transparent;
+}
+
+/* 홈 · 게임 찾기 · 특가 */
+.global-nav-link {
+  color: #aeb6c5;
+}
+
+.global-nav-link:hover {
+  color: #f4f7ff;
+  background: #1a1e29;
+}
+
+.global-nav-link:focus-visible {
+  color: #f4f7ff;
+  background: #1a1e29;
+  outline-color: rgba(40, 124, 255, 0.55);
+}
+
+/*
+ * 아주 좁은 모바일에서는 메뉴 3개가 들어가므로
+ * 로고와 링크 크기를 조금 더 줄인다.
+ */
+@media (max-width: 520px) {
+  .global-nav-inner {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .global-brand {
+    width: 112px;
+    height: 28px;
+  }
+
+  .global-nav-links {
+    gap: 0;
+  }
+
+  .global-nav-link {
+    min-height: 34px;
+    padding: 6px;
+    font-size: 0.73rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .global-brand {
+    width: 100px;
+    height: 25px;
+  }
+
+  .global-nav-link {
+    padding: 5px 4px;
+    font-size: 0.69rem;
+  }
+}
+
+/* ============================================================
+   YEONUDEAL LEFT BRAND HEADER V3
+   왼쪽 로고를 홈 링크로 사용하고 모바일 헤더 공간을 확보한다.
+   ============================================================ */
+
+/*
+ * 왼쪽에는 여누딜 홈 로고,
+ * 오른쪽에는 게임 찾기와 특가 메뉴를 배치한다.
+ */
+.global-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 여누딜 로고는 왼쪽의 홈 링크다. */
+.global-brand {
+  grid-column: auto;
+  justify-self: auto;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+/* 메뉴 영역은 오른쪽 끝에 배치한다. */
+.global-nav-links {
+  grid-column: auto;
+  justify-self: auto;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* 일반 모바일 */
+@media (max-width: 520px) {
+  .global-nav-inner {
+    min-height: 58px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .global-brand {
+    width: 112px;
+    height: 28px;
+  }
+
+  .global-nav-links {
+    gap: 2px;
+  }
+
+  .global-nav-link {
+    min-height: 34px;
+    padding: 6px 7px;
+    font-size: 0.75rem;
+  }
+}
+
+/* 320~360px의 작은 모바일 */
+@media (max-width: 360px) {
+  .global-nav-inner {
+    min-height: 56px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .global-brand {
+    width: 108px;
+    height: 27px;
+  }
+
+  .global-nav-links {
+    gap: 0;
+  }
+
+  .global-nav-link {
+    min-height: 32px;
+    padding: 5px 6px;
+    font-size: 0.72rem;
+  }
+
+  .home-hero {
+    padding-top: 34px;
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .home-hero h1 {
+    font-size: 1.75rem;
+    line-height: 1.28;
+    letter-spacing: -0.035em;
+  }
+
+  .home-description {
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+}
+
+/* ============================================================
+   YEONUDEAL NAVIGATION SIZE V4
+   로고보다 한 단계 낮은 위계를 유지하면서 메뉴 가독성을 높인다.
+   ============================================================ */
+
+/* 데스크톱: 게임 찾기와 특가를 약 15px로 확대 */
+.global-nav-links {
+  gap: 10px;
+}
+
+.global-nav-link {
+  min-height: 40px;
+  padding: 8px 15px;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* 태블릿과 작은 데스크톱 */
+@media (min-width: 521px) and (max-width: 700px) {
+  .global-nav-links {
+    gap: 5px;
+  }
+
+  .global-nav-link {
+    min-height: 38px;
+    padding: 7px 10px;
+    font-size: 0.875rem;
+  }
+}
+
+/* 361~520px: 390px 모바일 기준 약 13px */
+@media (min-width: 361px) and (max-width: 520px) {
+  .global-nav-links {
+    gap: 2px;
+  }
+
+  .global-nav-link {
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 0.8125rem;
+  }
+}
+
+/*
+ * 320~360px에서는 공간을 우선한다.
+ * 기존 크기를 유지해 로고와 메뉴가 겹치지 않도록 한다.
+ */
+@media (max-width: 360px) {
+  .global-nav-links {
+    gap: 0;
+  }
+
+  .global-nav-link {
+    min-height: 32px;
+    padding: 5px 6px;
+    font-size: 0.72rem;
   }
 }

@@ -1748,6 +1748,7 @@ games.get(
       priceStatus: string
       sourceTitle: string
       officialSourceUrl: string
+      trailerUrl: string | null
       sourceCredit: string
       requiredCopyright: string | null
       images: PublicPreorderImage[]
@@ -1776,6 +1777,7 @@ games.get(
 
           gos.source_title,
           gos.official_source_url,
+          gos.trailer_url,
           gos.source_credit,
           gos.required_copyright,
 
@@ -1901,6 +1903,7 @@ games.get(
           price_status: string
           source_title: string
           official_source_url: string
+          trailer_url: string | null
           source_credit: string
           required_copyright:
             string | null
@@ -1960,6 +1963,7 @@ games.get(
             row.source_title,
           officialSourceUrl:
             row.official_source_url,
+          trailerUrl: row.trailer_url,
           sourceCredit:
             row.source_credit,
           requiredCopyright:
@@ -2302,15 +2306,29 @@ games.get(
                           </strong>
                         </div>
 
-                        <a
-                          href={
-                            preorder.officialSourceUrl
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          공식 정보 확인 ↗
-                        </a>
+                        <div class="preorder-public-source-actions">
+                          {preorder.trailerUrl && (
+                            <a
+                              class="preorder-public-trailer-link"
+                              href={preorder.trailerUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              트레일러 보기 ▶
+                            </a>
+                          )}
+
+                          <a
+                            class="preorder-public-official-link"
+                            href={
+                              preorder.officialSourceUrl
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            공식 정보 확인 ↗
+                          </a>
+                        </div>
                       </div>
 
                       <p class="preorder-public-credit">
