@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="45 15 970 242.5"
+  width="1200"
+  height="300"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">여누딜</title>
+
+  <g transform="translate(16 -5) scale(0.58)">
+
+  <g id="yeonudeal-mascot">
+    <!-- 게임패드 뒤에서 올라와 가격표 구멍을 통과하는 끈 -->
+    <path
+      d="M326 143
+         C317 99 330 61 360 52
+         C392 42 417 69 413 103
+         C411 121 402 134 397 144
+         L397 160"
+      fill="none"
+      stroke="#FF6257"
+      stroke-width="19"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- 원본에 가까운 둥근 사각형 몸체 -->
+    <rect
+      x="70"
+      y="100"
+      width="346"
+      height="330"
+      rx="78"
+      fill="#092453"
+    />
+
+    <!-- 얼굴 -->
+    <circle cx="157" cy="202" r="18" fill="#287CFF"/>
+    <circle cx="329" cy="202" r="18" fill="#287CFF"/>
+
+    <path
+      d="M205 269
+         C228 294 268 294 292 269"
+      fill="none"
+      stroke="#FF6257"
+      stroke-width="17"
+      stroke-linecap="round"
+    />
+
+    <!-- 십자키 -->
+    <rect
+      x="143"
+      y="317"
+      width="28"
+      height="84"
+      rx="7"
+      fill="#FF6257"
+    />
+    <rect
+      x="115"
+      y="345"
+      width="84"
+      height="28"
+      rx="7"
+      fill="#FF6257"
+    />
+
+    <!-- 오른쪽 게임 버튼 -->
+    <circle cx="324" cy="340" r="14" fill="#287CFF"/>
+    <circle cx="354" cy="314" r="14" fill="#287CFF"/>
+    <circle cx="384" cy="340" r="14" fill="#287CFF"/>
+    <circle cx="354" cy="366" r="14" fill="#287CFF"/>
+
+    <!-- 게임패드 앞에 매달린 가격표 V5 -->
+    <g transform="rotate(-5 415 196)">
+      <path
+        d="M383 117
+           H429
+           L465 153
+           V260
+           Q465 274 451 274
+           H379
+           Q365 274 365 260
+           V131
+           Q365 117 379 117
+           Z
+
+           M384 144
+           A13 13 0 1 0 410 144
+           A13 13 0 1 0 384 144
+           Z"
+        fill="#FF6257"
+        fill-rule="evenodd"
+      />
+    </g>
+  </g>
+
+  </g>
+
+  <g id="yeonudeal-wordmark" fill="#092453">
+    <path d="M453 662H693V533H453ZM453 374H693V245H453ZM296 783Q367 783 423.0 741.5Q479 700 511.0 624.0Q543 548 543 444Q543 339 511.0 262.5Q479 186 423.0 144.5Q367 103 296 103Q225 103 169.0 144.5Q113 186 81.0 262.5Q49 339 49 444Q49 548 81.0 624.0Q113 700 169.0 741.5Q225 783 296 783ZM296 636Q268 636 247.0 615.5Q226 595 214.0 552.5Q202 510 202 444Q202 378 214.0 335.0Q226 292 247.0 271.0Q268 250 296 250Q325 250 346.0 271.0Q367 292 378.5 335.0Q390 378 390 444Q390 510 378.5 552.5Q367 595 346.0 615.5Q325 636 296 636ZM670 845H831V-97H670Z" transform="translate(350.000 230.994) scale(0.2165605 -0.2165605)"/>
+    <path d="M139 564H802V437H139ZM36 349H885V220H36ZM375 270H536V-95H375ZM139 805H300V505H139Z" transform="translate(549.236 230.994) scale(0.2165605 -0.2165605)"/>
+    <path d="M659 843H821V376H659ZM185 343H821V72H345V-3H186V185H661V221H185ZM186 33H840V-91H186ZM86 523H169Q271 523 345.0 525.0Q419 527 478.5 533.5Q538 540 595 551L611 430Q552 417 490.0 410.5Q428 404 351.0 401.5Q274 399 169 399H86ZM86 795H529V672H247V474H86Z" transform="translate(748.471 230.994) scale(0.2165605 -0.2165605)"/>
+  </g>
+</svg>

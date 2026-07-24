@@ -143,12 +143,10 @@ home.get('/', async (c) => {
   return c.render(
     <div class="home-page">
       <header class="home-hero">
-        <a href="/" class="home-brand">
-          🎮 여누딜
-        </a>
+
 
         <h1>
-          게임 가격, 한눈에 비교하세요
+          게임 가격, <span class="home-hero-title-rest">한눈에 비교하세요</span>
         </h1>
 
         <p class="home-description">

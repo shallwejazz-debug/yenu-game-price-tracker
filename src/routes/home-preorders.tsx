@@ -19,6 +19,7 @@ type HomePreorderRow = {
   preorder_bonus: string | null
   source_title: string
   official_source_url: string
+  trailer_url: string | null
   representative_image_id: number | null
 }
 
@@ -43,6 +44,7 @@ export type HomePreorderNews = {
   platform: string
   sourceTitle: string
   officialSourceUrl: string
+  trailerUrl: string | null
   representativeImageId: number | null
   editions: HomePreorderEdition[]
 }
@@ -132,6 +134,7 @@ export async function getHomePreorderNews(
         vp.preorder_bonus,
         gos.source_title,
         gos.official_source_url,
+        gos.trailer_url,
 
         (
           SELECT wii.id
@@ -203,6 +206,7 @@ export async function getHomePreorderNews(
         sourceTitle: row.source_title,
         officialSourceUrl:
           row.official_source_url,
+        trailerUrl: row.trailer_url,
         representativeImageId:
           row.representative_image_id,
         editions: [],
@@ -265,12 +269,12 @@ export function HomePreorderNewsSection({
       </div>
 
       <div class="home-preorder-news-list">
-        {news.map((item) => {
+        {news.map((item, index) => {
           const primary = item.editions[0]
 
           return (
             <article
-              class="home-preorder-news"
+              class={`home-preorder-news ${index === 0 ? 'home-preorder-news--featured' : 'home-preorder-news--compact'}`}
               key={item.gameId}
             >
               <a
@@ -360,6 +364,17 @@ export function HomePreorderNewsSection({
                   >
                     자세히 보기
                   </a>
+
+                  {item.trailerUrl && (
+                    <a
+                      class="home-preorder-trailer-link"
+                      href={item.trailerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      트레일러 보기 ▶
+                    </a>
+                  )}
 
                   <a
                     class="home-preorder-source-link"

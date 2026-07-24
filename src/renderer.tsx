@@ -43,11 +43,12 @@ export const renderer = jsxRenderer(
 
           <link
             rel="icon"
-            href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>"
+            type="image/svg+xml"
+            href="/static/brand/yeonudeal-symbol.svg"
           />
 
           <link
-            href="/static/style.css?v=20260723-preorder-home-news-v1"
+            href="/static/style.css?v=20260724-desktop-nav-v5"
             rel="stylesheet"
           />
         </head>
@@ -55,8 +56,19 @@ export const renderer = jsxRenderer(
         <body>
           <nav class="global-nav" aria-label="주요 메뉴">
             <div class="global-nav-inner">
-              <a href="/" class="global-brand">
-                홈
+              <a
+                href="/"
+                class="global-brand"
+                aria-label="여누딜 홈"
+                title="홈으로 이동"
+              >
+                <img
+                  src="/static/brand/yeonudeal-logo-horizontal-on-dark.svg"
+                  alt="여누딜"
+                  class="global-brand-logo"
+                  width="160"
+                  height="40"
+                />
               </a>
 
               <div class="global-nav-links">
