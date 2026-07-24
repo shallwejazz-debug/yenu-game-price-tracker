@@ -1926,14 +1926,39 @@ function renderGames() {
         }
       )
 
+      const rejectedPreview =
+        Array.isArray(result.rejected)
+          ? result.rejected
+              .slice(0, 2)
+              .map(function (item) {
+                return (
+                  '[' +
+                  String(item.reason || '기타') +
+                  '] ' +
+                  String(item.title || '')
+                    .slice(0, 70)
+                )
+              })
+              .join(' / ')
+          : ''
+
       const message =
-        result.message ||
         (
-          '검색 ' +
-          Number(result.found || 0) +
-          '건, 저장 ' +
-          Number(result.saved || 0) +
-          '건'
+          result.message ||
+          (
+            '검색 ' +
+            Number(result.found || 0) +
+            '건, 저장 ' +
+            Number(result.saved || 0) +
+            '건'
+          )
+        ) +
+        (
+          Number(result.saved || 0) === 0 &&
+          rejectedPreview
+            ? ' · 탈락 예: ' +
+              rejectedPreview
+            : ''
         )
 
       setStatus(
