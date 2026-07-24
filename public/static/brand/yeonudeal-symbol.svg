@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">여누딜 심볼</title>
+
+  <g id="yeonudeal-mascot">
+    <!-- 게임패드 뒤에서 올라와 가격표 구멍을 통과하는 끈 -->
+    <path
+      d="M326 143
+         C317 99 330 61 360 52
+         C392 42 417 69 413 103
+         C411 121 402 134 397 144
+         L397 160"
+      fill="none"
+      stroke="#FF6257"
+      stroke-width="19"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- 원본에 가까운 둥근 사각형 몸체 -->
+    <rect
+      x="70"
+      y="100"
+      width="346"
+      height="330"
+      rx="78"
+      fill="#092453"
+    />
+
+    <!-- 얼굴 -->
+    <circle cx="157" cy="202" r="18" fill="#287CFF"/>
+    <circle cx="329" cy="202" r="18" fill="#287CFF"/>
+
+    <path
+      d="M205 269
+         C228 294 268 294 292 269"
+      fill="none"
+      stroke="#FF6257"
+      stroke-width="17"
+      stroke-linecap="round"
+    />
+
+    <!-- 십자키 -->
+    <rect
+      x="143"
+      y="317"
+      width="28"
+      height="84"
+      rx="7"
+      fill="#FF6257"
+    />
+    <rect
+      x="115"
+      y="345"
+      width="84"
+      height="28"
+      rx="7"
+      fill="#FF6257"
+    />
+
+    <!-- 오른쪽 게임 버튼 -->
+    <circle cx="324" cy="340" r="14" fill="#287CFF"/>
+    <circle cx="354" cy="314" r="14" fill="#287CFF"/>
+    <circle cx="384" cy="340" r="14" fill="#287CFF"/>
+    <circle cx="354" cy="366" r="14" fill="#287CFF"/>
+
+    <!-- 게임패드 앞에 매달린 가격표 V5 -->
+    <g transform="rotate(-5 415 196)">
+      <path
+        d="M383 117
+           H429
+           L465 153
+           V260
+           Q465 274 451 274
+           H379
+           Q365 274 365 260
+           V131
+           Q365 117 379 117
+           Z
+
+           M384 144
+           A13 13 0 1 0 410 144
+           A13 13 0 1 0 384 144
+           Z"
+        fill="#FF6257"
+        fill-rule="evenodd"
+      />
+    </g>
+  </g>
+
+</svg>
