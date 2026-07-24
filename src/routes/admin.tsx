@@ -1260,7 +1260,7 @@ admin.post(
         )?.image ??
         ''
 
-     
+
 
       return c.json({
         ok: true,
@@ -2494,6 +2494,107 @@ admin.patch(
 // ============================================================
 // 기존 가격 수동 등록 API
 // ============================================================
+
+// ============================================================
+// 기존 게임의 에디션 목록
+// 관리자 게임 관리 화면에서 네이버 가격 수집 대상을 선택한다.
+// ============================================================
+
+admin.get(
+  '/api/games/:id/editions',
+  async (c) => {
+    const gameId = Number(c.req.param('id'))
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: '올바르지 않은 게임 ID입니다.',
+        },
+        400
+      )
+    }
+
+    const game = await c.env.DB.prepare(`
+      SELECT
+        id,
+        title
+      FROM games
+      WHERE id = ?
+      LIMIT 1
+    `)
+      .bind(gameId)
+      .first<{
+        id: number
+        title: string
+      }>()
+
+    if (!game) {
+      return c.json(
+        {
+          ok: false,
+          error: '게임을 찾을 수 없습니다.',
+        },
+        404
+      )
+    }
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        id,
+        game_id,
+        platform,
+        edition_name,
+        search_query,
+        keywords,
+        exclude_keywords
+      FROM editions
+      WHERE game_id = ?
+      ORDER BY
+        CASE platform
+          WHEN 'ps5' THEN 1
+          WHEN 'switch' THEN 2
+          WHEN 'switch2' THEN 3
+          WHEN 'xbox' THEN 4
+          WHEN 'ps4' THEN 5
+          WHEN 'pc' THEN 6
+          ELSE 7
+        END,
+        id ASC
+    `)
+      .bind(gameId)
+      .all()
+
+    return c.json({
+      ok: true,
+      game,
+      editions: (results ?? []).map(
+        (edition: any) => ({
+          id: Number(edition.id),
+          gameId: Number(edition.game_id),
+          platform: String(
+            edition.platform ?? ''
+          ),
+          editionName: String(
+            edition.edition_name ?? ''
+          ),
+          searchQuery: String(
+            edition.search_query ?? ''
+          ),
+          keywords: String(
+            edition.keywords ?? ''
+          ),
+          excludeKeywords: String(
+            edition.exclude_keywords ?? ''
+          ),
+        })
+      ),
+    })
+  }
+)
 
 admin.post(
   '/editions/:id/prices',

@@ -481,8 +481,10 @@
           '<button ' +
             'type="button" ' +
             'class="btn btn-sm" ' +
-            'disabled>' +
-            '수정 불가' +
+            'data-preorder-v2-confirmed-price="' +
+              escapedVariantId +
+            '">' +
+            '확정가 수정' +
           '</button>' +
 
           '<button ' +
@@ -1161,6 +1163,107 @@
   }
 
 
+  async function updatePublishedConfirmedPrice(
+    variantId
+  ) {
+    if (
+      !detail ||
+      !Array.isArray(detail.variants)
+    ) {
+      return
+    }
+
+    const variant = detail.variants.find(
+      function (item) {
+        return String(item.id) ===
+          String(variantId)
+      }
+    )
+
+    if (!variant) {
+      setStatus(
+        '예약판매 상품을 찾을 수 없습니다.',
+        'err'
+      )
+      return
+    }
+
+    const currentPrice =
+      Number(variant.confirmed_price) > 0
+        ? Number(variant.confirmed_price)
+        : Number(variant.candidate_price) > 0
+          ? Number(variant.candidate_price)
+          : ''
+
+    const entered = window.prompt(
+      variant.variant_name +
+        ' 확정 가격을 입력하세요.\n' +
+        '쉼표 없이 숫자만 입력합니다.',
+      currentPrice
+        ? String(currentPrice)
+        : ''
+    )
+
+    if (entered === null) return
+
+    const normalized = String(entered)
+      .replace(/[,\s원]/g, '')
+
+    const confirmedPrice = Number(normalized)
+
+    if (
+      !Number.isInteger(confirmedPrice) ||
+      confirmedPrice <= 0
+    ) {
+      setStatus(
+        '확정 가격은 1원 이상의 정수로 입력해 주세요.',
+        'err'
+      )
+      return
+    }
+
+    if (
+      !window.confirm(
+        variant.variant_name +
+          '의 공개 가격을 ' +
+          confirmedPrice.toLocaleString('ko-KR') +
+          '원으로 수정할까요?'
+      )
+    ) {
+      return
+    }
+
+    try {
+      const data = await api(
+        '/admin/api/preorders/variants/' +
+          encodeURIComponent(variantId) +
+          '/confirmed-price',
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            confirmedPrice: confirmedPrice
+          })
+        }
+      )
+
+      variant.confirmed_price =
+        data.confirmedPrice
+      variant.candidate_price = null
+      variant.price_status = 'CONFIRMED'
+
+      renderExisting()
+
+      setStatus(
+        data.message ||
+          '확정 가격을 수정했습니다.',
+        'ok'
+      )
+    } catch (error) {
+      setStatus(error.message, 'err')
+    }
+  }
+
+
   async function editVariant(variantId) {
     if (
       !detail ||
@@ -1663,6 +1766,20 @@
                 'data-preorder-v2-approve'
               ),
               approveButton
+            )
+            return
+          }
+
+          const priceButton =
+            event.target.closest(
+              '[data-preorder-v2-confirmed-price]'
+            )
+
+          if (priceButton) {
+            updatePublishedConfirmedPrice(
+              priceButton.getAttribute(
+                'data-preorder-v2-confirmed-price'
+              )
             )
             return
           }
