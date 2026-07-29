@@ -260,7 +260,22 @@ preorderAdmin.get('/games', async (c) => {
 
     FROM games g
 
-    WHERE g.publish_status = 'DRAFT'
+    WHERE
+      g.publish_status = 'DRAFT'
+      OR EXISTS (
+        SELECT 1
+        FROM editions pe
+        INNER JOIN product_variants ppv
+          ON ppv.edition_id = pe.id
+        INNER JOIN variant_preorders pvp
+          ON pvp.variant_id = ppv.id
+        WHERE
+          pe.game_id = g.id
+          AND pvp.publish_status IN (
+            'APPROVED',
+            'PUBLISHED'
+          )
+      )
 
     ORDER BY
       g.created_at DESC,
@@ -2329,6 +2344,119 @@ preorderAdmin.post(
         500
       )
     }
+  }
+)
+
+
+// ------------------------------------------------------------
+// 게시된 예약판매의 확정 가격 수정
+//
+// 공개 이후 가격이 확인된 경우 가격 필드만 안전하게 갱신한다.
+// 상품 구성, 이미지, 공식 출처, 공개 상태는 변경하지 않는다.
+// ------------------------------------------------------------
+
+preorderAdmin.patch(
+  '/variants/:variantId/confirmed-price',
+  async (c) => {
+    const variantId = Number(
+      c.req.param('variantId')
+    )
+
+    if (
+      !Number.isInteger(variantId) ||
+      variantId <= 0
+    ) {
+      return jsonError(
+        c,
+        'invalid variant id',
+        400
+      )
+    }
+
+    let body: any
+
+    try {
+      body = await c.req.json()
+    } catch {
+      return jsonError(
+        c,
+        'invalid JSON body',
+        400
+      )
+    }
+
+    const confirmedPrice =
+      positiveInteger(body?.confirmedPrice)
+
+    if (!confirmedPrice) {
+      return jsonError(
+        c,
+        '확정 가격은 1원 이상의 정수여야 합니다.',
+        400
+      )
+    }
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        vp.id,
+        vp.variant_id,
+        vp.publish_status
+      FROM variant_preorders vp
+      WHERE
+        vp.variant_id = ?
+        AND vp.publish_status = 'PUBLISHED'
+      ORDER BY vp.id ASC
+    `)
+      .bind(variantId)
+      .all<{
+        id: number
+        variant_id: number
+        publish_status: string
+      }>()
+
+    if (!results || results.length < 1) {
+      return jsonError(
+        c,
+        '게시된 예약판매 정보를 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    if (results.length !== 1) {
+      return jsonError(
+        c,
+        '게시된 예약판매 정보가 여러 개여서 자동 수정할 수 없습니다.',
+        409
+      )
+    }
+
+    const preorderId = Number(results[0].id)
+
+    await c.env.DB.prepare(`
+      UPDATE variant_preorders
+      SET
+        confirmed_price = ?,
+        candidate_price = NULL,
+        price_status = 'CONFIRMED',
+        updated_at = CURRENT_TIMESTAMP
+      WHERE
+        id = ?
+        AND publish_status = 'PUBLISHED'
+    `)
+      .bind(
+        confirmedPrice,
+        preorderId
+      )
+      .run()
+
+    return c.json({
+      ok: true,
+      variantId,
+      preorderId,
+      confirmedPrice,
+      priceStatus: 'CONFIRMED',
+      message: '게시된 예약판매의 확정 가격을 수정했습니다.',
+    })
   }
 )
 
