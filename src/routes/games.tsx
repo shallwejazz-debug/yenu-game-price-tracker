@@ -1688,6 +1688,8 @@ games.get(
     )
 
     if (!edition) {
+      return c.notFound()
+
       c.status(404)
 
       return c.render(
@@ -1738,6 +1740,54 @@ games.get(
           edition.id
         )
       : null
+
+    type PreorderShopOffer = {
+      id: number
+      seller_name: string
+      product_url: string | null
+      price: number
+      currency: string
+      stock_status:
+        | 'UNKNOWN'
+        | 'IN_STOCK'
+        | 'SOLD_OUT'
+      display_order: number
+    }
+
+    // 예약판매 판매처는 일반 가격 수집 데이터와 분리해서 조회한다.
+    // SOLD_OUT 판매처는 정보만 표시하고 구매 링크는 만들지 않는다.
+    let soldOutOffers: PreorderShopOffer[] = []
+
+    if (!isReleased) {
+      const soldOutResult = await c.env.DB
+        .prepare(
+          `SELECT
+             o.id,
+             o.seller_name,
+             o.product_url,
+             o.price,
+             o.currency,
+             o.stock_status,
+             o.display_order
+           FROM variant_preorder_offers o
+           INNER JOIN variant_preorders vp
+             ON vp.id = o.variant_preorder_id
+           INNER JOIN product_variants pv
+             ON pv.id = vp.variant_id
+           WHERE pv.edition_id = ?
+             AND vp.publish_status = 'PUBLISHED'
+             AND o.publish_status = 'PUBLISHED'
+             AND o.stock_status = 'SOLD_OUT'
+           ORDER BY
+             o.display_order ASC,
+             o.price ASC,
+             o.id ASC`
+        )
+        .bind(edition.id)
+        .all<PreorderShopOffer>()
+
+      soldOutOffers = soldOutResult.results ?? []
+    }
 
     // PUBLIC_PREORDER_V2_QUERY
     type PublicPreorderImage = {
@@ -2394,6 +2444,58 @@ games.get(
             </p>
           </section>
         )}
+        {!isReleased &&
+          soldOutOffers.length > 0 && (
+            <aside
+              class="preorder-soldout-summary"
+              aria-label="예약판매처 품절 정보"
+              style="margin: 20px 0 28px; padding: 15px 18px; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 12px; background: rgba(30, 34, 50, 0.72);"
+            >
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;"
+              >
+                <div>
+                  <p
+                    style="margin: 0 0 8px; color: #94a3b8; font-size: 0.8rem;"
+                  >
+                    예약판매처
+                  </p>
+
+                  {soldOutOffers.map((offer) => (
+                    <div
+                      key={offer.id}
+                      style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;"
+                    >
+                      <strong
+                        style="color: #f8fafc;"
+                      >
+                        {offer.seller_name}
+                      </strong>
+
+                      <span
+                        style="color: #cbd5e1;"
+                      >
+                        {won(offer.price)}
+                      </span>
+
+                      <span
+                        style="display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; background: rgba(239, 68, 68, 0.14); color: #fca5a5; font-size: 0.75rem; font-weight: 700;"
+                      >
+                        품절
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p
+                  style="margin: 0; color: #64748b; font-size: 0.78rem; line-height: 1.5;"
+                >
+                  현재 구매할 수 없는 예약판매처입니다.
+                </p>
+              </div>
+            </aside>
+          )}
+
         <div class="price-sections">
           <PriceSection
             title="디지털"
