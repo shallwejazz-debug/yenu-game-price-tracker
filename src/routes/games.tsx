@@ -1573,6 +1573,11 @@ games.get('/:gameId', async (c) => {
       FROM games
       WHERE id = ?
         AND publish_status = 'PUBLISHED'
+        AND (
+          release_date IS NULL
+          OR DATE(release_date) <=
+            DATE('now', '+9 hours')
+        )
       LIMIT 1
     `)
     .bind(gameId)
@@ -1645,6 +1650,11 @@ games.get(
         FROM games
         WHERE id = ?
           AND publish_status = 'PUBLISHED'
+          AND (
+            release_date IS NULL
+            OR DATE(release_date) <=
+              DATE('now', '+9 hours')
+          )
         LIMIT 1
       `)
       .bind(gameId)
@@ -1688,6 +1698,8 @@ games.get(
     )
 
     if (!edition) {
+      c.status(404)
+
       return c.render(
         <main class="container">
           <a

@@ -48,6 +48,7 @@ export interface Price {
   is_digital: number // 1 = 디지털, 0 = 패키지
   product_url: string | null
   mall_label: string | null
+  stock_status: 'UNKNOWN' | 'IN_STOCK' | 'SOLD_OUT'
   recorded_at: string
 }
 

@@ -12,6 +12,63 @@ import type { Game, Edition, Price, PriceHistory } from './types'
 
 const STALE_HOURS = 24
 
+// 일반 가격 저장은 한국 날짜 기준 발매일부터 허용한다.
+// release_date가 없는 기존 게임은 일반 판매 대상으로 유지한다.
+export async function assertPriceCollectionAllowed(
+  db: D1Database,
+  editionId: number
+): Promise<void> {
+  const row = await db.prepare(`
+    SELECT
+      e.id AS edition_id,
+      g.release_date
+
+    FROM editions e
+
+    INNER JOIN games g
+      ON g.id = e.game_id
+
+    WHERE
+      e.id = ?
+      AND (
+        g.release_date IS NULL
+        OR DATE(g.release_date) <=
+          DATE('now', '+9 hours')
+      )
+
+    LIMIT 1
+  `)
+    .bind(editionId)
+    .first<{
+      edition_id: number
+      release_date: string | null
+    }>()
+
+  if (!row) {
+    throw new Error(
+      '발매 전 게임은 일반 가격을 저장하거나 재수집할 수 없습니다.'
+    )
+  }
+}
+
+export async function clearPricesForCollection(
+  db: D1Database,
+  editionId: number
+): Promise<void> {
+  // 기존 가격을 지우기 전에 반드시 발매 여부부터 확인한다.
+  await assertPriceCollectionAllowed(
+    db,
+    editionId
+  )
+
+  await db.prepare(`
+    DELETE FROM prices
+    WHERE edition_id = ?
+  `)
+    .bind(editionId)
+    .run()
+}
+
 // ---------- 게임(작품) ----------
 export async function getGameById(
   db: D1Database,
@@ -24,6 +81,11 @@ export async function getGameById(
       WHERE
         id = ?
         AND publish_status = 'PUBLISHED'
+        AND (
+          release_date IS NULL
+          OR DATE(release_date) <=
+            DATE('now', '+9 hours')
+        )
       LIMIT 1
     `)
     .bind(id)
@@ -37,6 +99,10 @@ export async function listGames(db: D1Database): Promise<Game[]> {
   SELECT *
   FROM games
   WHERE publish_status = 'PUBLISHED'
+    AND (
+      release_date IS NULL
+      OR DATE(release_date) <= DATE('now', '+9 hours')
+    )
   ORDER BY created_at DESC
 `)
     .all<Game>()
@@ -67,6 +133,10 @@ export async function getRecentGames(
          FROM games g
          WHERE
           g.publish_status = 'PUBLISHED'
+          AND (
+            g.release_date IS NULL
+            OR DATE(g.release_date) <= DATE('now', '+9 hours')
+          )
           AND EXISTS (
            SELECT 1
            FROM editions e
@@ -161,12 +231,18 @@ export async function listGamesByPlatform(
            edition_id,
            MIN(
              CASE
-               WHEN is_digital = 0 AND rn = 1 THEN price
+               WHEN is_digital = 0
+                 AND rn = 1
+                 AND stock_status <> 'SOLD_OUT'
+               THEN price
              END
            ) AS package_lowest,
            MIN(
              CASE
-               WHEN is_digital = 1 AND rn = 1 THEN price
+               WHEN is_digital = 1
+                 AND rn = 1
+                 AND stock_status <> 'SOLD_OUT'
+               THEN price
              END
            ) AS digital_lowest
          FROM valid_prices
@@ -200,6 +276,10 @@ export async function listGamesByPlatform(
        WHERE
         e.platform = ?
         AND g.publish_status = 'PUBLISHED'
+        AND (
+          g.release_date IS NULL
+          OR DATE(g.release_date) <= DATE('now', '+9 hours')
+        )
         ORDER BY g.created_at DESC`
     )
     .bind(platform, platform)
@@ -236,6 +316,10 @@ export async function searchGamesAllPlatforms(
         FROM games
         WHERE
       publish_status = 'PUBLISHED'
+      AND (
+        release_date IS NULL
+        OR DATE(release_date) <= DATE('now', '+9 hours')
+      )
       AND title LIKE ? COLLATE NOCASE
 ),
 
@@ -265,13 +349,17 @@ export async function searchGamesAllPlatforms(
            e.game_id,
            MIN(
              CASE
-               WHEN vp.is_digital = 0 AND vp.rn = 1
+               WHEN vp.is_digital = 0
+                 AND vp.rn = 1
+                 AND vp.stock_status <> 'SOLD_OUT'
                THEN vp.price
              END
            ) AS package_lowest,
            MIN(
              CASE
-               WHEN vp.is_digital = 1 AND vp.rn = 1
+               WHEN vp.is_digital = 1
+                 AND vp.rn = 1
+                 AND vp.stock_status <> 'SOLD_OUT'
                THEN vp.price
              END
            ) AS digital_lowest
@@ -436,6 +524,7 @@ export async function getCurrentPrices(
          SELECT MAX(recorded_at) AS ed_max
          FROM prices
          WHERE edition_id = ?
+           AND stock_status <> 'SOLD_OUT'
        )
        SELECT p.*
        FROM prices p
@@ -443,6 +532,7 @@ export async function getCurrentPrices(
          SELECT source, is_digital, MAX(recorded_at) AS max_at
          FROM prices
          WHERE edition_id = ?
+           AND stock_status <> 'SOLD_OUT'
          GROUP BY source, is_digital
        ) latest
          ON p.source = latest.source
@@ -450,6 +540,7 @@ export async function getCurrentPrices(
         AND p.recorded_at = latest.max_at
        CROSS JOIN ed_latest
        WHERE p.edition_id = ?
+         AND p.stock_status <> 'SOLD_OUT'
          AND p.recorded_at >= datetime(
            ed_latest.ed_max,
            '-' || ? || ' hours'
@@ -482,6 +573,7 @@ export async function getPriceTrend(
       `SELECT DATE(recorded_at) AS date, MIN(price) AS price
        FROM prices
        WHERE edition_id = ? AND is_digital = ?
+         AND stock_status <> 'SOLD_OUT'
          AND recorded_at >= datetime('now', '-' || ? || ' days')
        GROUP BY DATE(recorded_at)
        ORDER BY date ASC`
@@ -523,6 +615,10 @@ export async function getLastUpdated(db: D1Database): Promise<string | null> {
     ON g.id = e.game_id
 
   WHERE g.publish_status = 'PUBLISHED'
+    AND (
+      g.release_date IS NULL
+      OR DATE(g.release_date) <= DATE('now', '+9 hours')
+    )
 `)
 
     .first<{ last: string | null }>()
@@ -545,6 +641,10 @@ export async function getPlatformCounts(
         ON g.id = e.game_id
     
       WHERE g.publish_status = 'PUBLISHED'
+        AND (
+          g.release_date IS NULL
+          OR DATE(g.release_date) <= DATE('now', '+9 hours')
+        )
     
       GROUP BY e.platform
     `)
@@ -566,6 +666,10 @@ export async function getTrackingCounts(
         )
         FROM games
         WHERE publish_status = 'PUBLISHED'
+          AND (
+            release_date IS NULL
+            OR DATE(release_date) <= DATE('now', '+9 hours')
+          )
       ) AS unique_games,
 
       (
@@ -576,6 +680,10 @@ export async function getTrackingCounts(
           ON g.id = e.game_id
 
         WHERE g.publish_status = 'PUBLISHED'
+          AND (
+            g.release_date IS NULL
+            OR DATE(g.release_date) <= DATE('now', '+9 hours')
+          )
       ) AS platform_editions
   `).first<{
     unique_games: number
@@ -608,6 +716,7 @@ export async function getCurrentPricesByGame(
            FROM editions
            WHERE game_id = ?
          )
+           AND stock_status <> 'SOLD_OUT'
          GROUP BY edition_id
        )
        SELECT p.*
@@ -623,6 +732,7 @@ export async function getCurrentPricesByGame(
            FROM editions
            WHERE game_id = ?
          )
+           AND stock_status <> 'SOLD_OUT'
          GROUP BY edition_id, source, is_digital
        ) latest
          ON p.edition_id = latest.edition_id
@@ -632,6 +742,7 @@ export async function getCurrentPricesByGame(
        INNER JOIN ed_latest
          ON ed_latest.edition_id = p.edition_id
        WHERE e.game_id = ?
+         AND p.stock_status <> 'SOLD_OUT'
          AND p.recorded_at >= datetime(
            ed_latest.ed_max,
            '-' || ? || ' hours'
@@ -669,6 +780,7 @@ export async function getPriceTrendByGame(
        FROM prices p
        INNER JOIN editions e ON e.id = p.edition_id
        WHERE e.game_id = ?
+         AND p.stock_status <> 'SOLD_OUT'
          AND p.recorded_at >= datetime('now', '-' || ? || ' days')
        GROUP BY p.edition_id, p.is_digital, DATE(p.recorded_at)
        ORDER BY p.edition_id, p.is_digital, date ASC`
@@ -689,19 +801,55 @@ export async function insertPrice(
     is_digital?: number
     product_url?: string | null
     mall_label?: string | null
-    title?: string | null        // ← 추가
+    title?: string | null
+    stock_status?:
+      | 'UNKNOWN'
+      | 'IN_STOCK'
+      | 'SOLD_OUT'
   }
 ) {
+  await assertPriceCollectionAllowed(
+    db,
+    data.edition_id
+  )
+
   const currency = data.currency ?? 'KRW'
   const isDigital = data.is_digital ?? 1
+  const stockStatus =
+    data.stock_status ?? 'IN_STOCK'
 
   const result = await db
     .prepare(
-      `INSERT INTO prices (edition_id, source, price, currency, is_digital, product_url, mall_label, title)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO prices (
+         edition_id,
+         source,
+         price,
+         currency,
+         is_digital,
+         product_url,
+         mall_label,
+         title,
+         stock_status
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(data.edition_id, data.source, data.price, currency, isDigital, data.product_url ?? null, data.mall_label ?? null, data.title ?? null)
+    .bind(
+      data.edition_id,
+      data.source,
+      data.price,
+      currency,
+      isDigital,
+      data.product_url ?? null,
+      data.mall_label ?? null,
+      data.title ?? null,
+      stockStatus
+    )
     .run()
+
+  // 품절 가격은 기록만 보존하고 최저가 이력에는 반영하지 않는다.
+  if (stockStatus === 'SOLD_OUT') {
+    return result
+  }
 
   const existing = await db
     .prepare('SELECT lowest_ever FROM price_history WHERE edition_id = ? AND is_digital = ?')
@@ -760,6 +908,7 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
          FROM prices p
          INNER JOIN ed_latest el ON el.edition_id = p.edition_id
          WHERE p.is_digital = 0
+           AND p.stock_status <> 'SOLD_OUT'
            AND p.recorded_at >= datetime(el.ed_max, '-' || ? || ' hours')
          GROUP BY p.edition_id, p.is_digital
        ),
@@ -799,6 +948,10 @@ export async function getTopDiscounts(db: D1Database, limit = 10) {
            ON w.edition_id = l.edition_id AND w.is_digital = l.is_digital
          WHERE 
          g.publish_status = 'PUBLISHED'
+         AND (
+           g.release_date IS NULL
+           OR DATE(g.release_date) <= DATE('now', '+9 hours')
+         )
          AND w.week_high IS NOT NULL 
          AND w.week_high > 0
          AND l.cur_price >= w.week_high * 0.55

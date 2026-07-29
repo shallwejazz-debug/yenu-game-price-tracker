@@ -96,6 +96,10 @@ app.get('/sitemap.xml', async (c) => {
 	INNER JOIN games g
 	  ON g.id = e.game_id
 	WHERE g.publish_status = 'PUBLISHED'
+  AND (
+    g.release_date IS NULL
+    OR DATE(g.release_date) <= DATE('now', '+9 hours')
+  )
 	ORDER BY
 	  e.game_id,
 	  e.platform
@@ -145,7 +149,28 @@ app.get('/go/:priceId', async (c) => {
   const priceId = Number(c.req.param('priceId'))
   if (Number.isNaN(priceId)) return c.text('잘못된 요청', 400)
 
-  const price = await c.env.DB.prepare('SELECT * FROM prices WHERE id = ?')
+  const price = await c.env.DB.prepare(`
+    SELECT p.*
+
+    FROM prices p
+
+    INNER JOIN editions e
+      ON e.id = p.edition_id
+
+    INNER JOIN games g
+      ON g.id = e.game_id
+
+    WHERE
+      p.id = ?
+      AND p.stock_status <> 'SOLD_OUT'
+      AND (
+        g.release_date IS NULL
+        OR DATE(g.release_date) <=
+          DATE('now', '+9 hours')
+      )
+
+    LIMIT 1
+  `)
     .bind(priceId)
     .first<Price>()
 

@@ -42,6 +42,7 @@ import {
   setSetting,
   findGameByTitle,
   findEdition,
+  clearPricesForCollection,
 } from '../db'
 import {
   searchAndClassify,
@@ -1567,13 +1568,10 @@ async function processImport(
           )
         }
 
-        await c.env.DB
-          .prepare(
-            `DELETE FROM prices
-             WHERE edition_id = ?`
-          )
-          .bind(editionId)
-          .run()
+        await clearPricesForCollection(
+          c.env.DB,
+          editionId
+        )
 
         let savedCount = 0
 
@@ -1841,13 +1839,10 @@ admin.post(
               )
             }
 
-            await c.env.DB
-              .prepare(
-                `DELETE FROM prices
-                 WHERE edition_id = ?`
-              )
-              .bind(editionId)
-              .run()
+            await clearPricesForCollection(
+              c.env.DB,
+              editionId
+            )
 
             let count = 0
 
@@ -2565,6 +2560,12 @@ admin.post(
               body.mall_label ?? null,
             title:
               body.title ?? null,
+            stock_status:
+              body.stock_status === 'UNKNOWN' ||
+              body.stock_status === 'IN_STOCK' ||
+              body.stock_status === 'SOLD_OUT'
+                ? body.stock_status
+                : 'IN_STOCK',
           }
         )
 
@@ -2716,13 +2717,10 @@ admin.post(
         })
       }
 
-      await c.env.DB
-        .prepare(
-          `DELETE FROM prices
-           WHERE edition_id = ?`
-        )
-        .bind(editionId)
-        .run()
+      await clearPricesForCollection(
+        c.env.DB,
+        editionId
+      )
 
       let saved = 0
 
