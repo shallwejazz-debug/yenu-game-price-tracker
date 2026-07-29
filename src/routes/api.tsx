@@ -84,7 +84,31 @@ function buildInsight(
 // 게임 1개의 전체 상세(모든 플랫폼 에디션 + 가격)를 JSON으로
 api.get('/games/:gameId', async (c) => {
   const gameId = Number(c.req.param('gameId'))
-  if (Number.isNaN(gameId)) return c.json({ error: 'invalid game id' }, 400)
+
+  if (Number.isNaN(gameId)) {
+    return c.json({ error: 'invalid game id' }, 400)
+  }
+
+  // 일반 가격 API는 한국 날짜 기준 발매일부터 공개한다.
+  const releasedGame = await c.env.DB
+    .prepare(`
+      SELECT id
+      FROM games
+      WHERE id = ?
+        AND publish_status = 'PUBLISHED'
+        AND (
+          release_date IS NULL
+          OR DATE(release_date) <=
+            DATE('now', '+9 hours')
+        )
+      LIMIT 1
+    `)
+    .bind(gameId)
+    .first<{ id: number }>()
+
+  if (!releasedGame) {
+    return c.json({ error: 'not found' }, 404)
+  }
 
   const game = await getGameById(c.env.DB, gameId)
   if (!game) return c.json({ error: 'not found' }, 404)

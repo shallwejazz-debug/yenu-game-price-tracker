@@ -81,11 +81,6 @@ export async function getGameById(
       WHERE
         id = ?
         AND publish_status = 'PUBLISHED'
-        AND (
-          release_date IS NULL
-          OR DATE(release_date) <=
-            DATE('now', '+9 hours')
-        )
       LIMIT 1
     `)
     .bind(id)

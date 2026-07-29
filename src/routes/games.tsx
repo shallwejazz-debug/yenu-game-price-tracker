@@ -1573,11 +1573,6 @@ games.get('/:gameId', async (c) => {
       FROM games
       WHERE id = ?
         AND publish_status = 'PUBLISHED'
-        AND (
-          release_date IS NULL
-          OR DATE(release_date) <=
-            DATE('now', '+9 hours')
-        )
       LIMIT 1
     `)
     .bind(gameId)
@@ -1650,11 +1645,6 @@ games.get(
         FROM games
         WHERE id = ?
           AND publish_status = 'PUBLISHED'
-          AND (
-            release_date IS NULL
-            OR DATE(release_date) <=
-              DATE('now', '+9 hours')
-          )
         LIMIT 1
       `)
       .bind(gameId)
@@ -1722,17 +1712,32 @@ games.get(
       )
     }
 
-    const prices =
-      await getCurrentPrices(
-        c.env.DB,
-        edition.id
-      )
+    const koreaDate = new Date(
+      Date.now() + 9 * 60 * 60 * 1000
+    )
+      .toISOString()
+      .slice(0, 10)
 
-    const history =
-      await getPriceHistory(
-        c.env.DB,
-        edition.id
-      )
+    const isReleased =
+      !game.release_date ||
+      game.release_date.slice(0, 10) <=
+        koreaDate
+
+    // 발매 전에는 예약판매 정보만 표시한다.
+    // 일반 최저가와 가격 이력은 발매일부터 노출한다.
+    const prices = isReleased
+      ? await getCurrentPrices(
+          c.env.DB,
+          edition.id
+        )
+      : []
+
+    const history = isReleased
+      ? await getPriceHistory(
+          c.env.DB,
+          edition.id
+        )
+      : null
 
     // PUBLIC_PREORDER_V2_QUERY
     type PublicPreorderImage = {
