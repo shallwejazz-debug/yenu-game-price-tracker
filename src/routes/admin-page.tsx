@@ -580,35 +580,22 @@ export function AdminPage(): string {
             />
           </label>
 
-          <label class="admin-field">
+                    <div class="admin-field">
             <span>플랫폼</span>
 
-            <select id="watcherTransformPlatform">
-              <option value="switch">
-                Nintendo Switch
-              </option>
+            <div
+              id="watcherTransformPlatformRows"
+              style="display:grid;gap:8px"
+            />
 
-              <option value="ps5">
-                PlayStation 5
-              </option>
-
-              <option value="ps4">
-                PlayStation 4
-              </option>
-
-              <option value="xbox">
-                Xbox
-              </option>
-
-              <option value="pc">
-                PC
-              </option>
-
-              <option value="etc">
-                기타
-              </option>
-            </select>
-          </label>
+            <button
+              id="addWatcherTransformPlatform"
+              type="button"
+              class="btn btn-sm"
+            >
+              + 플랫폼 추가
+            </button>
+          </div>
 
           <label class="admin-field">
             <span>에디션 표시명</span>

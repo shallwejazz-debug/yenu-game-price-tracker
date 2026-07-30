@@ -866,8 +866,21 @@ watcherAdmin.post(
     }
 
     const title = text(body.title)
-    const platform = text(body.platform)
-      .toLowerCase()
+    const platforms = Array.from(
+      new Set(
+        (
+          Array.isArray(body.platforms)
+            ? body.platforms
+            : [body.platform]
+        )
+          .map((value) =>
+            text(value).toLowerCase()
+          )
+          .filter(Boolean)
+      )
+    )
+
+    const platform = platforms[0] || ''
 
     const editionName =
       text(body.editionName)
@@ -907,6 +920,7 @@ watcherAdmin.post(
       'ps4',
       'xbox',
       'switch',
+      'switch2',
       'etc',
     ])
 
@@ -920,7 +934,13 @@ watcherAdmin.post(
       )
     }
 
-    if (!allowedPlatforms.has(platform)) {
+    if (
+      platforms.length < 1 ||
+      platforms.some(
+        (value) =>
+          !allowedPlatforms.has(value)
+      )
+    ) {
       return c.json(
         {
           ok: false,
@@ -1079,6 +1099,7 @@ watcherAdmin.post(
 
       title,
       platform,
+      platforms,
       editionName,
       genre,
 
@@ -1352,9 +1373,21 @@ watcherAdmin.post(
 
     const title = text(draft.title)
 
-    const platform = text(
-      draft.platform
-    ).toLowerCase()
+    const platforms = Array.from(
+      new Set(
+        (
+          Array.isArray(draft.platforms)
+            ? draft.platforms
+            : [draft.platform]
+        )
+          .map((value) =>
+            text(value).toLowerCase()
+          )
+          .filter(Boolean)
+      )
+    )
+
+    const platform = platforms[0] || ''
 
     const editionName =
       text(draft.editionName)
@@ -1394,12 +1427,17 @@ watcherAdmin.post(
       'ps4',
       'xbox',
       'switch',
+      'switch2',
       'etc',
     ])
 
     if (
       !title ||
-      !allowedPlatforms.has(platform) ||
+      platforms.length < 1 ||
+      platforms.some(
+        (value) =>
+          !allowedPlatforms.has(value)
+      ) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(
         releaseDate
       )
@@ -1543,38 +1581,6 @@ watcherAdmin.post(
 
       createdGameId = Number(game.id)
 
-      const edition =
-        await c.env.DB.prepare(`
-          INSERT INTO editions (
-            game_id,
-            platform,
-            edition_name,
-            search_query,
-            keywords,
-            steam_appid
-          )
-          VALUES (
-            ?, ?, ?, ?, ?, NULL
-          )
-          RETURNING id
-        `)
-          .bind(
-            createdGameId,
-            platform,
-            editionName || null,
-            title,
-            title
-          )
-          .first<{
-            id: number
-          }>()
-
-      if (!edition?.id) {
-        throw new Error(
-          'failed to create edition draft'
-        )
-      }
-
       const officialSource =
         await c.env.DB.prepare(`
           INSERT INTO game_official_sources (
@@ -1588,9 +1594,7 @@ watcherAdmin.post(
             required_copyright,
             permission_status_snapshot
           )
-          VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?
-          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           RETURNING id
         `)
           .bind(
@@ -1604,9 +1608,7 @@ watcherAdmin.post(
             item.required_copyright || null,
             permissionStatus
           )
-          .first<{
-            id: number
-          }>()
+          .first<{ id: number }>()
 
       if (!officialSource?.id) {
         throw new Error(
@@ -1614,56 +1616,148 @@ watcherAdmin.post(
         )
       }
 
-      const preorder =
-        await c.env.DB.prepare(`
-          INSERT INTO edition_preorders (
-            edition_id,
-            official_source_id,
-            release_date,
-            preorder_start_date,
-            preorder_end_date,
-            preorder_status,
-            preorder_bonus,
-            preorder_bonus_note,
-            candidate_price,
-            confirmed_price,
-            price_status,
-            selected_image_id,
-            publish_status,
-            display_order,
-            approved_at,
-            published_at
-          )
-          VALUES (
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, NULL, ?,
-            NULL, 'DRAFT', 0,
-            NULL, NULL
-          )
-          RETURNING id
-        `)
-          .bind(
-            edition.id,
-            officialSource.id,
-            releaseDate,
-            preorderStartDate || null,
-            preorderEndDate || null,
-            preorderStatus,
-            preorderBonus || null,
-            preorderBonusNote || null,
-            candidatePrice,
-            priceStatus
-          )
-          .first<{
-            id: number
-          }>()
+      const editionIds: number[] = []
+      const variantIds: number[] = []
+      const preorderIds: number[] = []
 
-      if (!preorder?.id) {
-        throw new Error(
-          'failed to create preorder draft'
-        )
+      for (
+        const [index, targetPlatform]
+          of platforms.entries()
+      ) {
+        const targetEditionName =
+          editionName ||
+          (
+            targetPlatform === 'switch2'
+              ? 'Nintendo Switch 2'
+              : targetPlatform === 'switch'
+                ? 'Nintendo Switch'
+                : targetPlatform === 'ps5'
+                  ? 'PlayStation 5'
+                  : targetPlatform === 'pc'
+                    ? 'Steam'
+                    : targetPlatform.toUpperCase()
+          )
+
+        const edition =
+          await c.env.DB.prepare(`
+            INSERT INTO editions (
+              game_id,
+              platform,
+              edition_name,
+              search_query,
+              keywords,
+              steam_appid
+            )
+            VALUES (?, ?, ?, ?, ?, NULL)
+            RETURNING id
+          `)
+            .bind(
+              createdGameId,
+              targetPlatform,
+              targetEditionName,
+              title,
+              title
+            )
+            .first<{ id: number }>()
+
+        if (!edition?.id) {
+          throw new Error(
+            'failed to create platform edition'
+          )
+        }
+
+        const packageType =
+          targetPlatform === 'pc'
+            ? 'DIGITAL'
+            : 'PACKAGE'
+
+        const variant =
+          await c.env.DB.prepare(`
+            INSERT INTO product_variants (
+              edition_id,
+              variant_code,
+              variant_name,
+              variant_kind,
+              package_type,
+              is_default,
+              display_order,
+              publish_status
+            )
+            VALUES (
+              ?,
+              'standard',
+              ?,
+              'STANDARD',
+              ?,
+              1,
+              ?,
+              'DRAFT'
+            )
+            RETURNING id
+          `)
+            .bind(
+              edition.id,
+              targetEditionName,
+              packageType,
+              index
+            )
+            .first<{ id: number }>()
+
+        if (!variant?.id) {
+          throw new Error(
+            'failed to create product variant'
+          )
+        }
+
+        const preorder =
+          await c.env.DB.prepare(`
+            INSERT INTO variant_preorders (
+              variant_id,
+              official_source_id,
+              release_date,
+              preorder_start_date,
+              preorder_end_date,
+              preorder_status,
+              preorder_bonus,
+              preorder_bonus_note,
+              contents_text,
+              candidate_price,
+              confirmed_price,
+              price_status,
+              publish_status,
+              display_order
+            )
+            VALUES (
+              ?, ?, ?, ?, ?, ?, ?, ?, NULL,
+              ?, NULL, ?, 'DRAFT', ?
+            )
+            RETURNING id
+          `)
+            .bind(
+              variant.id,
+              officialSource.id,
+              releaseDate,
+              preorderStartDate || null,
+              preorderEndDate || null,
+              preorderStatus,
+              preorderBonus || null,
+              preorderBonusNote || null,
+              candidatePrice,
+              priceStatus,
+              index
+            )
+            .first<{ id: number }>()
+
+        if (!preorder?.id) {
+          throw new Error(
+            'failed to create variant preorder'
+          )
+        }
+
+        editionIds.push(Number(edition.id))
+        variantIds.push(Number(variant.id))
+        preorderIds.push(Number(preorder.id))
       }
-
       await c.env.DB.prepare(`
         UPDATE watch_items
 
@@ -1688,13 +1782,15 @@ watcherAdmin.post(
 
         itemId: item.id,
         gameId: createdGameId,
-        editionId: Number(edition.id),
+        editionId: editionIds[0] || null,
+        editionIds,
 
         officialSourceId:
           Number(officialSource.id),
 
-        preorderId:
-          Number(preorder.id),
+        variantIds,
+        preorderId: preorderIds[0] || null,
+        preorderIds,
 
         gamePublishStatus: 'DRAFT',
         preorderPublishStatus: 'DRAFT',

@@ -17,11 +17,11 @@
   let collectorRunning = false
   let eventActionRunning = false
   let transformActionRunning = false
-  let registerDraftRunning = false  
+  let registerDraftRunning = false
   let imageActionRunning = false
   let imageStoreRunning = false
   let imagePreviewRunning = false
-  let watcherPreviewObjectUrl = ''  
+  let watcherPreviewObjectUrl = ''
   let watcherFinalReviewContext = {
     item: null,
     selectedImage: null
@@ -954,8 +954,288 @@ async function readAllWatcherEvents() {
       : ''
   }
 
+
+  function watcherPlatformOptions(selected) {
+    const options = [
+      ['switch2', 'Nintendo Switch 2'],
+      ['switch', 'Nintendo Switch'],
+      ['ps5', 'PlayStation 5'],
+      ['ps4', 'PlayStation 4'],
+      ['xbox', 'Xbox'],
+      ['pc', 'Steam / PC'],
+      ['etc', '기타']
+    ]
+
+    return options.map(function (option) {
+      return (
+        '<option value="' +
+          escapeHtml(option[0]) +
+          '"' +
+          (
+            option[0] === selected
+              ? ' selected'
+              : ''
+          ) +
+        '>' +
+          escapeHtml(option[1]) +
+        '</option>'
+      )
+    }).join('')
+  }
+
+  function getWatcherTransformPlatforms() {
+    const container =
+      $('watcherTransformPlatformRows')
+
+    if (!container) return []
+
+    const values = Array.from(
+      container.querySelectorAll(
+        '[data-watcher-transform-platform]'
+      )
+    ).map(function (select) {
+      return String(select.value || '')
+        .trim()
+        .toLowerCase()
+    }).filter(Boolean)
+
+    return Array.from(new Set(values))
+  }
+
+  function setWatcherTransformPlatforms(values) {
+    const container =
+      $('watcherTransformPlatformRows')
+
+    if (!container) return
+
+    let platforms = Array.isArray(values)
+      ? values.map(function (value) {
+          return String(value || '')
+            .trim()
+            .toLowerCase()
+        }).filter(Boolean)
+      : []
+
+    platforms = Array.from(new Set(platforms))
+
+    if (!platforms.length) {
+      platforms = ['switch']
+    }
+
+    container.innerHTML = platforms
+      .map(function (platform, index) {
+        return (
+          '<div ' +
+            'data-watcher-platform-row="1" ' +
+            'style="display:flex;gap:8px;align-items:center"' +
+          '>' +
+            '<select ' +
+              (
+                index === 0
+                  ? 'id="watcherTransformPlatform" '
+                  : ''
+              ) +
+              'data-watcher-transform-platform="1" ' +
+              'style="flex:1"' +
+            '>' +
+              watcherPlatformOptions(platform) +
+            '</select>' +
+            '<button ' +
+              'type="button" ' +
+              'class="btn btn-sm" ' +
+              'data-remove-watcher-platform="1"' +
+              (
+                platforms.length <= 1
+                  ? ' disabled'
+                  : ''
+              ) +
+            '>' +
+              '삭제' +
+            '</button>' +
+          '</div>'
+        )
+      })
+      .join('')
+  }
+
+  function addWatcherTransformPlatform() {
+    const current = getWatcherTransformPlatforms()
+
+    const order = [
+      'switch2',
+      'switch',
+      'ps5',
+      'pc',
+      'ps4',
+      'xbox',
+      'etc'
+    ]
+
+    const next = order.find(function (platform) {
+      return !current.includes(platform)
+    })
+
+    if (!next) {
+      setTransformStatus(
+        '추가할 수 있는 플랫폼이 없습니다.',
+        'err'
+      )
+      return
+    }
+
+    setWatcherTransformPlatforms(
+      current.concat(next)
+    )
+
+    renderWatcherFinalReview()
+  }
+
+  function detectClePlatforms(item, draft) {
+    if (
+      draft &&
+      Array.isArray(draft.platforms) &&
+      draft.platforms.length
+    ) {
+      return draft.platforms
+    }
+
+    const sourceKey = String(
+      item && item.source_key || ''
+    ).toUpperCase()
+
+    if (sourceKey !== 'CLOUDED_LEOPARD') {
+      return [
+        draft && draft.platform
+          ? draft.platform
+          : 'switch'
+      ]
+    }
+
+    const text = [
+      item && item.title,
+      item && item.raw_title,
+      item && item.raw_text
+    ].join('\n')
+
+    const result = []
+
+    if (
+      /Nintendo\s*Switch\s*2|Switch\s*2|NSW2/i
+        .test(text)
+    ) {
+      result.push('switch2')
+    }
+
+    const withoutSwitch2 = text.replace(
+      /Nintendo\s*Switch\s*2|Switch\s*2|NSW2/gi,
+      ' '
+    )
+
+    if (
+      /Nintendo\s*Switch|\bNSW\b/i
+        .test(withoutSwitch2)
+    ) {
+      result.push('switch')
+    }
+
+    if (/PlayStation\s*5|\bPS5\b/i.test(text)) {
+      result.push('ps5')
+    }
+
+    if (/PlayStation\s*4|\bPS4\b/i.test(text)) {
+      result.push('ps4')
+    }
+
+    if (/\bSteam\b|\bPC\b/i.test(text)) {
+      result.push('pc')
+    }
+
+    if (/\bXbox\b/i.test(text)) {
+      result.push('xbox')
+    }
+
+    return result.length
+      ? result
+      : [
+          draft && draft.platform
+            ? draft.platform
+            : 'switch'
+        ]
+  }
+
+  function suggestCleTitle(item, draft) {
+    const existing = String(
+      draft && draft.title || ''
+    ).trim()
+
+    const sourceKey = String(
+      item && item.source_key || ''
+    ).toUpperCase()
+
+    if (
+      sourceKey !== 'CLOUDED_LEOPARD' &&
+      existing
+    ) {
+      return existing
+    }
+
+    const raw = String(
+      item && (
+        item.raw_title ||
+        item.title
+      ) || existing
+    ).trim()
+
+    const quoted = raw.match(
+      /[『「《](.*?)[』」》]/
+    )
+
+    return quoted && quoted[1]
+      ? quoted[1].trim()
+      : existing || raw
+  }
+
+  function suggestCleReleaseDate(item, draft) {
+    const existing = String(
+      draft && draft.releaseDate || ''
+    ).trim()
+
+    if (existing) return existing
+
+    if (
+      String(item && item.source_key || '')
+        .toUpperCase() !== 'CLOUDED_LEOPARD'
+    ) {
+      return ''
+    }
+
+    const text = String(
+      item && item.raw_text || ''
+    )
+
+    const patterns = [
+      /(?:발매|출시|판매\s*예정)[^\n]{0,100}?(20\d{2})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/i,
+      /(20\d{2})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일[^\n]{0,80}?(?:발매|출시)/i,
+      /(?:발매|출시)[^\n]{0,100}?(20\d{2})[./-](\d{1,2})[./-](\d{1,2})/i
+    ]
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+
+      if (match) {
+        return [
+          match[1],
+          match[2].padStart(2, '0'),
+          match[3].padStart(2, '0')
+        ].join('-')
+      }
+    }
+
+    return ''
+  }
   function watcherPlatformLabel(value) {
     const labels = {
+      switch2: 'Nintendo Switch 2',
       switch: 'Nintendo Switch',
       ps5: 'PlayStation 5',
       ps4: 'PlayStation 4',
@@ -1251,8 +1531,8 @@ async function readAllWatcherEvents() {
     }
   }
 
-  
-  
+
+
   function setTransformImageStatus(
     message,
     type
@@ -1448,7 +1728,7 @@ async function readAllWatcherEvents() {
     configureWatcherPrivatePreview(
       selectedImage || null
     )
-    
+
     if (selectedElement) {
       selectedElement.hidden =
         !selectedImage
@@ -1477,7 +1757,7 @@ async function readAllWatcherEvents() {
         )
 
 
-      
+
     }
 
     if (!list.length) {
@@ -1550,7 +1830,7 @@ async function readAllWatcherEvents() {
           permissionStatus === 'APPROVED' &&
           localStorageAllowed
 
-        
+
         let hostName = '공식 이미지'
 
         if (sourceUrl) {
@@ -1979,7 +2259,7 @@ async function readAllWatcherEvents() {
     }
   }
 
-  
+
   async function selectWatcherImage(
     imageIdValue
   ) {
@@ -2303,7 +2583,7 @@ async function readAllWatcherEvents() {
     }
   }
 
-  
+
   async function openWatcherTransform(itemId) {
     const id = Number(itemId)
     const card = $('watcherTransformCard')
@@ -2380,12 +2660,11 @@ async function readAllWatcherEvents() {
 
       setTransformValue(
         'watcherTransformTitle',
-        draft.title || item.title || ''
+        suggestCleTitle(item, draft)
       )
 
-      setTransformValue(
-        'watcherTransformPlatform',
-        draft.platform || 'switch'
+      setWatcherTransformPlatforms(
+        detectClePlatforms(item, draft)
       )
 
       setTransformValue(
@@ -2400,7 +2679,7 @@ async function readAllWatcherEvents() {
 
       setTransformValue(
         'watcherTransformReleaseDate',
-        draft.releaseDate || ''
+        suggestCleReleaseDate(item, draft)
       )
 
       setTransformValue(
@@ -2515,14 +2794,16 @@ async function readAllWatcherEvents() {
       'watcherTransformCandidatePrice'
     )
 
+    const platforms =
+      getWatcherTransformPlatforms()
+
     const payload = {
       title: value(
         'watcherTransformTitle'
       ),
 
-      platform: value(
-        'watcherTransformPlatform'
-      ),
+      platform: platforms[0] || '',
+      platforms,
 
       editionName: value(
         'watcherTransformEditionName'
@@ -2764,7 +3045,7 @@ async function readAllWatcherEvents() {
     }
   }
 
-  
+
   function renderSummary(summary) {
     const data = summary || {}
 
@@ -3124,10 +3405,16 @@ async function readAllWatcherEvents() {
   const saveTransformButton =
     $('saveWatcherTransform')
 
+  const addPlatformButton =
+    $('addWatcherTransformPlatform')
+
+  const platformRows =
+    $('watcherTransformPlatformRows')
+
 
   const registerDraftButton =
     $('registerWatcherDraft')
-   
+
   const closeTransformButton =
     $('closeWatcherTransform')
 
@@ -3160,7 +3447,72 @@ async function readAllWatcherEvents() {
       readAllWatcherEvents
     )
   }
-   
+
+  if (addPlatformButton) {
+    addPlatformButton.addEventListener(
+      'click',
+      addWatcherTransformPlatform
+    )
+  }
+
+  if (platformRows) {
+    platformRows.addEventListener(
+      'click',
+      function (event) {
+        const target = event.target
+
+        if (!(target instanceof Element)) {
+          return
+        }
+
+        const removeButton = target.closest(
+          '[data-remove-watcher-platform]'
+        )
+
+        if (!removeButton) return
+
+        const row = removeButton.closest(
+          '[data-watcher-platform-row]'
+        )
+
+        if (row) {
+          row.remove()
+
+          setWatcherTransformPlatforms(
+            getWatcherTransformPlatforms()
+          )
+
+          renderWatcherFinalReview()
+        }
+      }
+    )
+
+    platformRows.addEventListener(
+      'change',
+      function () {
+        const platforms =
+          getWatcherTransformPlatforms()
+
+        const selects = Array.from(
+          platformRows.querySelectorAll(
+            '[data-watcher-transform-platform]'
+          )
+        )
+
+        if (platforms.length !== selects.length) {
+          setTransformStatus(
+            '같은 플랫폼을 중복 선택할 수 없습니다.',
+            'err'
+          )
+
+          setWatcherTransformPlatforms(platforms)
+        }
+
+        renderWatcherFinalReview()
+      }
+    )
+  }
+
   if (saveTransformButton) {
     saveTransformButton.addEventListener(
       'click',
@@ -3263,7 +3615,7 @@ async function readAllWatcherEvents() {
       }
     )
 
-   
+
   if (closeTransformButton) {
     closeTransformButton.addEventListener(
       'click',
@@ -3277,7 +3629,7 @@ async function readAllWatcherEvents() {
       closeWatcherTransform
     )
   }
-   
+
   if (eventList) {
     eventList.addEventListener(
       'click',
