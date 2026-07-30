@@ -586,7 +586,7 @@ export function AdminPage(): string {
             <div
               id="watcherTransformPlatformRows"
               style="display:grid;gap:8px"
-            />
+            ></div>
 
             <button
               id="addWatcherTransformPlatform"
@@ -2226,7 +2226,7 @@ export function AdminPage(): string {
   </main>
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
-	<script src="/static/watcher-admin.js?v=20260722-watcher-script-fix-1"></script>
+	<script src="/static/watcher-admin.js?v=20260730-platform-ui-hotfix-1"></script>
 	<script src="/static/preorder-admin.js?v=20260724-naver-preorder-v1"></script>
 </body>
 </html>`

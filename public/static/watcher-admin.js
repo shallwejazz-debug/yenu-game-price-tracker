@@ -1050,6 +1050,9 @@ async function readAllWatcherEvents() {
                   : ''
               ) +
               'data-watcher-transform-platform="1" ' +
+              'data-previous-platform="' +
+                escapeHtml(platform) +
+              '" ' +
               'style="flex:1"' +
             '>' +
               watcherPlatformOptions(platform) +
@@ -4138,25 +4141,82 @@ async function readAllWatcherEvents() {
 
     platformRows.addEventListener(
       'change',
-      function () {
-        const platforms =
-          getWatcherTransformPlatforms()
+      function (event) {
+        const target = event.target
 
-        const selects = Array.from(
+        if (
+          !(target instanceof Element) ||
+          !target.matches(
+            '[data-watcher-transform-platform]'
+          )
+        ) {
+          return
+        }
+
+        const nextPlatform =
+          String(target.value || '')
+            .trim()
+            .toLowerCase()
+
+        const previousPlatform =
+          String(
+            target.getAttribute(
+              'data-previous-platform'
+            ) || ''
+          )
+            .trim()
+            .toLowerCase()
+
+        const rawPlatforms = Array.from(
           platformRows.querySelectorAll(
             '[data-watcher-transform-platform]'
           )
-        )
+        ).map(function (select) {
+          return String(select.value || '')
+            .trim()
+            .toLowerCase()
+        })
 
-        if (platforms.length !== selects.length) {
+        if (
+          new Set(rawPlatforms).size !==
+          rawPlatforms.length
+        ) {
+          target.value = previousPlatform
+
           setTransformStatus(
-            '같은 플랫폼을 중복 선택할 수 없습니다.',
+            '같은 플랫폼은 중복 선택할 수 없습니다.',
             'err'
           )
 
-          setWatcherTransformPlatforms(platforms)
+          return
         }
 
+        const variants =
+          getWatcherTransformVariants()
+
+        variants.forEach(function (variant) {
+          variant.platforms =
+            variant.platforms.map(
+              function (platform) {
+                return (
+                  platform === previousPlatform
+                    ? nextPlatform
+                    : platform
+                )
+              }
+            )
+        })
+
+        target.setAttribute(
+          'data-previous-platform',
+          nextPlatform
+        )
+
+        renderWatcherTransformVariants(
+          variants
+        )
+
+        setTransformStatus('', '')
         renderWatcherFinalReview()
       }
     )
