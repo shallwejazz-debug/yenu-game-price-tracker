@@ -1109,20 +1109,53 @@ async function readAllWatcherEvents() {
     renderWatcherFinalReview()
   }
 
-  function detectClePlatforms(item, draft) {
-    if (
-      draft &&
-      Array.isArray(draft.platforms) &&
-      draft.platforms.length
-    ) {
-      return draft.platforms
-    }
 
+  function clePlatformEvidence(item) {
+    const title = String(
+      item && (
+        item.raw_title ||
+        item.title
+      ) || ''
+    ).trim()
+
+    const rawText = String(
+      item && item.raw_text || ''
+    )
+
+    const labeledLines = rawText
+      .split(/\r?\n/)
+      .map(function (line) {
+        return line.trim()
+      })
+      .filter(function (line) {
+        return (
+          /^(?:대응\s*기종|지원\s*기종|플랫폼|대응\s*플랫폼|출시\s*플랫폼|기종)\s*[:：]/i
+            .test(line)
+        )
+      })
+      .slice(0, 10)
+
+    return [
+      title
+    ].concat(labeledLines).join('\n')
+  }
+
+  function detectClePlatforms(item, draft) {
     const sourceKey = String(
       item && item.source_key || ''
     ).toUpperCase()
 
-    if (sourceKey !== 'CLOUDED_LEOPARD') {
+    if (
+      sourceKey !== 'CLOUDED_LEOPARD'
+    ) {
+      if (
+        draft &&
+        Array.isArray(draft.platforms) &&
+        draft.platforms.length
+      ) {
+        return draft.platforms
+      }
+
       return [
         draft && draft.platform
           ? draft.platform
@@ -1130,12 +1163,7 @@ async function readAllWatcherEvents() {
       ]
     }
 
-    const text = [
-      item && item.title,
-      item && item.raw_title,
-      item && item.raw_text
-    ].join('\n')
-
+    const text = clePlatformEvidence(item)
     const result = []
 
     if (
@@ -1157,29 +1185,166 @@ async function readAllWatcherEvents() {
       result.push('switch')
     }
 
-    if (/PlayStation\s*5|\bPS5\b/i.test(text)) {
+    if (/PlayStation\s*5|PS5/i.test(text)) {
       result.push('ps5')
     }
 
-    if (/PlayStation\s*4|\bPS4\b/i.test(text)) {
+    if (/PlayStation\s*4|PS4/i.test(text)) {
       result.push('ps4')
     }
 
-    if (/\bSteam\b|\bPC\b/i.test(text)) {
-      result.push('pc')
-    }
-
-    if (/\bXbox\b/i.test(text)) {
+    if (/Xbox/i.test(text)) {
       result.push('xbox')
     }
 
-    return result.length
-      ? result
-      : [
-          draft && draft.platform
-            ? draft.platform
-            : 'switch'
-        ]
+    if (/Steam|\bPC\b/i.test(text)) {
+      result.push('pc')
+    }
+
+    if (result.length) {
+      return Array.from(new Set(result))
+    }
+
+    if (
+      draft &&
+      Array.isArray(draft.platforms) &&
+      draft.platforms.length
+    ) {
+      return draft.platforms
+    }
+
+    return [
+      draft && draft.platform
+        ? draft.platform
+        : 'switch'
+    ]
+  }
+
+  function suggestCleVariants(
+    item,
+    draft,
+    platforms
+  ) {
+    if (
+      draft &&
+      Array.isArray(draft.variants) &&
+      draft.variants.length
+    ) {
+      return draft.variants
+    }
+
+    const targetPlatforms =
+      Array.isArray(platforms)
+        ? platforms
+        : []
+
+    const text = [
+      item && item.raw_title,
+      item && item.title,
+      item && item.raw_text
+    ].join('\n')
+
+    const variants = [{
+      variantCode: 'STANDARD',
+      variantName: '일반판',
+      variantKind: 'STANDARD',
+      packageType: 'AUTO',
+      platforms: targetPlatforms,
+      contentsText: '',
+      candidatePrice: null,
+      preorderBonus: '',
+      preorderBonusNote: ''
+    }]
+
+    if (/디럭스|Deluxe/i.test(text)) {
+      variants.push({
+        variantCode: 'DELUXE',
+        variantName: '디럭스 에디션',
+        variantKind: 'DELUXE',
+        packageType: 'AUTO',
+        platforms: targetPlatforms,
+        contentsText: '',
+        candidatePrice: null,
+        preorderBonus: '',
+        preorderBonusNote: ''
+      })
+    }
+
+    if (/얼티밋|Ultimate/i.test(text)) {
+      variants.push({
+        variantCode: 'ULTIMATE',
+        variantName: '얼티밋 에디션',
+        variantKind: 'ULTIMATE',
+        packageType: 'AUTO',
+        platforms: targetPlatforms,
+        contentsText: '',
+        candidatePrice: null,
+        preorderBonus: '',
+        preorderBonusNote: ''
+      })
+    }
+
+    const customNames = []
+
+    const bracketPattern =
+      /[『「《\[【](.{1,60}?(?:BOX|박스|한정판|컬렉터즈|프리미엄).{0,30}?)[』」》\]】]/gi
+
+    let match
+
+    while (
+      (match = bracketPattern.exec(text)) !== null
+    ) {
+      customNames.push(
+        String(match[1] || '').trim()
+      )
+    }
+
+    const simplePattern =
+      /([가-힣A-Za-z0-9][가-힣A-Za-z0-9 _-]{0,35}(?:BOX|박스))/gi
+
+    while (
+      (match = simplePattern.exec(text)) !== null
+    ) {
+      customNames.push(
+        String(match[1] || '').trim()
+      )
+    }
+
+    Array.from(
+      new Set(
+        customNames.filter(Boolean)
+      )
+    ).slice(0, 10).forEach(
+      function (name, index) {
+        const packagePlatforms =
+          targetPlatforms.filter(
+            function (platform) {
+              return platform !== 'pc'
+            }
+          )
+
+        variants.push({
+          variantCode:
+            'OTHER_' + String(index + 1),
+
+          variantName: name,
+          variantKind: 'OTHER',
+          packageType: 'PACKAGE',
+
+          platforms:
+            packagePlatforms.length
+              ? packagePlatforms
+              : targetPlatforms,
+
+          contentsText: '',
+          candidatePrice: null,
+          preorderBonus: '',
+          preorderBonusNote: ''
+        })
+      }
+    )
+
+    return variants
   }
 
   function suggestCleTitle(item, draft) {
@@ -1584,7 +1749,7 @@ async function readAllWatcherEvents() {
             '</div>' +
 
             '<div class="admin-field">' +
-              '<span>적용 플랫폼</span>' +
+              '<span>이 에디션 판매 플랫폼</span>' +
               '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
                 platformChecks +
               '</div>' +
@@ -3128,16 +3293,25 @@ async function readAllWatcherEvents() {
         suggestCleTitle(item, draft)
       )
 
-      setWatcherTransformPlatforms(
+      const suggestedPlatforms =
         detectClePlatforms(item, draft)
+
+      setWatcherTransformPlatforms(
+        suggestedPlatforms
       )
 
+      const suggestedVariants =
+        suggestCleVariants(
+          item,
+          draft,
+          suggestedPlatforms
+        )
+
       watcherHasMultiEditionDraft =
-        Array.isArray(draft.variants) &&
-        draft.variants.length > 0
+        suggestedVariants.length > 0
 
       setWatcherTransformVariants(
-        draft.variants,
+        suggestedVariants,
         {
           editionName:
             draft.editionName || '일반판',
@@ -3940,7 +4114,28 @@ async function readAllWatcherEvents() {
     )
   }
 
- function init() {
+  function init() {
+  const platformRowsForLabel =
+    $('watcherTransformPlatformRows')
+
+  if (platformRowsForLabel) {
+    const platformField =
+      platformRowsForLabel.closest(
+        '.admin-field'
+      )
+
+    const platformLabel =
+      platformField &&
+      platformField.querySelector(
+        ':scope > span'
+      )
+
+    if (platformLabel) {
+      platformLabel.textContent =
+        '게임 출시 플랫폼'
+    }
+  }
+
   const refreshButton = $('refreshWatcher')
   const collectArcButton = $('collectArcWatcher')
 

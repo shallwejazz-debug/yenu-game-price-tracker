@@ -2672,6 +2672,17 @@ watcherAdmin.post(
       )
     }
 
+    if (preorderRows.length > 1) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '멀티 에디션 이미지는 사전예약 V2 화면에서 에디션별로 연결해 주세요.',
+        },
+        409
+      )
+    }
+
     if (
       preorderRows.some(
         (preorder) =>
