@@ -1226,6 +1226,259 @@ async function readAllWatcherEvents() {
     ]
   }
 
+
+  function cleArticleText(item) {
+    return String(
+      item && item.raw_text || ''
+    )
+      .replace(/\u00a0/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n[ \t]+/g, '\n')
+  }
+
+  function cleSection(
+    text,
+    startPattern,
+    endPattern
+  ) {
+    const startMatch =
+      text.match(startPattern)
+
+    if (!startMatch || startMatch.index == null) {
+      return ''
+    }
+
+    const start =
+      startMatch.index +
+      startMatch[0].length
+
+    const rest = text.slice(start)
+    const endMatch = rest.match(endPattern)
+
+    return (
+      endMatch && endMatch.index != null
+        ? rest.slice(0, endMatch.index)
+        : rest
+    ).trim()
+  }
+
+  function clePriceEntries(text) {
+    const entries = []
+    const pattern =
+      /【([^】]{1,100})】\s*(?:\n\s*)?KRW\s*([0-9,]+)/gi
+
+    let match
+
+    while (
+      (match = pattern.exec(text)) !== null
+    ) {
+      const label = String(match[1] || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      const price = Number(
+        String(match[2] || '')
+          .replace(/,/g, '')
+      )
+
+      if (
+        label &&
+        Number.isInteger(price) &&
+        price > 0
+      ) {
+        entries.push({
+          label,
+          normalized:
+            label
+              .toUpperCase()
+              .replace(/\s+/g, ''),
+          price
+        })
+      }
+    }
+
+    return entries
+  }
+
+  function cleFindPrice(entries, words) {
+    const targets = words.map(
+      function (word) {
+        return String(word)
+          .toUpperCase()
+          .replace(/\s+/g, '')
+      }
+    )
+
+    const entry = entries.find(
+      function (candidate) {
+        return targets.every(
+          function (target) {
+            return candidate.normalized
+              .includes(target)
+          }
+        )
+      }
+    )
+
+    return entry ? entry.price : null
+  }
+
+  function cleBoxName(item, text) {
+    const source = [
+      item && item.raw_title,
+      item && item.title,
+      text.slice(0, 3000)
+    ].join('\n')
+
+    const quoted = source.match(
+      /[「『《【\[]([^「」『』《》【】\[\]\r\n]{1,100}?(?:BOX|박스))[^「」『』《》【】\[\]\r\n]*[」』》】\]]/i
+    )
+
+    if (quoted && quoted[1]) {
+      return String(quoted[1])
+        .replace(/^.*?the\s*2nd\s*/i, '')
+        .replace(/^한정판\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
+
+    const simple = source.match(
+      /([가-힣A-Za-z0-9 _-]{1,50}(?:BOX|박스))/i
+    )
+
+    return simple && simple[1]
+      ? String(simple[1])
+          .replace(/^.*?the\s*2nd\s*/i, '')
+          .replace(/^한정판\s*/i, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      : ''
+  }
+
+  function cleBoxContents(text) {
+    const section = cleSection(
+      text,
+      /■\s*[^\n]*(?:BOX|박스)[^\n]*세트\s*내용[^\n]*/i,
+      /■\s*(?:초회|사전|예약|클리어|상품\s*개요)/i
+    )
+
+    if (!section) return ''
+
+    const parts = section.match(
+      /[①②③④⑤⑥⑦⑧⑨⑩][\s\S]*?(?=[①②③④⑤⑥⑦⑧⑨⑩]|$)/g
+    )
+
+    if (!parts || !parts.length) {
+      return section.slice(0, 10000)
+    }
+
+    return parts.map(function (part) {
+      return part
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    }).join('\n\n').slice(0, 10000)
+  }
+
+  function cleBonusInfo(text) {
+    const section = cleSection(
+      text,
+      /■\s*(?:초회\s*구입\s*특전|사전\s*예약\s*특전)[^\n]*/i,
+      /■\s*(?:클리어|키워드|캐릭터|상품\s*개요)/i
+    )
+
+    if (!section) {
+      return {
+        bonus: '',
+        note: '',
+        steamExcluded: false
+      }
+    }
+
+    const bullet = section.match(
+      /[・●]\s*([^\n]{1,300})/
+    )
+
+    const bonus = bullet && bullet[1]
+      ? bullet[1].trim()
+      : ''
+
+    const notes = section
+      .split('\n')
+      .filter(function (line) {
+        return /^\s*※/.test(line)
+      })
+      .map(function (line) {
+        return line.trim()
+      })
+      .join('\n')
+
+    return {
+      bonus,
+      note: notes,
+      steamExcluded:
+        /Steam\s*버전[^\n]{0,100}(?:제공되지|제외)/i
+          .test(section)
+    }
+  }
+
+  function cleLinkBonus(text) {
+    const section = cleSection(
+      text,
+      /■\s*클리어\s*데이터\s*연동\s*특전[^\n]*/i,
+      /■\s*(?:키워드|캐릭터|상품\s*개요)/i
+    )
+
+    if (!section) return ''
+
+    const bullet = section.match(
+      /[・●]\s*([^\n]{1,300})/
+    )
+
+    return bullet && bullet[1]
+      ? '클리어 데이터 연동 특전: ' +
+        bullet[1].trim()
+      : ''
+  }
+
+  function suggestCleGenre(item, draft) {
+    if (draft && draft.genre) {
+      return draft.genre
+    }
+
+    const text = cleArticleText(item)
+
+    const overview = cleSection(
+      text,
+      /■\s*[^\n]*상품\s*개요[^\n]*/i,
+      /ABOUT\s+US|CONTACT|©/i
+    )
+
+    const match = overview.match(
+      /(?:^|\n)\s*장르\s*[:：]?\s*([^\n]{1,100})/i
+    )
+
+    return match && match[1]
+      ? match[1].trim()
+      : ''
+  }
+
+  function suggestCleTrailer(item, draft) {
+    if (draft && draft.trailerUrl) {
+      return draft.trailerUrl
+    }
+
+    const text = cleArticleText(item)
+
+    const match = text.match(
+      /(?:WebCM|트레일러|Trailer)[\s\S]{0,300}?(https?:\/\/[^\s<>"']+)/i
+    )
+
+    return match && match[1]
+      ? match[1].trim()
+      : ''
+  }
+
   function suggestCleVariants(
     item,
     draft,
@@ -1244,155 +1497,240 @@ async function readAllWatcherEvents() {
         ? platforms
         : []
 
-    const rawTitle = String(
-      item && (
-        item.raw_title ||
-        item.title
-      ) || ''
-    ).trim()
+    const text = cleArticleText(item)
+    const prices = clePriceEntries(text)
+    const bonusInfo = cleBonusInfo(text)
+    const linkBonus = cleLinkBonus(text)
+    const boxContents = cleBoxContents(text)
+    const boxName = cleBoxName(item, text)
 
-    const rawText = String(
-      item && item.raw_text || ''
-    )
-
-    const editionLines = rawText
-      .split(/\r?\n/)
-      .map(function (line) {
-        return line.trim()
-      })
-      .filter(function (line) {
-        return (
-          /^(?:상품\s*구성|제품\s*구성|에디션|한정판|패키지\s*구성)\s*[:：]/i
-            .test(line)
-        )
-      })
-      .slice(0, 20)
-
-    const text = [
-      rawTitle
-    ].concat(editionLines).join('\n')
-
-    const variants = [{
-      variantCode: 'STANDARD',
-      variantName: '일반판',
-      variantKind: 'STANDARD',
-      packageType: 'AUTO',
-      platforms: targetPlatforms,
-      contentsText: '',
-      candidatePrice: null,
-      preorderBonus: '',
-      preorderBonusNote: ''
-    }]
-
-    if (/디럭스|Deluxe/i.test(text)) {
-      variants.push({
-        variantCode: 'DELUXE',
-        variantName: '디럭스 에디션',
-        variantKind: 'DELUXE',
-        packageType: 'AUTO',
-        platforms: targetPlatforms,
-        contentsText: '',
-        candidatePrice: null,
-        preorderBonus: '',
-        preorderBonusNote: ''
-      })
-    }
-
-    if (/얼티밋|Ultimate/i.test(text)) {
-      variants.push({
-        variantCode: 'ULTIMATE',
-        variantName: '얼티밋 에디션',
-        variantKind: 'ULTIMATE',
-        packageType: 'AUTO',
-        platforms: targetPlatforms,
-        contentsText: '',
-        candidatePrice: null,
-        preorderBonus: '',
-        preorderBonusNote: ''
-      })
-    }
-
-    const customNames = []
-
-    const quotedCustomPattern =
-      /[「《\[【]([^「」《》\[\]【】\r\n]{1,80}?(?:BOX|박스|한정판|컬렉터즈|프리미엄)[^「」《》\[\]【】\r\n]{0,30})[」》\]】]/gi
-
-    let match
-
-    while (
-      (
-        match =
-          quotedCustomPattern.exec(text)
-      ) !== null
-    ) {
-      const name = String(
-        match[1] || ''
+    const packageStandardPrice =
+      cleFindPrice(
+        prices,
+        ['패키지', '일반판']
       )
-        .replace(
-          /^(?:한정판|패키지)\s*[:：-]?\s*/i,
-          ''
-        )
-        .replace(/\s+/g, ' ')
-        .trim()
 
-      if (name) {
-        customNames.push(name)
-      }
-    }
+    const switch2Price =
+      cleFindPrice(
+        prices,
+        ['SWITCH2', 'EDITION']
+      )
 
-    const normalizedCustomNames =
-      customNames.filter(
-        function (name, index, list) {
-          const normalized = name
-            .toUpperCase()
-            .replace(/\s+/g, '')
+    const boxPrice =
+      cleFindPrice(
+        prices,
+        ['우로보로스', 'BOX']
+      ) ||
+      cleFindPrice(
+        prices,
+        ['한정판']
+      )
 
-          return (
-            list.findIndex(
-              function (candidate) {
-                return candidate
-                  .toUpperCase()
-                  .replace(/\s+/g, '') ===
-                  normalized
-              }
-            ) === index
-          )
+    const digitalStandardPrice =
+      cleFindPrice(
+        prices,
+        ['디지털', '일반판']
+      )
+
+    const deluxePrice =
+      cleFindPrice(
+        prices,
+        ['디지털', '디럭스']
+      )
+
+    const nonPcPlatforms =
+      targetPlatforms.filter(
+        function (platform) {
+          return platform !== 'pc'
         }
       )
 
-    Array.from(
-      new Set(
-        normalizedCustomNames
+    const normalConsolePlatforms =
+      nonPcPlatforms.filter(
+        function (platform) {
+          return platform !== 'switch2'
+        }
       )
-    ).slice(0, 10).forEach(
-      function (name, index) {
-        const packagePlatforms =
-          targetPlatforms.filter(
-            function (platform) {
-              return platform !== 'pc'
-            }
-          )
 
-        variants.push({
-          variantCode:
-            'OTHER_' + String(index + 1),
+    const pcPlatforms =
+      targetPlatforms.includes('pc')
+        ? ['pc']
+        : []
 
-          variantName: name,
-          variantKind: 'OTHER',
-          packageType: 'PACKAGE',
+    const switch2Platforms =
+      targetPlatforms.includes('switch2')
+        ? ['switch2']
+        : []
 
-          platforms:
-            packagePlatforms.length
-              ? packagePlatforms
-              : targetPlatforms,
+    const variants = []
 
-          contentsText: '',
-          candidatePrice: null,
-          preorderBonus: '',
-          preorderBonusNote: ''
-        })
+    const add = function (value) {
+      if (
+        !value.platforms ||
+        !value.platforms.length
+      ) {
+        return
       }
-    )
+
+      variants.push({
+        variantCode: value.variantCode,
+        variantName: value.variantName,
+        variantKind: value.variantKind,
+        packageType: value.packageType,
+        platforms: value.platforms,
+        contentsText:
+          value.contentsText || '',
+        candidatePrice:
+          value.candidatePrice == null
+            ? null
+            : value.candidatePrice,
+        preorderBonus:
+          value.preorderBonus || '',
+        preorderBonusNote:
+          value.preorderBonusNote || ''
+      })
+    }
+
+    const commonNote = [
+      bonusInfo.note,
+      linkBonus
+    ].filter(Boolean).join('\n')
+
+    add({
+      variantCode: 'STANDARD',
+      variantName: '일반판',
+      variantKind: 'STANDARD',
+      packageType:
+        digitalStandardPrice
+          ? 'BOTH'
+          : 'PACKAGE',
+      platforms:
+        normalConsolePlatforms,
+      candidatePrice:
+        packageStandardPrice ||
+        digitalStandardPrice,
+      preorderBonus:
+        bonusInfo.bonus,
+      preorderBonusNote:
+        commonNote
+    })
+
+    add({
+      variantCode: 'SWITCH2_EDITION',
+      variantName:
+        'Nintendo Switch 2 Edition',
+      variantKind: 'OTHER',
+      packageType: 'BOTH',
+      platforms: switch2Platforms,
+      candidatePrice: switch2Price,
+      preorderBonus:
+        bonusInfo.bonus,
+      preorderBonusNote:
+        commonNote
+    })
+
+    add({
+      variantCode: 'STEAM_STANDARD',
+      variantName: 'Steam 일반판',
+      variantKind: 'STANDARD',
+      packageType: 'DIGITAL',
+      platforms: pcPlatforms,
+      candidatePrice:
+        digitalStandardPrice ||
+        packageStandardPrice,
+      preorderBonus:
+        bonusInfo.steamExcluded
+          ? ''
+          : bonusInfo.bonus,
+      preorderBonusNote:
+        bonusInfo.steamExcluded
+          ? 'Steam 버전은 초회/예약 특전 제외'
+          : commonNote
+    })
+
+    if (deluxePrice) {
+      add({
+        variantCode: 'DIGITAL_DELUXE',
+        variantName:
+          '디지털 디럭스 버전',
+        variantKind: 'DELUXE',
+        packageType: 'DIGITAL',
+        platforms: nonPcPlatforms,
+        candidatePrice: deluxePrice,
+        preorderBonus:
+          bonusInfo.bonus,
+        preorderBonusNote:
+          commonNote
+      })
+
+      add({
+        variantCode: 'STEAM_DELUXE',
+        variantName:
+          'Steam 디지털 디럭스 버전',
+        variantKind: 'DELUXE',
+        packageType: 'DIGITAL',
+        platforms: pcPlatforms,
+        candidatePrice: deluxePrice,
+        preorderBonus:
+          bonusInfo.steamExcluded
+            ? ''
+            : bonusInfo.bonus,
+        preorderBonusNote:
+          bonusInfo.steamExcluded
+            ? 'Steam 버전은 초회/예약 특전 제외'
+            : commonNote
+      })
+    }
+
+    if (boxName || boxPrice || boxContents) {
+      add({
+        variantCode: 'OROBOROS_BOX',
+        variantName:
+          boxName || '한정판 BOX',
+        variantKind: 'OTHER',
+        packageType: 'PACKAGE',
+        platforms: nonPcPlatforms,
+        contentsText: boxContents,
+        candidatePrice: boxPrice,
+        preorderBonus:
+          bonusInfo.bonus,
+        preorderBonusNote:
+          commonNote
+      })
+
+      add({
+        variantCode: 'STEAM_OROBOROS_BOX',
+        variantName:
+          'Steam ' +
+          (boxName || '한정판 BOX'),
+        variantKind: 'OTHER',
+        packageType: 'PACKAGE',
+        platforms: pcPlatforms,
+        contentsText: boxContents,
+        candidatePrice: boxPrice,
+        preorderBonus:
+          bonusInfo.steamExcluded
+            ? ''
+            : bonusInfo.bonus,
+        preorderBonusNote:
+          bonusInfo.steamExcluded
+            ? 'Steam 제품 코드 카드 포함. Steam 버전은 초회/예약 특전 제외'
+            : commonNote
+      })
+    }
+
+    if (!variants.length) {
+      add({
+        variantCode: 'STANDARD',
+        variantName: '일반판',
+        variantKind: 'STANDARD',
+        packageType: 'AUTO',
+        platforms: targetPlatforms,
+        candidatePrice: null,
+        preorderBonus: '',
+        preorderBonusNote: ''
+      })
+    }
 
     return variants
   }
@@ -3389,7 +3727,7 @@ async function readAllWatcherEvents() {
 
       setTransformValue(
         'watcherTransformGenre',
-        draft.genre || ''
+        suggestCleGenre(item, draft)
       )
 
       setTransformValue(
@@ -3426,7 +3764,7 @@ async function readAllWatcherEvents() {
 
       setTransformValue(
         'watcherTransformTrailer',
-        draft.trailerUrl || ''
+        suggestCleTrailer(item, draft)
       )
 
       const sourceTitle =
