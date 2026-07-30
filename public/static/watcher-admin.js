@@ -27,6 +27,8 @@
     selectedImage: null
   }
 
+  let watcherHasMultiEditionDraft = false
+
 
 
 
@@ -738,6 +740,16 @@ async function readAllWatcherEvents() {
       return
     }
 
+    if (
+      status === 'TRANSFORMED' &&
+      watcherHasMultiEditionDraft
+    ) {
+      button.disabled = false
+      button.textContent =
+        '멀티 에디션 비공개 등록'
+      return
+    }
+
     if (status === 'TRANSFORMED') {
       button.disabled = false
       button.textContent = '비공개 게임 등록'
@@ -759,6 +771,8 @@ async function readAllWatcherEvents() {
       'watcherTransformItemId',
       ''
     )
+
+    watcherHasMultiEditionDraft = false
 
     setTransformStatus('', '')
     setTransformImageStatus('', '')
@@ -1056,6 +1070,8 @@ async function readAllWatcherEvents() {
         )
       })
       .join('')
+
+    syncWatcherVariantPlatforms()
   }
 
   function addWatcherTransformPlatform() {
@@ -1233,6 +1249,452 @@ async function readAllWatcherEvents() {
 
     return ''
   }
+
+  function watcherVariantKindOptions(selected) {
+    const options = [
+      ['STANDARD', '스탠다드'],
+      ['DELUXE', '디럭스'],
+      ['ULTIMATE', '얼티밋'],
+      ['LIMITED', '한정판'],
+      ['COLLECTORS', '컬렉터즈'],
+      ['OTHER', '기타 / 직접 입력']
+    ]
+
+    return options.map(function (option) {
+      return (
+        '<option value="' +
+          option[0] +
+          '"' +
+          (
+            option[0] === selected
+              ? ' selected'
+              : ''
+          ) +
+        '>' +
+          option[1] +
+        '</option>'
+      )
+    }).join('')
+  }
+
+  function watcherPackageTypeOptions(selected) {
+    const options = [
+      ['AUTO', '플랫폼에 따라 자동'],
+      ['PACKAGE', '패키지'],
+      ['DIGITAL', '디지털'],
+      ['BOTH', '패키지 + 디지털']
+    ]
+
+    return options.map(function (option) {
+      return (
+        '<option value="' +
+          option[0] +
+          '"' +
+          (
+            option[0] === selected
+              ? ' selected'
+              : ''
+          ) +
+        '>' +
+          option[1] +
+        '</option>'
+      )
+    }).join('')
+  }
+
+  function watcherVariantCode(value, fallbackIndex) {
+    const normalized = String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+
+    return normalized ||
+      ('VARIANT_' + String(fallbackIndex + 1))
+  }
+
+  function getWatcherTransformVariants() {
+    const container =
+      $('watcherTransformVariantList')
+
+    if (!container) return []
+
+    return Array.from(
+      container.querySelectorAll(
+        '[data-watcher-variant-card]'
+      )
+    ).map(function (card, index) {
+      const field = function (name) {
+        const element = card.querySelector(
+          '[data-watcher-variant-field="' +
+            name +
+          '"]'
+        )
+
+        return element
+          ? String(element.value || '').trim()
+          : ''
+      }
+
+      const platforms = Array.from(
+        card.querySelectorAll(
+          '[data-watcher-variant-platform]:checked'
+        )
+      ).map(function (input) {
+        return String(input.value || '')
+          .trim()
+          .toLowerCase()
+      })
+
+      const rawPrice = field('candidatePrice')
+
+      return {
+        variantCode: watcherVariantCode(
+          field('variantCode'),
+          index
+        ),
+
+        variantName: field('variantName'),
+
+        variantKind:
+          field('variantKind').toUpperCase(),
+
+        packageType:
+          field('packageType').toUpperCase(),
+
+        platforms: Array.from(
+          new Set(platforms)
+        ),
+
+        contentsText: field('contentsText'),
+
+        candidatePrice:
+          rawPrice === ''
+            ? null
+            : Number(rawPrice),
+
+        preorderBonus:
+          field('preorderBonus'),
+
+        preorderBonusNote:
+          field('preorderBonusNote'),
+
+        displayOrder: index,
+
+        isDefault:
+          field('variantKind').toUpperCase() ===
+          'STANDARD'
+      }
+    })
+  }
+
+  function renderWatcherTransformVariants(values) {
+    const container =
+      $('watcherTransformVariantList')
+
+    if (!container) return
+
+    const currentPlatforms =
+      getWatcherTransformPlatforms()
+
+    let variants = Array.isArray(values)
+      ? values
+      : []
+
+    if (!variants.length) {
+      variants = [{
+        variantCode: 'STANDARD',
+        variantName: '일반판',
+        variantKind: 'STANDARD',
+        packageType: 'AUTO',
+        platforms: currentPlatforms,
+        contentsText: '',
+        candidatePrice: null,
+        preorderBonus: '',
+        preorderBonusNote: ''
+      }]
+    }
+
+    container.innerHTML = variants.map(
+      function (rawVariant, index) {
+        const variant =
+          rawVariant &&
+          typeof rawVariant === 'object'
+            ? rawVariant
+            : {}
+
+        const selectedPlatforms =
+          Array.isArray(variant.platforms) &&
+          variant.platforms.length
+            ? variant.platforms.map(
+                function (platform) {
+                  return String(platform || '')
+                    .trim()
+                    .toLowerCase()
+                }
+              )
+            : currentPlatforms
+
+        const kind = String(
+          variant.variantKind || 'STANDARD'
+        ).toUpperCase()
+
+        const packageType = String(
+          variant.packageType || 'AUTO'
+        ).toUpperCase()
+
+        const code = watcherVariantCode(
+          variant.variantCode || kind,
+          index
+        )
+
+        const name = String(
+          variant.variantName ||
+          (
+            kind === 'STANDARD'
+              ? '일반판'
+              : kind
+          )
+        )
+
+        const platformChecks =
+          currentPlatforms.map(
+            function (platform) {
+              return (
+                '<label style="' +
+                  'display:inline-flex;' +
+                  'gap:5px;' +
+                  'align-items:center;' +
+                  'margin-right:12px' +
+                '">' +
+                  '<input ' +
+                    'type="checkbox" ' +
+                    'data-watcher-variant-platform="1" ' +
+                    'value="' +
+                      escapeHtml(platform) +
+                    '"' +
+                    (
+                      selectedPlatforms.includes(platform)
+                        ? ' checked'
+                        : ''
+                    ) +
+                  ' />' +
+                  '<span>' +
+                    escapeHtml(
+                      watcherPlatformLabel(platform)
+                    ) +
+                  '</span>' +
+                '</label>'
+              )
+            }
+          ).join('')
+
+        return (
+          '<article ' +
+            'data-watcher-variant-card="1" ' +
+            'style="' +
+              'border:1px solid #d8dde6;' +
+              'border-radius:10px;' +
+              'padding:14px;' +
+              'display:grid;' +
+              'gap:12px' +
+            '"' +
+          '>' +
+            '<div style="' +
+              'display:flex;' +
+              'justify-content:space-between;' +
+              'gap:8px;' +
+              'align-items:center' +
+            '">' +
+              '<strong>에디션 ' +
+                escapeHtml(index + 1) +
+              '</strong>' +
+
+              '<div style="display:flex;gap:6px">' +
+                '<button type="button" ' +
+                  'class="btn btn-sm" ' +
+                  'data-clone-watcher-variant="1">' +
+                  '복제' +
+                '</button>' +
+
+                '<button type="button" ' +
+                  'class="btn btn-sm" ' +
+                  'data-remove-watcher-variant="1"' +
+                  (
+                    variants.length <= 1
+                      ? ' disabled'
+                      : ''
+                  ) +
+                '>' +
+                  '삭제' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+
+            '<div class="watcher-transform-grid">' +
+              '<label class="admin-field">' +
+                '<span>에디션 종류</span>' +
+                '<select ' +
+                  'data-watcher-variant-field="variantKind">' +
+                  watcherVariantKindOptions(kind) +
+                '</select>' +
+              '</label>' +
+
+              '<label class="admin-field">' +
+                '<span>표시명</span>' +
+                '<input type="text" ' +
+                  'data-watcher-variant-field="variantName" ' +
+                  'value="' +
+                    escapeHtml(name) +
+                  '" placeholder="예: 우로보로스 BOX" />' +
+              '</label>' +
+
+              '<label class="admin-field">' +
+                '<span>에디션 코드</span>' +
+                '<input type="text" ' +
+                  'data-watcher-variant-field="variantCode" ' +
+                  'value="' +
+                    escapeHtml(code) +
+                  '" />' +
+              '</label>' +
+
+              '<label class="admin-field">' +
+                '<span>상품 형태</span>' +
+                '<select ' +
+                  'data-watcher-variant-field="packageType">' +
+                  watcherPackageTypeOptions(packageType) +
+                '</select>' +
+              '</label>' +
+
+              '<label class="admin-field">' +
+                '<span>가격 후보</span>' +
+                '<input type="number" min="1" step="1" ' +
+                  'data-watcher-variant-field="candidatePrice" ' +
+                  'value="' +
+                    escapeHtml(
+                      variant.candidatePrice == null
+                        ? ''
+                        : variant.candidatePrice
+                    ) +
+                  '" />' +
+              '</label>' +
+            '</div>' +
+
+            '<div class="admin-field">' +
+              '<span>적용 플랫폼</span>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+                platformChecks +
+              '</div>' +
+            '</div>' +
+
+            '<label class="admin-field">' +
+              '<span>구성품</span>' +
+              '<textarea rows="4" ' +
+                'data-watcher-variant-field="contentsText">' +
+                escapeHtml(
+                  variant.contentsText || ''
+                ) +
+              '</textarea>' +
+            '</label>' +
+
+            '<label class="admin-field">' +
+              '<span>예약 특전</span>' +
+              '<textarea rows="3" ' +
+                'data-watcher-variant-field="preorderBonus">' +
+                escapeHtml(
+                  variant.preorderBonus || ''
+                ) +
+              '</textarea>' +
+            '</label>' +
+
+            '<label class="admin-field">' +
+              '<span>특전 참고사항</span>' +
+              '<textarea rows="3" ' +
+                'data-watcher-variant-field="preorderBonusNote">' +
+                escapeHtml(
+                  variant.preorderBonusNote || ''
+                ) +
+              '</textarea>' +
+            '</label>' +
+          '</article>'
+        )
+      }
+    ).join('')
+
+    const first = variants[0] || {}
+
+    setTransformValue(
+      'watcherTransformEditionName',
+      first.variantName || ''
+    )
+  }
+
+  function setWatcherTransformVariants(
+    values,
+    fallback
+  ) {
+    let variants = Array.isArray(values)
+      ? values
+      : []
+
+    if (!variants.length && fallback) {
+      variants = [{
+        variantCode: 'STANDARD',
+        variantName:
+          fallback.editionName || '일반판',
+        variantKind: 'STANDARD',
+        packageType: 'AUTO',
+        platforms:
+          getWatcherTransformPlatforms(),
+        contentsText: '',
+        candidatePrice:
+          fallback.candidatePrice == null
+            ? null
+            : fallback.candidatePrice,
+        preorderBonus:
+          fallback.preorderBonus || '',
+        preorderBonusNote:
+          fallback.preorderBonusNote || ''
+      }]
+    }
+
+    renderWatcherTransformVariants(variants)
+  }
+
+  function syncWatcherVariantPlatforms() {
+    const container =
+      $('watcherTransformVariantList')
+
+    if (!container || !container.children.length) {
+      return
+    }
+
+    renderWatcherTransformVariants(
+      getWatcherTransformVariants()
+    )
+  }
+
+  function addWatcherTransformVariant() {
+    const variants =
+      getWatcherTransformVariants()
+
+    variants.push({
+      variantCode:
+        'VARIANT_' + String(variants.length + 1),
+      variantName: '',
+      variantKind: 'OTHER',
+      packageType: 'AUTO',
+      platforms:
+        getWatcherTransformPlatforms(),
+      contentsText: '',
+      candidatePrice: null,
+      preorderBonus: '',
+      preorderBonusNote: ''
+    })
+
+    renderWatcherTransformVariants(variants)
+  }
+
   function watcherPlatformLabel(value) {
     const labels = {
       switch2: 'Nintendo Switch 2',
@@ -2667,9 +3129,25 @@ async function readAllWatcherEvents() {
         detectClePlatforms(item, draft)
       )
 
-      setTransformValue(
-        'watcherTransformEditionName',
-        draft.editionName || ''
+      watcherHasMultiEditionDraft =
+        Array.isArray(draft.variants) &&
+        draft.variants.length > 0
+
+      setWatcherTransformVariants(
+        draft.variants,
+        {
+          editionName:
+            draft.editionName || '일반판',
+
+          candidatePrice:
+            draft.candidatePrice,
+
+          preorderBonus:
+            draft.preorderBonus,
+
+          preorderBonusNote:
+            draft.preorderBonusNote
+        }
       )
 
       setTransformValue(
@@ -2797,6 +3275,9 @@ async function readAllWatcherEvents() {
     const platforms =
       getWatcherTransformPlatforms()
 
+    const variants =
+      getWatcherTransformVariants()
+
     const payload = {
       title: value(
         'watcherTransformTitle'
@@ -2805,9 +3286,14 @@ async function readAllWatcherEvents() {
       platform: platforms[0] || '',
       platforms,
 
-      editionName: value(
-        'watcherTransformEditionName'
-      ),
+      editionName:
+        variants[0]
+          ? variants[0].variantName
+          : value(
+              'watcherTransformEditionName'
+            ),
+
+      variants,
 
       genre: value(
         'watcherTransformGenre'
@@ -2861,6 +3347,68 @@ async function readAllWatcherEvents() {
       return
     }
 
+    if (!variants.length) {
+      setTransformStatus(
+        '에디션을 하나 이상 추가해 주세요.',
+        'err'
+      )
+      return
+    }
+
+    const invalidVariant = variants.find(
+      function (variant) {
+        return (
+          !variant.variantName ||
+          !variant.variantCode ||
+          !variant.platforms.length ||
+          (
+            variant.candidatePrice !== null &&
+            (
+              !Number.isInteger(
+                variant.candidatePrice
+              ) ||
+              variant.candidatePrice <= 0
+            )
+          )
+        )
+      }
+    )
+
+    if (invalidVariant) {
+      setTransformStatus(
+        '각 에디션의 표시명, 코드, 적용 플랫폼, 가격을 확인해 주세요.',
+        'err'
+      )
+      return
+    }
+
+    const combinations = new Set()
+    let duplicated = false
+
+    variants.forEach(function (variant) {
+      variant.platforms.forEach(
+        function (platform) {
+          const key =
+            platform + ':' +
+            variant.variantCode
+
+          if (combinations.has(key)) {
+            duplicated = true
+          }
+
+          combinations.add(key)
+        }
+      )
+    })
+
+    if (duplicated) {
+      setTransformStatus(
+        '같은 플랫폼에 동일한 에디션 코드를 중복 등록할 수 없습니다.',
+        'err'
+      )
+      return
+    }
+
     if (
       payload.candidatePrice !== null &&
       (
@@ -2905,6 +3453,8 @@ async function readAllWatcherEvents() {
 
       watcherLoaded = false
       await loadWatcher(true)
+
+      watcherHasMultiEditionDraft = true
 
       setRegisterDraftButton(
         data.reviewStatus || 'TRANSFORMED',
@@ -2967,8 +3517,8 @@ async function readAllWatcherEvents() {
 
     const confirmed = window.confirm(
       '저장된 초안을 비공개 게임으로 등록할까요?\n\n' +
-      'games와 editions에 DRAFT 상태로 저장됩니다.\n' +
-      '공개 사이트에는 표시되지 않으며 이미지도 등록하지 않습니다.'
+      '게임 1개와 선택한 플랫폼별 에디션을 V2 DRAFT로 등록합니다.\n' +
+      '공개 사이트에는 표시되지 않으며 자동 공개도 하지 않습니다.'
     )
 
     if (!confirmed) return
@@ -3408,6 +3958,12 @@ async function readAllWatcherEvents() {
   const addPlatformButton =
     $('addWatcherTransformPlatform')
 
+  const addVariantButton =
+    $('addWatcherTransformVariant')
+
+  const variantList =
+    $('watcherTransformVariantList')
+
   const platformRows =
     $('watcherTransformPlatformRows')
 
@@ -3452,6 +4008,99 @@ async function readAllWatcherEvents() {
     addPlatformButton.addEventListener(
       'click',
       addWatcherTransformPlatform
+    )
+  }
+
+  if (addVariantButton) {
+    addVariantButton.addEventListener(
+      'click',
+      addWatcherTransformVariant
+    )
+  }
+
+  if (variantList) {
+    variantList.addEventListener(
+      'click',
+      function (event) {
+        const target = event.target
+
+        if (!(target instanceof Element)) {
+          return
+        }
+
+        const card = target.closest(
+          '[data-watcher-variant-card]'
+        )
+
+        if (!card) return
+
+        if (
+          target.closest(
+            '[data-clone-watcher-variant]'
+          )
+        ) {
+          const cards = Array.from(
+            variantList.querySelectorAll(
+              '[data-watcher-variant-card]'
+            )
+          )
+
+          const variants =
+            getWatcherTransformVariants()
+
+          const index = cards.indexOf(card)
+
+          if (index >= 0 && variants[index]) {
+            const copy = JSON.parse(
+              JSON.stringify(variants[index])
+            )
+
+            copy.variantCode =
+              copy.variantCode + '_COPY'
+
+            copy.variantName =
+              copy.variantName + ' 복사본'
+
+            variants.splice(
+              index + 1,
+              0,
+              copy
+            )
+
+            renderWatcherTransformVariants(
+              variants
+            )
+          }
+
+          return
+        }
+
+        if (
+          target.closest(
+            '[data-remove-watcher-variant]'
+          )
+        ) {
+          const cards = Array.from(
+            variantList.querySelectorAll(
+              '[data-watcher-variant-card]'
+            )
+          )
+
+          if (cards.length <= 1) return
+
+          const variants =
+            getWatcherTransformVariants()
+
+          const index = cards.indexOf(card)
+
+          if (index >= 0) {
+            variants.splice(index, 1)
+            renderWatcherTransformVariants(
+              variants
+            )
+          }
+        }
+      }
     )
   }
 

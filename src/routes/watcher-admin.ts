@@ -914,6 +914,112 @@ watcherAdmin.post(
         ? null
         : Number(rawCandidatePrice)
 
+    const rawVariants =
+      Array.isArray(body.variants)
+        ? body.variants
+        : []
+
+    const allowedVariantKinds = new Set([
+      'STANDARD',
+      'DELUXE',
+      'ULTIMATE',
+      'LIMITED',
+      'COLLECTORS',
+      'OTHER',
+    ])
+
+    const allowedPackageTypes = new Set([
+      'AUTO',
+      'PACKAGE',
+      'DIGITAL',
+      'BOTH',
+    ])
+
+    const variants = rawVariants.map(
+      (rawVariant, index) => {
+        const value =
+          rawVariant &&
+          typeof rawVariant === 'object' &&
+          !Array.isArray(rawVariant)
+            ? rawVariant as Record<
+                string,
+                unknown
+              >
+            : {}
+
+        const rawPrice =
+          value.candidatePrice
+
+        return {
+          variantCode:
+            text(value.variantCode)
+              .toUpperCase()
+              .replace(
+                /[^A-Z0-9_-]+/g,
+                '_'
+              )
+              .replace(
+                /^_+|_+$/g,
+                ''
+              )
+              .slice(0, 40),
+
+          variantName:
+            text(value.variantName)
+              .slice(0, 100),
+
+          variantKind:
+            text(value.variantKind)
+              .toUpperCase(),
+
+          packageType:
+            text(value.packageType || 'AUTO')
+              .toUpperCase(),
+
+          platforms: Array.from(
+            new Set(
+              (
+                Array.isArray(
+                  value.platforms
+                )
+                  ? value.platforms
+                  : []
+              )
+                .map((target) =>
+                  text(target).toLowerCase()
+                )
+                .filter(Boolean)
+            )
+          ),
+
+          contentsText:
+            text(value.contentsText)
+              .slice(0, 10000) || null,
+
+          candidatePrice:
+            rawPrice == null ||
+            rawPrice === ''
+              ? null
+              : Number(rawPrice),
+
+          preorderBonus:
+            text(value.preorderBonus)
+              .slice(0, 5000) || null,
+
+          preorderBonusNote:
+            text(value.preorderBonusNote)
+              .slice(0, 5000) || null,
+
+          displayOrder: index,
+
+          isDefault:
+            value.isDefault === true ||
+            value.isDefault === 1 ||
+            value.isDefault === '1',
+        }
+      }
+    )
+
     const allowedPlatforms = new Set([
       'pc',
       'ps5',
@@ -948,6 +1054,69 @@ watcherAdmin.post(
         },
         400
       )
+    }
+
+    if (
+      variants.length < 1 ||
+      variants.some((variant) =>
+        !variant.variantCode ||
+        !variant.variantName ||
+        !allowedVariantKinds.has(
+          variant.variantKind
+        ) ||
+        !allowedPackageTypes.has(
+          variant.packageType
+        ) ||
+        variant.platforms.length < 1 ||
+        variant.platforms.some(
+          (target) =>
+            !allowedPlatforms.has(target)
+        ) ||
+        (
+          variant.candidatePrice != null &&
+          (
+            !Number.isInteger(
+              variant.candidatePrice
+            ) ||
+            variant.candidatePrice <= 0
+          )
+        )
+      )
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid edition variant',
+        },
+        400
+      )
+    }
+
+    const variantCombinations =
+      new Set<string>()
+
+    for (const variant of variants) {
+      for (
+        const targetPlatform
+          of variant.platforms
+      ) {
+        const key =
+          targetPlatform + ':' +
+          variant.variantCode
+
+        if (variantCombinations.has(key)) {
+          return c.json(
+            {
+              ok: false,
+              error:
+                'duplicate platform variant',
+            },
+            400
+          )
+        }
+
+        variantCombinations.add(key)
+      }
     }
 
     if (
@@ -1093,14 +1262,18 @@ watcherAdmin.post(
       )
 
     const draft = {
-      schemaVersion: 1,
+      schemaVersion: 2,
 
       watchItemId: item.id,
 
       title,
       platform,
       platforms,
-      editionName,
+      editionName:
+        variants[0]?.variantName ||
+        editionName,
+
+      variants,
       genre,
 
       releaseDate,
@@ -1421,6 +1594,145 @@ watcherAdmin.post(
         ? null
         : Number(rawCandidatePrice)
 
+    const rawVariants =
+      Array.isArray(draft.variants)
+        ? draft.variants
+        : []
+
+    const allowedVariantKinds = new Set([
+      'STANDARD',
+      'DELUXE',
+      'ULTIMATE',
+      'LIMITED',
+      'COLLECTORS',
+      'OTHER',
+    ])
+
+    const allowedPackageTypes = new Set([
+      'AUTO',
+      'PACKAGE',
+      'DIGITAL',
+      'BOTH',
+    ])
+
+    const variants =
+      rawVariants.length > 0
+        ? rawVariants.map(
+            (rawVariant, index) => {
+              const value =
+                rawVariant &&
+                typeof rawVariant ===
+                  'object' &&
+                !Array.isArray(rawVariant)
+                  ? rawVariant as Record<
+                      string,
+                      unknown
+                    >
+                  : {}
+
+              const rawPrice =
+                value.candidatePrice
+
+              const rawOrder =
+                Number(value.displayOrder)
+
+              return {
+                variantCode:
+                  text(value.variantCode)
+                    .toUpperCase()
+                    .replace(
+                      /[^A-Z0-9_-]+/g,
+                      '_'
+                    )
+                    .replace(
+                      /^_+|_+$/g,
+                      ''
+                    )
+                    .slice(0, 40),
+
+                variantName:
+                  text(value.variantName)
+                    .slice(0, 100),
+
+                variantKind:
+                  text(value.variantKind)
+                    .toUpperCase(),
+
+                packageType:
+                  text(
+                    value.packageType ||
+                    'AUTO'
+                  ).toUpperCase(),
+
+                platforms: Array.from(
+                  new Set(
+                    (
+                      Array.isArray(
+                        value.platforms
+                      )
+                        ? value.platforms
+                        : []
+                    )
+                      .map((target) =>
+                        text(target)
+                          .toLowerCase()
+                      )
+                      .filter(Boolean)
+                  )
+                ),
+
+                contentsText:
+                  text(value.contentsText)
+                    .slice(0, 10000) ||
+                  null,
+
+                candidatePrice:
+                  rawPrice == null ||
+                  rawPrice === ''
+                    ? null
+                    : Number(rawPrice),
+
+                preorderBonus:
+                  text(value.preorderBonus)
+                    .slice(0, 5000) ||
+                  null,
+
+                preorderBonusNote:
+                  text(
+                    value.preorderBonusNote
+                  )
+                    .slice(0, 5000) ||
+                  null,
+
+                displayOrder:
+                  Number.isInteger(rawOrder)
+                    ? rawOrder
+                    : index,
+
+                isDefault:
+                  value.isDefault === true ||
+                  value.isDefault === 1 ||
+                  value.isDefault === '1',
+              }
+            }
+          )
+        : [{
+            variantCode: 'STANDARD',
+            variantName:
+              editionName || '일반판',
+            variantKind: 'STANDARD',
+            packageType: 'AUTO',
+            platforms,
+            contentsText: null,
+            candidatePrice,
+            preorderBonus:
+              preorderBonus || null,
+            preorderBonusNote:
+              preorderBonusNote || null,
+            displayOrder: 0,
+            isDefault: true,
+          }]
+
     const allowedPlatforms = new Set([
       'pc',
       'ps5',
@@ -1432,9 +1744,85 @@ watcherAdmin.post(
     ])
 
     if (
+      variants.length < 1 ||
+      variants.some((variant) =>
+        !variant.variantCode ||
+        !variant.variantName ||
+        !allowedVariantKinds.has(
+          variant.variantKind
+        ) ||
+        !allowedPackageTypes.has(
+          variant.packageType
+        ) ||
+        variant.platforms.length < 1 ||
+        variant.platforms.some(
+          (targetPlatform) =>
+            !allowedPlatforms.has(
+              targetPlatform
+            )
+        ) ||
+        (
+          variant.candidatePrice != null &&
+          (
+            !Number.isInteger(
+              variant.candidatePrice
+            ) ||
+            variant.candidatePrice <= 0
+          )
+        )
+      )
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '에디션 구성 정보를 다시 확인해 주세요.',
+        },
+        400
+      )
+    }
+
+    const combinationKeys =
+      new Set<string>()
+
+    for (const variant of variants) {
+      for (
+        const targetPlatform
+          of variant.platforms
+      ) {
+        const key =
+          targetPlatform + ':' +
+          variant.variantCode
+
+        if (combinationKeys.has(key)) {
+          return c.json(
+            {
+              ok: false,
+              error:
+                '동일 플랫폼에 같은 에디션 코드가 중복되었습니다.',
+            },
+            400
+          )
+        }
+
+        combinationKeys.add(key)
+      }
+    }
+
+    const effectivePlatforms =
+      Array.from(
+        new Set(
+          variants.flatMap(
+            (variant) =>
+              variant.platforms
+          )
+        )
+      )
+
+    if (
       !title ||
-      platforms.length < 1 ||
-      platforms.some(
+      effectivePlatforms.length < 1 ||
+      effectivePlatforms.some(
         (value) =>
           !allowedPlatforms.has(value)
       ) ||
@@ -1621,22 +2009,25 @@ watcherAdmin.post(
       const preorderIds: number[] = []
 
       for (
-        const [index, targetPlatform]
-          of platforms.entries()
+        const [
+          platformIndex,
+          targetPlatform,
+        ] of effectivePlatforms.entries()
       ) {
         const targetEditionName =
-          editionName ||
-          (
-            targetPlatform === 'switch2'
-              ? 'Nintendo Switch 2'
-              : targetPlatform === 'switch'
-                ? 'Nintendo Switch'
-                : targetPlatform === 'ps5'
-                  ? 'PlayStation 5'
+          targetPlatform === 'switch2'
+            ? 'Nintendo Switch 2'
+            : targetPlatform === 'switch'
+              ? 'Nintendo Switch'
+              : targetPlatform === 'ps5'
+                ? 'PlayStation 5'
+                : targetPlatform === 'ps4'
+                  ? 'PlayStation 4'
                   : targetPlatform === 'pc'
-                    ? 'Steam'
-                    : targetPlatform.toUpperCase()
-          )
+                    ? 'Steam / PC'
+                    : targetPlatform === 'xbox'
+                      ? 'Xbox'
+                      : targetPlatform.toUpperCase()
 
         const edition =
           await c.env.DB.prepare(`
@@ -1666,98 +2057,183 @@ watcherAdmin.post(
           )
         }
 
-        const packageType =
-          targetPlatform === 'pc'
-            ? 'DIGITAL'
-            : 'PACKAGE'
+        editionIds.push(
+          Number(edition.id)
+        )
 
-        const variant =
-          await c.env.DB.prepare(`
-            INSERT INTO product_variants (
-              edition_id,
-              variant_code,
-              variant_name,
-              variant_kind,
-              package_type,
-              is_default,
-              display_order,
-              publish_status
-            )
-            VALUES (
-              ?,
-              'standard',
-              ?,
-              'STANDARD',
-              ?,
-              1,
-              ?,
-              'DRAFT'
-            )
-            RETURNING id
-          `)
-            .bind(
-              edition.id,
-              targetEditionName,
-              packageType,
-              index
-            )
-            .first<{ id: number }>()
+        const platformVariants =
+          variants.filter(
+            (variant) =>
+              variant.platforms.includes(
+                targetPlatform
+              )
+          )
 
-        if (!variant?.id) {
+        const explicitDefaults =
+          platformVariants.filter(
+            (variant) =>
+              variant.isDefault
+          )
+
+        if (explicitDefaults.length > 1) {
           throw new Error(
-            'failed to create product variant'
+            'multiple default variants for ' +
+            targetPlatform
           )
         }
 
-        const preorder =
-          await c.env.DB.prepare(`
-            INSERT INTO variant_preorders (
-              variant_id,
-              official_source_id,
-              release_date,
-              preorder_start_date,
-              preorder_end_date,
-              preorder_status,
-              preorder_bonus,
-              preorder_bonus_note,
-              contents_text,
-              candidate_price,
-              confirmed_price,
-              price_status,
-              publish_status,
-              display_order
-            )
-            VALUES (
-              ?, ?, ?, ?, ?, ?, ?, ?, NULL,
-              ?, NULL, ?, 'DRAFT', ?
-            )
-            RETURNING id
-          `)
-            .bind(
-              variant.id,
-              officialSource.id,
-              releaseDate,
-              preorderStartDate || null,
-              preorderEndDate || null,
-              preorderStatus,
-              preorderBonus || null,
-              preorderBonusNote || null,
-              candidatePrice,
-              priceStatus,
-              index
-            )
-            .first<{ id: number }>()
+        for (
+          const [
+            variantIndex,
+            targetVariant,
+          ] of platformVariants.entries()
+        ) {
+          const packageType =
+            targetVariant.packageType ===
+              'AUTO'
+              ? (
+                targetPlatform === 'pc'
+                  ? 'DIGITAL'
+                  : 'PACKAGE'
+              )
+              : targetVariant.packageType
 
-        if (!preorder?.id) {
-          throw new Error(
-            'failed to create variant preorder'
+          const isDefault =
+            explicitDefaults.length === 1
+              ? (
+                explicitDefaults[0] ===
+                targetVariant
+                  ? 1
+                  : 0
+              )
+              : (
+                variantIndex === 0
+                  ? 1
+                  : 0
+              )
+
+          const displayOrder =
+            Number.isInteger(
+              targetVariant.displayOrder
+            )
+              ? targetVariant.displayOrder
+              : variantIndex
+
+          const variant =
+            await c.env.DB.prepare(`
+              INSERT INTO product_variants (
+                edition_id,
+                variant_code,
+                variant_name,
+                variant_kind,
+                package_type,
+                is_default,
+                display_order,
+                publish_status
+              )
+              VALUES (
+                ?, ?, ?, ?, ?, ?, ?, 'DRAFT'
+              )
+              RETURNING id
+            `)
+              .bind(
+                edition.id,
+                targetVariant.variantCode,
+                targetVariant.variantName,
+                targetVariant.variantKind,
+                packageType,
+                isDefault,
+                displayOrder
+              )
+              .first<{ id: number }>()
+
+          if (!variant?.id) {
+            throw new Error(
+              'failed to create product variant'
+            )
+          }
+
+          const targetPrice =
+            targetVariant.candidatePrice == null
+              ? candidatePrice
+              : targetVariant.candidatePrice
+
+          const targetPriceStatus =
+            targetPrice == null
+              ? 'UNCONFIRMED'
+              : 'CANDIDATE'
+
+          const targetBonus =
+            targetVariant.preorderBonus == null
+              ? preorderBonus || null
+              : targetVariant.preorderBonus
+
+          const targetBonusNote =
+            targetVariant
+              .preorderBonusNote == null
+              ? preorderBonusNote || null
+              : targetVariant
+                  .preorderBonusNote
+
+          const preorder =
+            await c.env.DB.prepare(`
+              INSERT INTO variant_preorders (
+                variant_id,
+                official_source_id,
+                release_date,
+                preorder_start_date,
+                preorder_end_date,
+                preorder_status,
+                preorder_bonus,
+                preorder_bonus_note,
+                contents_text,
+                candidate_price,
+                confirmed_price,
+                price_status,
+                publish_status,
+                display_order
+              )
+              VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, NULL, ?, 'DRAFT', ?
+              )
+              RETURNING id
+            `)
+              .bind(
+                variant.id,
+                officialSource.id,
+                releaseDate,
+                preorderStartDate || null,
+                preorderEndDate || null,
+                preorderStatus,
+                targetBonus,
+                targetBonusNote,
+                targetVariant.contentsText,
+                targetPrice,
+                targetPriceStatus,
+                (
+                  platformIndex * 100 +
+                  displayOrder
+                )
+              )
+              .first<{ id: number }>()
+
+          if (!preorder?.id) {
+            throw new Error(
+              'failed to create variant preorder'
+            )
+          }
+
+          variantIds.push(
+            Number(variant.id)
+          )
+
+          preorderIds.push(
+            Number(preorder.id)
           )
         }
-
-        editionIds.push(Number(edition.id))
-        variantIds.push(Number(variant.id))
-        preorderIds.push(Number(preorder.id))
       }
+
       await c.env.DB.prepare(`
         UPDATE watch_items
 
@@ -2144,59 +2620,84 @@ watcherAdmin.post(
       )
     }
 
-    const preorder = await c.env.DB.prepare(`
-      SELECT
-        ep.id,
-        ep.publish_status
+    const { results: preorderRows } =
+      await c.env.DB.prepare(`
+        SELECT
+          vp.id,
+          vp.publish_status
 
-      FROM edition_preorders ep
+        FROM variant_preorders vp
 
-      INNER JOIN editions e
-        ON e.id = ep.edition_id
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
 
-      INNER JOIN game_official_sources gos
-        ON gos.id = ep.official_source_id
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
 
-      WHERE
-        e.game_id = ?
-        AND gos.game_id = ?
-        AND gos.watch_item_id = ?
+        INNER JOIN game_official_sources gos
+          ON gos.id = vp.official_source_id
 
-      LIMIT 1
-    `)
-      .bind(
-        gameId,
-        gameId,
-        itemId
-      )
-      .first<{
-        id: number
-        publish_status: string
-      }>()
+        WHERE
+          e.game_id = ?
+          AND gos.game_id = ?
+          AND gos.watch_item_id = ?
 
-    if (!preorder) {
+        ORDER BY
+          e.id ASC,
+          pv.display_order ASC,
+          vp.display_order ASC,
+          vp.id ASC
+      `)
+        .bind(
+          gameId,
+          gameId,
+          itemId
+        )
+        .all<{
+          id: number
+          publish_status: string
+        }>()
+
+    if (
+      !preorderRows ||
+      preorderRows.length < 1
+    ) {
       return c.json(
         {
           ok: false,
           error:
-            '연결된 예약판매 DRAFT를 찾을 수 없습니다.',
+            '연결된 V2 예약판매 DRAFT를 찾을 수 없습니다.',
         },
         404
       )
     }
 
-    if (preorder.publish_status !== 'DRAFT') {
+    if (
+      preorderRows.some(
+        (preorder) =>
+          preorder.publish_status !==
+          'DRAFT'
+      )
+    ) {
       return c.json(
         {
           ok: false,
           error:
-            'DRAFT 상태의 예약판매 정보에서만 이미지를 선택할 수 있습니다.',
+            '모든 예약판매가 DRAFT 상태여야 이미지를 선택할 수 있습니다.',
         },
         409
       )
     }
 
-    await c.env.DB.batch([
+    const preorder =
+      preorderRows[0]
+
+    const preorderIds =
+      preorderRows.map(
+        (row) => Number(row.id)
+      )
+
+    const imageStatements = [
       c.env.DB.prepare(`
         UPDATE watch_item_images
 
@@ -2205,8 +2706,7 @@ watcherAdmin.post(
           updated_at = CURRENT_TIMESTAMP
 
         WHERE watch_item_id = ?
-      `)
-        .bind(itemId),
+      `).bind(itemId),
 
       c.env.DB.prepare(`
         UPDATE watch_item_images
@@ -2221,27 +2721,46 @@ watcherAdmin.post(
         WHERE
           id = ?
           AND watch_item_id = ?
-      `)
-        .bind(
-          imageType,
-          imageId,
-          itemId
-        ),
+      `).bind(
+        imageType,
+        imageId,
+        itemId
+      ),
+    ]
 
-      c.env.DB.prepare(`
-        UPDATE edition_preorders
+    for (const preorderId of preorderIds) {
+      imageStatements.push(
+        c.env.DB.prepare(`
+          DELETE FROM variant_preorder_images
 
-        SET
-          selected_image_id = ?,
-          updated_at = CURRENT_TIMESTAMP
+          WHERE
+            preorder_id = ?
+            AND display_role = 'REPRESENTATIVE'
+        `).bind(preorderId)
+      )
 
-        WHERE id = ?
-      `)
-        .bind(
-          imageId,
-          preorder.id
-        ),
-    ])
+      imageStatements.push(
+        c.env.DB.prepare(`
+          INSERT INTO variant_preorder_images (
+            preorder_id,
+            image_id,
+            display_role,
+            display_order,
+            alt_text
+          )
+          VALUES (
+            ?, ?, 'REPRESENTATIVE', 0, NULL
+          )
+        `).bind(
+          preorderId,
+          imageId
+        )
+      )
+    }
+
+    await c.env.DB.batch(
+      imageStatements
+    )
 
     return c.json({
       ok: true,
@@ -2251,6 +2770,8 @@ watcherAdmin.post(
 
       preorderId:
         Number(preorder.id),
+
+      preorderIds,
 
       selectedImageId:
         imageId,
@@ -2371,9 +2892,9 @@ watcherAdmin.post(
           AS source_permission_status,
         policy.local_storage_allowed,
 
-        ep.id AS preorder_id,
-        ep.selected_image_id,
-        ep.publish_status
+        vp.id AS preorder_id,
+        vpi.image_id AS selected_image_id,
+        vp.publish_status
           AS preorder_publish_status
 
       FROM watch_items wi
@@ -2395,12 +2916,24 @@ watcherAdmin.post(
           gos.game_id = g.id
           AND gos.watch_item_id = wi.id
 
-      INNER JOIN edition_preorders ep
-        ON ep.official_source_id = gos.id
+      INNER JOIN variant_preorder_images vpi
+        ON
+          vpi.image_id = image.id
+          AND vpi.display_role =
+            'REPRESENTATIVE'
+
+      INNER JOIN variant_preorders vp
+        ON
+          vp.id = vpi.preorder_id
+          AND vp.official_source_id =
+            gos.id
+
+      INNER JOIN product_variants pv
+        ON pv.id = vp.variant_id
 
       INNER JOIN editions edition
         ON
-          edition.id = ep.edition_id
+          edition.id = pv.edition_id
           AND edition.game_id = g.id
 
       WHERE
@@ -3214,9 +3747,9 @@ watcherAdmin.get(
           AS source_permission_status,
         policy.local_storage_allowed,
 
-        ep.id AS preorder_id,
-        ep.selected_image_id,
-        ep.publish_status
+        vp.id AS preorder_id,
+        vpi.image_id AS selected_image_id,
+        vp.publish_status
           AS preorder_publish_status
 
       FROM watch_items wi
@@ -3237,8 +3770,25 @@ watcherAdmin.get(
           gos.game_id = g.id
           AND gos.watch_item_id = wi.id
 
-      INNER JOIN edition_preorders ep
-        ON ep.official_source_id = gos.id
+      INNER JOIN variant_preorder_images vpi
+        ON
+          vpi.image_id = image.id
+          AND vpi.display_role =
+            'REPRESENTATIVE'
+
+      INNER JOIN variant_preorders vp
+        ON
+          vp.id = vpi.preorder_id
+          AND vp.official_source_id =
+            gos.id
+
+      INNER JOIN product_variants pv
+        ON pv.id = vp.variant_id
+
+      INNER JOIN editions edition
+        ON
+          edition.id = pv.edition_id
+          AND edition.game_id = g.id
 
       WHERE wi.id = ?
 

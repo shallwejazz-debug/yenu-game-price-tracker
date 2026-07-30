@@ -597,15 +597,41 @@ export function AdminPage(): string {
             </button>
           </div>
 
-          <label class="admin-field">
-            <span>에디션 표시명</span>
+          
+          <input
+            id="watcherTransformEditionName"
+            type="hidden"
+            value=""
+          />
 
-            <input
-              id="watcherTransformEditionName"
-              type="text"
-              placeholder="예: Nintendo Switch 한국어 패키지판"
-            />
-          </label>
+          <section
+            id="watcherTransformVariantEditor"
+            class="admin-card"
+            style="grid-column:1/-1;margin:0;padding:16px"
+          >
+            <div class="admin-section-head">
+              <div>
+                <h3>상품 에디션 구성</h3>
+                <p class="admin-hint">
+                  에디션을 먼저 만들고 적용할 플랫폼을 선택하세요.
+                  플랫폼별 구성이 다르면 복제 후 해당 플랫폼만 선택하면 됩니다.
+                </p>
+              </div>
+
+              <button
+                id="addWatcherTransformVariant"
+                type="button"
+                class="btn btn-sm"
+              >
+                + 에디션 추가
+              </button>
+            </div>
+
+            <div
+              id="watcherTransformVariantList"
+              style="display:grid;gap:12px"
+            ></div>
+          </section>
 
           <label class="admin-field">
             <span>장르</span>
