@@ -1441,6 +1441,7 @@ async function readAllWatcherEvents() {
       : ''
   }
 
+
   function suggestCleGenre(item, draft) {
     if (draft && draft.genre) {
       return draft.genre
@@ -1448,19 +1449,20 @@ async function readAllWatcherEvents() {
 
     const text = cleArticleText(item)
 
-    const overview = cleSection(
-      text,
-      /■\s*[^\n]*상품\s*개요[^\n]*/i,
-      /ABOUT\s+US|CONTACT|©/i
-    )
-
-    const match = overview.match(
+    const match = text.match(
       /(?:^|\n)\s*장르\s*[:：]?\s*([^\n]{1,100})/i
     )
 
-    return match && match[1]
-      ? match[1].trim()
-      : ''
+    if (!match || !match[1]) {
+      return ''
+    }
+
+    return match[1]
+      .replace(
+        /\s+(?:대응\s*기종|발매일|가격).*$/i,
+        ''
+      )
+      .trim()
   }
 
   function suggestCleTrailer(item, draft) {
