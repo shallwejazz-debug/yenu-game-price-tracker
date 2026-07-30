@@ -1,12 +1,12 @@
 // ============================================================
-// WATCHER 관리자 API
+// WATCHER 愿由ъ옄 API
 // src/routes/watcher-admin.ts
 //
 // GET /admin/api/watcher/summary
 // GET /admin/api/watcher/sources
 // GET /admin/api/watcher/items
 //
-// 모든 API는 X-Admin-Token 인증 필요
+// 紐⑤뱺 API??X-Admin-Token ?몄쬆 ?꾩슂
 // ============================================================
 
 import { Hono } from 'hono'
@@ -23,8 +23,8 @@ const watcherAdmin = new Hono<{
 }>()
 
 // ------------------------------------------------------------
-// 관리자 인증
-// 기존 관리자 화면과 동일하게 X-Admin-Token 사용
+// 愿由ъ옄 ?몄쬆
+// 湲곗〈 愿由ъ옄 ?붾㈃怨??숈씪?섍쾶 X-Admin-Token ?ъ슜
 // ------------------------------------------------------------
 
 watcherAdmin.use('*', async (c, next) => {
@@ -64,7 +64,7 @@ watcherAdmin.use('*', async (c, next) => {
 
 
 // ------------------------------------------------------------
-// WATCHER 현황
+// WATCHER ?꾪솴
 // ------------------------------------------------------------
 
 watcherAdmin.get('/summary', async (c) => {
@@ -170,7 +170,7 @@ watcherAdmin.get('/summary', async (c) => {
 
 
 // ------------------------------------------------------------
-// 수집 출처와 이미지 정책 목록
+// ?섏쭛 異쒖쿂? ?대?吏 ?뺤콉 紐⑸줉
 // ------------------------------------------------------------
 
 watcherAdmin.get('/sources', async (c) => {
@@ -225,7 +225,7 @@ watcherAdmin.get('/sources', async (c) => {
 
 
 // ------------------------------------------------------------
-// 수집 항목 목록
+// ?섏쭛 ??ぉ 紐⑸줉
 //
 // query:
 //   status=DISCOVERED
@@ -366,10 +366,10 @@ watcherAdmin.get('/items', async (c) => {
 })
 
 // ------------------------------------------------------------
-// WATCHER 이벤트 그룹 목록
+// WATCHER ?대깽??洹몃９ 紐⑸줉
 //
-// DB에는 상세 이벤트를 그대로 유지하고,
-// 관리자 화면에서는 날짜별·보도자료별로 묶어서 반환한다.
+// DB?먮뒗 ?곸꽭 ?대깽?몃? 洹몃?濡??좎??섍퀬,
+// 愿由ъ옄 ?붾㈃?먯꽌???좎쭨蹂꽷룸낫?꾩옄猷뚮퀎濡?臾띠뼱??諛섑솚?쒕떎.
 // ------------------------------------------------------------
 
 watcherAdmin.get('/events', async (c) => {
@@ -504,7 +504,7 @@ watcherAdmin.get('/events', async (c) => {
 })
 
 // ------------------------------------------------------------
-// WATCHER 이벤트 모두 읽음
+// WATCHER ?대깽??紐⑤몢 ?쎌쓬
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -526,10 +526,10 @@ watcherAdmin.post(
 )
 
 // ------------------------------------------------------------
-// WATCHER 이벤트 그룹 읽음
+// WATCHER ?대깽??洹몃９ ?쎌쓬
 //
-// 같은 날짜에 같은 보도자료에서 생성된 이벤트를
-// 한 번에 읽음 처리한다.
+// 媛숈? ?좎쭨??媛숈? 蹂대룄?먮즺?먯꽌 ?앹꽦???대깽?몃?
+// ??踰덉뿉 ?쎌쓬 泥섎━?쒕떎.
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -632,7 +632,7 @@ watcherAdmin.post(
 )
 
 // ------------------------------------------------------------
-// WATCHER 이벤트 개별 읽음
+// WATCHER ?대깽??媛쒕퀎 ?쎌쓬
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -691,8 +691,260 @@ watcherAdmin.post(
 )
 
 // ------------------------------------------------------------
-// 특정 수집 항목 상세
+// ?뱀젙 ?섏쭛 ??ぉ ?곸꽭
 // ------------------------------------------------------------
+
+
+// ------------------------------------------------------------
+// CLOUDED LEOPARD DRAFT SUGGESTION
+// Existing transformed values win; only missing values are filled.
+// ------------------------------------------------------------
+
+function buildCleDraftSuggestion(
+  input: unknown
+): Record<string, unknown> {
+  const item = {
+    ...((input && typeof input === 'object')
+      ? input as Record<string, unknown>
+      : {}),
+  }
+
+  if (
+    String(item.source_key || '') !==
+    'CLOUDED_LEOPARD'
+  ) {
+    return item
+  }
+
+  const rawTitle = String(
+    item.raw_title ||
+    item.title ||
+    ''
+  ).trim()
+
+  const rawText = String(
+    item.raw_text ||
+    ''
+  ).replace(/\r/g, '')
+
+  const sourceUrl = String(
+    item.source_url ||
+    ''
+  ).trim()
+
+  const quotedTitle =
+    rawTitle.match(/[『「《](.*?)[』」》]/)?.[1]
+      ?.trim() || ''
+
+  const cleanedTitle = rawTitle
+    .replace(
+      /\s*[|｜]\s*Clouded Leopard Entertainment.*$/i,
+      ''
+    )
+    .replace(
+      /\s*[-–—]\s*Clouded Leopard Entertainment.*$/i,
+      ''
+    )
+    .trim()
+
+  const gameTitle =
+    quotedTitle ||
+    cleanedTitle ||
+    rawTitle
+
+  const searchable = `${rawTitle}\n${rawText}`
+    .slice(0, 50000)
+
+  const detectedPlatforms: string[] = []
+
+  if (
+    /Nintendo\s*Switch\s*2|Switch\s*2|\bNSW2\b/i
+      .test(searchable)
+  ) {
+    detectedPlatforms.push('switch2')
+  }
+
+  const withoutSwitch2 = searchable.replace(
+    /Nintendo\s*Switch\s*2|Switch\s*2|\bNSW2\b/gi,
+    ' '
+  )
+
+  if (
+    /Nintendo\s*Switch|\bNSW\b/i
+      .test(withoutSwitch2)
+  ) {
+    detectedPlatforms.push('switch')
+  }
+
+  if (
+    /PlayStation\s*5|\bPS5\b/i
+      .test(searchable)
+  ) {
+    detectedPlatforms.push('ps5')
+  }
+
+  if (
+    /PlayStation\s*4|\bPS4\b/i
+      .test(searchable)
+  ) {
+    detectedPlatforms.push('ps4')
+  }
+
+  if (
+    /\bSteam\b|\bPC\b/i.test(searchable)
+  ) {
+    detectedPlatforms.push('pc')
+  }
+
+  if (
+    /\bXbox\b/i.test(searchable)
+  ) {
+    detectedPlatforms.push('xbox')
+  }
+
+  const platform =
+    detectedPlatforms[0] ||
+    'etc'
+
+  let releaseDate = ''
+
+  const releasePatterns = [
+    /(?:\uBC1C\uB9E4|\uCD9C\uC2DC|\uD310\uB9E4\s*\uC608\uC815)[^\n]{0,100}?(20\d{2})\s*\uB144\s*(\d{1,2})\s*\uC6D4\s*(\d{1,2})\s*\uC77C/i,
+    /(?:\uBC1C\uB9E4|\uCD9C\uC2DC|\uD310\uB9E4\s*\uC608\uC815)[^\n]{0,100}?(20\d{2})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})/i,
+    /(20\d{2})\s*\uB144\s*(\d{1,2})\s*\uC6D4\s*(\d{1,2})\s*\uC77C[^\n]{0,60}?(?:\uBC1C\uB9E4|\uCD9C\uC2DC)/i,
+    /(20\d{2})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})[^\n]{0,60}?(?:\uBC1C\uB9E4|\uCD9C\uC2DC)/i,
+  ]
+
+  for (const pattern of releasePatterns) {
+    const match = searchable.match(pattern)
+
+    if (!match) continue
+
+    releaseDate = [
+      match[1],
+      match[2].padStart(2, '0'),
+      match[3].padStart(2, '0'),
+    ].join('-')
+
+    break
+  }
+
+  let editionName = ''
+
+  if (
+    /\uD55C\uC815\uD310|\uD55C\uC815\s*\uC5D0\uB514\uC158|Limited\s*Edition/i
+      .test(searchable)
+  ) {
+    editionName = '\uD55C\uC815\uD310'
+  } else if (
+    /\uD328\uD0A4\uC9C0\uD310|\uD328\uD0A4\uC9C0\s*\uBC84\uC804/i
+      .test(searchable)
+  ) {
+    editionName = '\uD328\uD0A4\uC9C0\uD310'
+  }
+
+  const platformLabels: Record<string, string> = {
+    switch2: 'Nintendo Switch 2',
+    switch: 'Nintendo Switch',
+    ps5: 'PlayStation 5',
+    ps4: 'PlayStation 4',
+    pc: 'Steam / PC',
+    xbox: 'Xbox',
+    etc: '\uAE30\uD0C0',
+  }
+
+  const detectedPlatformText =
+    detectedPlatforms
+      .map((value) => platformLabels[value] || value)
+      .join(' / ')
+
+  const suggestion: Record<string, unknown> = {
+    game_title: gameTitle,
+    gameTitle,
+    title: gameTitle,
+
+    platform,
+    platforms: detectedPlatforms,
+    detected_platforms: detectedPlatforms,
+    detectedPlatforms,
+
+    release_date: releaseDate,
+    releaseDate,
+
+    edition_name: editionName,
+    editionName,
+
+    source_url: sourceUrl,
+    sourceUrl,
+    official_url: sourceUrl,
+    officialUrl: sourceUrl,
+
+    source_key: 'CLOUDED_LEOPARD',
+    sourceKey: 'CLOUDED_LEOPARD',
+
+    source_name:
+      'Clouded Leopard Entertainment',
+    sourceName:
+      'Clouded Leopard Entertainment',
+
+    permission_status: 'CONDITIONAL',
+    permissionStatus: 'CONDITIONAL',
+
+    notes: detectedPlatformText
+      ? `\uAC10\uC9C0 \uD50C\uB7AB\uD3FC: ${detectedPlatformText}`
+      : '',
+  }
+
+  let existing: Record<string, unknown> = {}
+
+  if (
+    typeof item.transformed_json === 'string' &&
+    item.transformed_json.trim()
+  ) {
+    try {
+      const parsed = JSON.parse(
+        item.transformed_json
+      )
+
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed)
+      ) {
+        existing =
+          parsed as Record<string, unknown>
+      }
+    } catch {
+      existing = {}
+    }
+  }
+
+  const merged = {
+    ...suggestion,
+  }
+
+  for (
+    const [key, value] of
+    Object.entries(existing)
+  ) {
+    const hasValue =
+      value !== null &&
+      value !== undefined &&
+      !(
+        typeof value === 'string' &&
+        value.trim() === ''
+      )
+
+    if (hasValue) {
+      merged[key] = value
+    }
+  }
+
+  item.transformed_json =
+    JSON.stringify(merged)
+
+  return item
+}
 
 watcherAdmin.get('/items/:id', async (c) => {
   const id = Number(c.req.param('id'))
@@ -772,16 +1024,15 @@ watcherAdmin.get('/items/:id', async (c) => {
 
   return c.json({
     ok: true,
-    item,
+    item: buildCleDraftSuggestion(item),
     images: images ?? [],
   })
 })
 
 // ------------------------------------------------------------
-// WATCHER 항목을 게임 등록 초안으로 변환
-//
-// 초안만 저장하며 실제 games 테이블에는 등록하지 않음
-// 이미지 선택·다운로드·공개도 하지 않음
+// WATCHER ??ぉ??寃뚯엫 ?깅줉 珥덉븞?쇰줈 蹂??//
+// 珥덉븞留???ν븯硫??ㅼ젣 games ?뚯씠釉붿뿉???깅줉?섏? ?딆쓬
+// ?대?吏 ?좏깮쨌?ㅼ슫濡쒕뱶쨌怨듦컻???섏? ?딆쓬
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -907,6 +1158,7 @@ watcherAdmin.post(
       'ps4',
       'xbox',
       'switch',
+      'switch2',
       'etc',
     ])
 
@@ -1068,7 +1320,7 @@ watcherAdmin.post(
     const sourceCredit =
       text(item.required_credit) ||
       (
-        '이미지 및 정보 출처: ' +
+        '?대?吏 諛??뺣낫 異쒖쿂: ' +
         item.source_name
       )
 
@@ -1172,16 +1424,16 @@ watcherAdmin.post(
 )
 
 // ------------------------------------------------------------
-// WATCHER 초안을 실제 비공개 게임 DRAFT로 등록
+// WATCHER 珥덉븞???ㅼ젣 鍮꾧났媛?寃뚯엫 DRAFT濡??깅줉
 //
-// 생성:
+// ?앹꽦:
 //   games                  DRAFT
-//   editions               플랫폼판
-//   game_official_sources  공식 출처
-//   edition_preorders      예약판매 초안
+//   editions               ?뚮옯?쇳뙋
+//   game_official_sources  怨듭떇 異쒖쿂
+//   edition_preorders      ?덉빟?먮ℓ 珥덉븞
 //
-// 이미지:
-//   선택·다운로드·공개하지 않음
+// ?대?吏:
+//   ?좏깮쨌?ㅼ슫濡쒕뱶쨌怨듦컻?섏? ?딆쓬
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -1266,7 +1518,7 @@ watcherAdmin.post(
         itemId: item.id,
         gameId: Number(item.linked_game_id),
         message:
-          '이미 게임 DRAFT에 연결된 보도자료입니다.',
+          '?대? 寃뚯엫 DRAFT???곌껐??蹂대룄?먮즺?낅땲??',
       })
     }
 
@@ -1277,7 +1529,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '게임 등록 초안을 먼저 저장해 주세요.',
+            '寃뚯엫 ?깅줉 珥덉븞??癒쇱? ??ν빐 二쇱꽭??',
         },
         409
       )
@@ -1306,7 +1558,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '공식 출처 이미지·정보 사용 정책이 승인되지 않았습니다.',
+            '怨듭떇 異쒖쿂 ?대?吏쨌?뺣낫 ?ъ슜 ?뺤콉???뱀씤?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -1338,7 +1590,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '저장된 게임 초안을 해석할 수 없습니다.',
+            '??λ맂 寃뚯엫 珥덉븞???댁꽍?????놁뒿?덈떎.',
         },
         409
       )
@@ -1408,7 +1660,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '게임 제목·플랫폼·발매일을 다시 확인해 주세요.',
+            '寃뚯엫 ?쒕ぉ쨌?뚮옯?셋룸컻留ㅼ씪???ㅼ떆 ?뺤씤??二쇱꽭??',
         },
         400
       )
@@ -1425,7 +1677,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '가격 후보가 올바르지 않습니다.',
+            '媛寃??꾨낫媛 ?щ컮瑜댁? ?딆뒿?덈떎.',
         },
         400
       )
@@ -1456,7 +1708,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '같은 제목의 게임이 이미 있습니다. 기존 게임 연결 기능에서 처리해 주세요.',
+            '媛숈? ?쒕ぉ??寃뚯엫???대? ?덉뒿?덈떎. 湲곗〈 寃뚯엫 ?곌껐 湲곕뒫?먯꽌 泥섎━??二쇱꽭??',
           existingGameId:
             Number(existingGame.id),
           existingPublishStatus:
@@ -1496,7 +1748,7 @@ watcherAdmin.post(
     const sourceCredit =
       text(item.required_credit) ||
       (
-        '이미지 및 정보 출처: ' +
+        '?대?吏 諛??뺣낫 異쒖쿂: ' +
         item.source_name
       )
 
@@ -1703,7 +1955,7 @@ watcherAdmin.post(
         imagePublished: false,
 
         message:
-          '비공개 게임 DRAFT를 생성했습니다.',
+          '鍮꾧났媛?寃뚯엫 DRAFT瑜??앹꽦?덉뒿?덈떎.',
       })
     } catch (error) {
       if (createdGameId) {
@@ -1751,7 +2003,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '게임 DRAFT 등록에 실패했습니다: ' +
+            '寃뚯엫 DRAFT ?깅줉???ㅽ뙣?덉뒿?덈떎: ' +
             message,
         },
         500
@@ -1761,19 +2013,15 @@ watcherAdmin.post(
 )
 
 // ------------------------------------------------------------
-// WATCHER 게임 DRAFT 대표 이미지 후보 선택
+// WATCHER 寃뚯엫 DRAFT ????대?吏 ?꾨낫 ?좏깮
 //
-// 처리:
-//   - 관리자가 이미지 유형을 확인하여 지정
-//   - 개별 이미지 상태를 APPROVED로 변경
-//   - 같은 보도자료의 다른 이미지 선택 해제
-//   - edition_preorders.selected_image_id 연결
+// 泥섎━:
+//   - 愿由ъ옄媛 ?대?吏 ?좏삎???뺤씤?섏뿬 吏??//   - 媛쒕퀎 ?대?吏 ?곹깭瑜?APPROVED濡?蹂寃?//   - 媛숈? 蹂대룄?먮즺???ㅻⅨ ?대?吏 ?좏깮 ?댁젣
+//   - edition_preorders.selected_image_id ?곌껐
 //
-// 하지 않는 처리:
-//   - 이미지 다운로드
-//   - R2 저장
-//   - games.image_url 변경
-//   - 게임 공개
+// ?섏? ?딅뒗 泥섎━:
+//   - ?대?吏 ?ㅼ슫濡쒕뱶
+//   - R2 ???//   - games.image_url 蹂寃?//   - 寃뚯엫 怨듦컻
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -1848,7 +2096,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '대표 이미지 유형을 선택해 주세요.',
+            '????대?吏 ?좏삎???좏깮??二쇱꽭??',
         },
         400
       )
@@ -1940,7 +2188,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이미지 후보 또는 WATCHER 항목을 찾을 수 없습니다.',
+            '?대?吏 ?꾨낫 ?먮뒗 WATCHER ??ぉ??李얠쓣 ???놁뒿?덈떎.',
         },
         404
       )
@@ -1958,7 +2206,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '비공개 게임 DRAFT를 먼저 등록해 주세요.',
+            '鍮꾧났媛?寃뚯엫 DRAFT瑜?癒쇱? ?깅줉??二쇱꽭??',
         },
         409
       )
@@ -1971,7 +2219,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '대표 이미지 후보 선택은 DRAFT 게임에서만 가능합니다.',
+            '????대?吏 ?꾨낫 ?좏깮? DRAFT 寃뚯엫?먯꽌留?媛?ν빀?덈떎.',
         },
         409
       )
@@ -1990,7 +2238,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+            '異쒖쿂???대?吏 ?ъ슜 ?뺤콉???뱀씤?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -2042,7 +2290,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이 출처에서는 선택한 이미지 유형의 사용이 허용되지 않았습니다.',
+            '??異쒖쿂?먯꽌???좏깮???대?吏 ?좏삎???ъ슜???덉슜?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -2083,7 +2331,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '연결된 예약판매 DRAFT를 찾을 수 없습니다.',
+            '?곌껐???덉빟?먮ℓ DRAFT瑜?李얠쓣 ???놁뒿?덈떎.',
         },
         404
       )
@@ -2094,7 +2342,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            'DRAFT 상태의 예약판매 정보에서만 이미지를 선택할 수 있습니다.',
+            'DRAFT ?곹깭???덉빟?먮ℓ ?뺣낫?먯꽌留??대?吏瑜??좏깮?????덉뒿?덈떎.',
         },
         409
       )
@@ -2188,28 +2436,21 @@ watcherAdmin.post(
         false,
 
       message:
-        '대표 이미지 후보를 선택했습니다. 아직 다운로드하거나 공개하지 않았습니다.',
+        '????대?吏 ?꾨낫瑜??좏깮?덉뒿?덈떎. ?꾩쭅 ?ㅼ슫濡쒕뱶?섍굅??怨듦컻?섏? ?딆븯?듬땲??',
     })
   }
 )
 
 // ------------------------------------------------------------
-// 선택된 WATCHER 대표 이미지 원본을 비공개 R2에 저장
+// ?좏깮??WATCHER ????대?吏 ?먮낯??鍮꾧났媛?R2?????//
+// 泥섎━:
+//   - ?좏깮쨌?뱀씤???대?吏?몄? ?ш?利?//   - 異쒖쿂??濡쒖뺄 ????덉슜 ?щ? ?ш?利?//   - DRAFT 寃뚯엫쨌?덉빟?먮ℓ?몄? ?ш?利?//   - 怨듭떇 ?먮낯 URL?먯꽌 ?쒕쾭媛 ?ㅼ슫濡쒕뱶
+//   - ?뚯씪 ?ш린 諛??ㅼ젣 ?대?吏 ?뺤떇 寃利?//   - SHA-256 怨꾩궛
+//   - 鍮꾧났媛?GAME_IMAGES R2 踰꾪궥?????//   - watch_item_images???대? ????꾩튂 湲곕줉
 //
-// 처리:
-//   - 선택·승인된 이미지인지 재검증
-//   - 출처의 로컬 저장 허용 여부 재검증
-//   - DRAFT 게임·예약판매인지 재검증
-//   - 공식 원본 URL에서 서버가 다운로드
-//   - 파일 크기 및 실제 이미지 형식 검증
-//   - SHA-256 계산
-//   - 비공개 GAME_IMAGES R2 버킷에 저장
-//   - watch_item_images에 내부 저장 위치 기록
-//
-// 하지 않는 처리:
-//   - games.image_url 변경
-//   - 게임 또는 예약판매 공개
-//   - 공개 이미지 URL 생성
+// ?섏? ?딅뒗 泥섎━:
+//   - games.image_url 蹂寃?//   - 寃뚯엫 ?먮뒗 ?덉빟?먮ℓ 怨듦컻
+//   - 怨듦컻 ?대?吏 URL ?앹꽦
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -2349,7 +2590,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '연결된 이미지·게임·예약판매 정보를 찾을 수 없습니다.',
+            '?곌껐???대?吏쨌寃뚯엫쨌?덉빟?먮ℓ ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.',
         },
         404
       )
@@ -2367,7 +2608,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '비공개 게임 DRAFT를 먼저 등록해 주세요.',
+            '鍮꾧났媛?寃뚯엫 DRAFT瑜?癒쇱? ?깅줉??二쇱꽭??',
         },
         409
       )
@@ -2380,7 +2621,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이미지 저장은 DRAFT 게임에서만 가능합니다.',
+            '?대?吏 ??μ? DRAFT 寃뚯엫?먯꽌留?媛?ν빀?덈떎.',
         },
         409
       )
@@ -2393,7 +2634,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이미지 저장은 DRAFT 예약판매 정보에서만 가능합니다.',
+            '?대?吏 ??μ? DRAFT ?덉빟?먮ℓ ?뺣낫?먯꽌留?媛?ν빀?덈떎.',
         },
         409
       )
@@ -2407,7 +2648,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '대표 이미지 후보를 먼저 선택해 주세요.',
+            '????대?吏 ?꾨낫瑜?癒쇱? ?좏깮??二쇱꽭??',
         },
         409
       )
@@ -2421,7 +2662,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '개별 이미지 검수가 승인되지 않았습니다.',
+            '媛쒕퀎 ?대?吏 寃?섍? ?뱀씤?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -2440,7 +2681,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+            '異쒖쿂???대?吏 ?ъ슜 ?뺤콉???뱀씤?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -2453,7 +2694,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이 출처는 이미지 로컬 저장을 허용하지 않습니다.',
+            '??異쒖쿂???대?吏 濡쒖뺄 ??μ쓣 ?덉슜?섏? ?딆뒿?덈떎.',
         },
         409
       )
@@ -2479,7 +2720,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '저장할 수 없는 이미지 유형입니다.',
+            '??ν븷 ???녿뒗 ?대?吏 ?좏삎?낅땲??',
         },
         409
       )
@@ -2496,7 +2737,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '공식 이미지 원본 URL이 올바르지 않습니다.',
+            '怨듭떇 ?대?吏 ?먮낯 URL???щ컮瑜댁? ?딆뒿?덈떎.',
         },
         409
       )
@@ -2510,7 +2751,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            'HTTP 또는 HTTPS 이미지 URL만 저장할 수 있습니다.',
+            'HTTP ?먮뒗 HTTPS ?대?吏 URL留???ν븷 ???덉뒿?덈떎.',
         },
         409
       )
@@ -2578,7 +2819,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '내부 네트워크 주소에서는 이미지를 가져올 수 없습니다.',
+            '?대? ?ㅽ듃?뚰겕 二쇱냼?먯꽌???대?吏瑜?媛?몄삱 ???놁뒿?덈떎.',
         },
         409
       )
@@ -2649,7 +2890,7 @@ watcherAdmin.post(
             {
               ok: false,
               error:
-                '이미지 원본의 리디렉션 횟수가 너무 많습니다.',
+                '?대?吏 ?먮낯??由щ뵒?됱뀡 ?잛닔媛 ?덈Т 留롮뒿?덈떎.',
             },
             502
           )
@@ -2674,7 +2915,7 @@ watcherAdmin.post(
             {
               ok: false,
               error:
-                '허용되지 않은 주소로 이미지 요청이 이동했습니다.',
+                '?덉슜?섏? ?딆? 二쇱냼濡??대?吏 ?붿껌???대룞?덉뒿?덈떎.',
             },
             409
           )
@@ -2692,7 +2933,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '공식 이미지 원본을 가져오지 못했습니다: ' +
+            '怨듭떇 ?대?吏 ?먮낯??媛?몄삤吏 紐삵뻽?듬땲?? ' +
             message,
         },
         502
@@ -2704,7 +2945,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '공식 이미지 서버가 오류를 반환했습니다.',
+            '怨듭떇 ?대?吏 ?쒕쾭媛 ?ㅻ쪟瑜?諛섑솚?덉뒿?덈떎.',
           sourceStatus:
             response?.status ?? null,
         },
@@ -2726,7 +2967,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이미지 파일이 10MB 제한을 초과합니다.',
+            '?대?吏 ?뚯씪??10MB ?쒗븳??珥덇낵?⑸땲??',
         },
         413
       )
@@ -2742,7 +2983,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이미지 데이터를 읽지 못했습니다.',
+            '?대?吏 ?곗씠?곕? ?쎌? 紐삵뻽?듬땲??',
         },
         502
       )
@@ -2758,8 +2999,8 @@ watcherAdmin.post(
           ok: false,
           error:
             imageBuffer.byteLength <= 0
-              ? '빈 이미지 파일입니다.'
-              : '이미지 파일이 10MB 제한을 초과합니다.',
+              ? '鍮??대?吏 ?뚯씪?낅땲??'
+              : '?대?吏 ?뚯씪??10MB ?쒗븳??珥덇낵?⑸땲??',
         },
         imageBuffer.byteLength <= 0
           ? 422
@@ -2810,7 +3051,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            'JPEG, PNG 또는 WebP 이미지만 저장할 수 있습니다.',
+            'JPEG, PNG ?먮뒗 WebP ?대?吏留???ν븷 ???덉뒿?덈떎.',
           sourceContentType:
             response.headers.get(
               'content-type'
@@ -2892,7 +3133,7 @@ watcherAdmin.post(
         imagePublished: false,
 
         message:
-          '이미 비공개 R2에 저장된 이미지입니다.',
+          '?대? 鍮꾧났媛?R2????λ맂 ?대?吏?낅땲??',
       })
     }
 
@@ -2974,7 +3215,7 @@ watcherAdmin.post(
           {
             ok: false,
             error:
-              '이미지 선택 상태가 변경되어 R2 저장을 취소했습니다.',
+              '?대?吏 ?좏깮 ?곹깭媛 蹂寃쎈릺??R2 ??μ쓣 痍⑥냼?덉뒿?덈떎.',
           },
           409
         )
@@ -3007,7 +3248,7 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '이미지를 비공개 저장소에 저장하지 못했습니다: ' +
+            '?대?吏瑜?鍮꾧났媛???μ냼????ν븯吏 紐삵뻽?듬땲?? ' +
             message,
         },
         500
@@ -3045,20 +3286,20 @@ watcherAdmin.post(
       imagePublished: false,
 
       message:
-        '선택된 대표 이미지를 비공개 R2에 저장했습니다.',
+        '?좏깮??????대?吏瑜?鍮꾧났媛?R2????ν뻽?듬땲??',
     })
   }
 )
 
 // ------------------------------------------------------------
-// 비공개 R2 대표 이미지 관리자 미리보기
+// 鍮꾧났媛?R2 ????대?吏 愿由ъ옄 誘몃━蹂닿린
 //
-// 보안:
-//   - watcherAdmin 공통 X-Admin-Token 인증 적용
-//   - 선택·승인된 대표 이미지만 허용
-//   - DRAFT 게임·예약판매 정보만 허용
-//   - DB에 기록된 고정 R2 객체만 반환
-//   - 외부 R2 공개 URL은 사용하지 않음
+// 蹂댁븞:
+//   - watcherAdmin 怨듯넻 X-Admin-Token ?몄쬆 ?곸슜
+//   - ?좏깮쨌?뱀씤??????대?吏留??덉슜
+//   - DRAFT 寃뚯엫쨌?덉빟?먮ℓ ?뺣낫留??덉슜
+//   - DB??湲곕줉??怨좎젙 R2 媛앹껜留?諛섑솚
+//   - ?몃? R2 怨듦컻 URL? ?ъ슜?섏? ?딆쓬
 // ------------------------------------------------------------
 
 watcherAdmin.get(
@@ -3180,7 +3421,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '미리보기 이미지 정보를 찾을 수 없습니다.',
+            '誘몃━蹂닿린 ?대?吏 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.',
         },
         404
       )
@@ -3198,7 +3439,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '연결된 게임 정보가 올바르지 않습니다.',
+            '?곌껐??寃뚯엫 ?뺣낫媛 ?щ컮瑜댁? ?딆뒿?덈떎.',
         },
         409
       )
@@ -3211,7 +3452,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '현재 관리자 미리보기는 DRAFT 게임에서만 사용할 수 있습니다.',
+            '?꾩옱 愿由ъ옄 誘몃━蹂닿린??DRAFT 寃뚯엫?먯꽌留??ъ슜?????덉뒿?덈떎.',
         },
         409
       )
@@ -3225,7 +3466,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '현재 관리자 미리보기는 DRAFT 예약판매 정보에서만 사용할 수 있습니다.',
+            '?꾩옱 愿由ъ옄 誘몃━蹂닿린??DRAFT ?덉빟?먮ℓ ?뺣낫?먯꽌留??ъ슜?????덉뒿?덈떎.',
         },
         409
       )
@@ -3243,7 +3484,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '현재 선택된 대표 이미지만 미리볼 수 있습니다.',
+            '?꾩옱 ?좏깮??????대?吏留?誘몃━蹂????덉뒿?덈떎.',
         },
         409
       )
@@ -3257,7 +3498,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '개별 이미지 검수가 승인되지 않았습니다.',
+            '媛쒕퀎 ?대?吏 寃?섍? ?뱀씤?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -3279,7 +3520,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '출처의 이미지 사용 정책이 승인되지 않았습니다.',
+            '異쒖쿂???대?吏 ?ъ슜 ?뺤콉???뱀씤?섏? ?딆븯?듬땲??',
         },
         409
       )
@@ -3294,7 +3535,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '이 출처는 이미지 로컬 저장과 미리보기를 허용하지 않습니다.',
+            '??異쒖쿂???대?吏 濡쒖뺄 ??κ낵 誘몃━蹂닿린瑜??덉슜?섏? ?딆뒿?덈떎.',
         },
         409
       )
@@ -3316,7 +3557,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '비공개 R2 저장 정보가 올바르지 않습니다.',
+            '鍮꾧났媛?R2 ????뺣낫媛 ?щ컮瑜댁? ?딆뒿?덈떎.',
         },
         409
       )
@@ -3327,7 +3568,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '저장된 이미지의 무결성 해시가 없습니다.',
+            '??λ맂 ?대?吏??臾닿껐???댁떆媛 ?놁뒿?덈떎.',
         },
         409
       )
@@ -3343,7 +3584,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '비공개 R2에서 이미지 객체를 찾을 수 없습니다.',
+            '鍮꾧났媛?R2?먯꽌 ?대?吏 媛앹껜瑜?李얠쓣 ???놁뒿?덈떎.',
         },
         404
       )
@@ -3366,7 +3607,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            'R2 이미지 메타데이터와 DB 정보가 일치하지 않습니다.',
+            'R2 ?대?吏 硫뷀??곗씠?곗? DB ?뺣낫媛 ?쇱튂?섏? ?딆뒿?덈떎.',
         },
         409
       )
@@ -3386,7 +3627,7 @@ watcherAdmin.get(
         {
           ok: false,
           error:
-            '미리보기를 허용하지 않는 파일 형식입니다.',
+            '誘몃━蹂닿린瑜??덉슜?섏? ?딅뒗 ?뚯씪 ?뺤떇?낅땲??',
         },
         415
       )
@@ -3442,7 +3683,7 @@ watcherAdmin.get(
 )
 
 // ------------------------------------------------------------
-// 아크시스템웍스아시아 수동 수집 실행
+// ?꾪겕?쒖뒪?쒖썚?ㅼ븘?쒖븘 ?섎룞 ?섏쭛 ?ㅽ뻾
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -3479,7 +3720,7 @@ watcherAdmin.post(
 
 
 // ------------------------------------------------------------
-// Clouded Leopard Entertainment 수동 수집
+// Clouded Leopard Entertainment ?섎룞 ?섏쭛
 // ------------------------------------------------------------
 
 watcherAdmin.post(
@@ -3517,8 +3758,8 @@ watcherAdmin.post(
 )
 
 // ------------------------------------------------------------
-// 아크 + CLE 전체 수집
-// 한 출처 실패가 다른 출처를 중단하지 않는다.
+// ?꾪겕 + CLE ?꾩껜 ?섏쭛
+// ??異쒖쿂 ?ㅽ뙣媛 ?ㅻⅨ 異쒖쿂瑜?以묐떒?섏? ?딅뒗??
 // ------------------------------------------------------------
 
 watcherAdmin.post(

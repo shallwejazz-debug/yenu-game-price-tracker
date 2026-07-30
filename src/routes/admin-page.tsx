@@ -1,18 +1,16 @@
 // ============================================================
-// 관리자 콘솔 HTML 페이지
+// 愿由ъ옄 肄섏넄 HTML ?섏씠吏
 // src/routes/admin-page.tsx
 //
-// 탭 구성
-//   1. 현황
-//   2. 후보 선별
-//   3. 게임 가져오기
-//   4. 게임 관리
-//   5. 설정 / 백업
+// ??援ъ꽦
+//   1. ?꾪솴
+//   2. ?꾨낫 ?좊퀎
+//   3. 寃뚯엫 媛?몄삤湲?//   4. 寃뚯엫 愿由?//   5. ?ㅼ젙 / 諛깆뾽
 //
-// 주의
-//   - 후보 평가만으로 게임을 바로 저장하지 않음
-//   - 선택 후보는 게임 가져오기 탭으로만 전달
-//   - 실제 저장 전 기존 미리보기 단계를 거침
+// 二쇱쓽
+//   - ?꾨낫 ?됯?留뚯쑝濡?寃뚯엫??諛붾줈 ??ν븯吏 ?딆쓬
+//   - ?좏깮 ?꾨낫??寃뚯엫 媛?몄삤湲???쑝濡쒕쭔 ?꾨떖
+//   - ?ㅼ젣 ?????湲곗〈 誘몃━蹂닿린 ?④퀎瑜?嫄곗묠
 // ============================================================
 
 export function AdminPage(): string {
@@ -25,11 +23,11 @@ export function AdminPage(): string {
     content="width=device-width, initial-scale=1.0"
   />
 
-  <title>관리자 콘솔 · 여누딜</title>
+  <title>愿由ъ옄 肄섏넄 쨌 ?щ늻??/title>
 
   <link
     rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>?숋툘</text></svg>"
   />
 
   <link href="/static/style.css" rel="stylesheet" />
@@ -41,16 +39,16 @@ export function AdminPage(): string {
 
 <body>
   <!-- ======================================================
-       관리자 잠금 화면
+       愿由ъ옄 ?좉툑 ?붾㈃
        ====================================================== -->
   <div id="lockScreen" class="lock-screen">
     <div class="lock-box">
-      <div class="lock-icon">🔒</div>
+      <div class="lock-icon">?뵏</div>
 
-      <h1>관리자 인증</h1>
+      <h1>愿由ъ옄 ?몄쬆</h1>
 
       <p class="lock-hint">
-        관리자 비밀번호를 입력하세요.
+        愿由ъ옄 鍮꾨?踰덊샇瑜??낅젰?섏꽭??
       </p>
 
       <form id="lockForm" autocomplete="off">
@@ -58,7 +56,7 @@ export function AdminPage(): string {
           type="password"
           id="lockPassword"
           class="lock-input"
-          placeholder="비밀번호"
+          placeholder="鍮꾨?踰덊샇"
           autocomplete="current-password"
         />
 
@@ -66,28 +64,26 @@ export function AdminPage(): string {
           type="submit"
           class="btn btn-primary lock-btn"
         >
-          잠금 해제
+          ?좉툑 ?댁젣
         </button>
       </form>
 
       <p id="lockStatus" class="admin-status"></p>
 
       <a href="/games" class="lock-back">
-        ← 사이트로 돌아가기
-      </a>
+        ???ъ씠?몃줈 ?뚯븘媛湲?      </a>
     </div>
   </div>
 
   <!-- ======================================================
-       관리자 본문
+       愿由ъ옄 蹂몃Ц
        ====================================================== -->
   <main class="admin-wrap" id="adminContent" hidden>
     <header class="admin-head">
       <div>
-        <h1>⚙️ 관리자 콘솔</h1>
+        <h1>?숋툘 愿由ъ옄 肄섏넄</h1>
         <p class="admin-head-sub">
-          여누딜 게임·가격·후보 관리
-        </p>
+          ?щ늻??寃뚯엫쨌媛寃㈑룻썑蹂?愿由?        </p>
       </div>
 
       <div class="admin-head-actions">
@@ -96,22 +92,20 @@ export function AdminPage(): string {
           class="btn btn-sm"
           type="button"
         >
-          🔒 잠그기
-        </button>
+          ?뵏 ?좉렇湲?        </button>
 
         <a href="/games" class="admin-back">
-          ← 사이트로
+          ???ъ씠?몃줈
         </a>
       </div>
     </header>
 
     <!-- ====================================================
-         상단 탭
-         ==================================================== -->
+         ?곷떒 ??         ==================================================== -->
     <nav
       class="admin-tabs"
       id="adminTabs"
-      aria-label="관리자 메뉴"
+      aria-label="愿由ъ옄 硫붾돱"
     >
       <button
         type="button"
@@ -119,8 +113,8 @@ export function AdminPage(): string {
         data-admin-tab="dashboard"
         aria-selected="true"
       >
-        <span class="admin-tab-icon">🏠</span>
-        <span>현황</span>
+        <span class="admin-tab-icon">?룧</span>
+        <span>?꾪솴</span>
       </button>
 
       <button
@@ -129,8 +123,8 @@ export function AdminPage(): string {
               data-admin-tab="watcher"
               aria-selected="false"
             >
-              <span class="admin-tab-icon">📡</span>
-              <span>예판 WATCHER</span>
+              <span class="admin-tab-icon">?뱻</span>
+              <span>?덊뙋 WATCHER</span>
               <span
                 id="watcherTabBadge"
                 class="admin-tab-badge"
@@ -146,8 +140,8 @@ export function AdminPage(): string {
         data-admin-tab="preorder-v2"
         aria-selected="false"
       >
-        <span class="admin-tab-icon">🛒</span>
-        <span>사전예약 V2</span>
+        <span class="admin-tab-icon">?썟</span>
+        <span>?ъ쟾?덉빟 V2</span>
         <span
           id="preorderV2TabBadge"
           class="admin-tab-badge"
@@ -164,8 +158,8 @@ export function AdminPage(): string {
         data-admin-tab="candidates"
         aria-selected="false"
       >
-        <span class="admin-tab-icon">📊</span>
-        <span>후보 선별</span>
+        <span class="admin-tab-icon">?뱤</span>
+        <span>?꾨낫 ?좊퀎</span>
         <span
           id="candidateTabBadge"
           class="admin-tab-badge"
@@ -181,8 +175,8 @@ export function AdminPage(): string {
         data-admin-tab="import"
         aria-selected="false"
       >
-        <span class="admin-tab-icon">🤖</span>
-        <span>게임 가져오기</span>
+        <span class="admin-tab-icon">?쨼</span>
+        <span>寃뚯엫 媛?몄삤湲?/span>
         <span
           id="importTabBadge"
           class="admin-tab-badge"
@@ -198,8 +192,8 @@ export function AdminPage(): string {
         data-admin-tab="games"
         aria-selected="false"
       >
-        <span class="admin-tab-icon">🎮</span>
-        <span>게임 관리</span>
+        <span class="admin-tab-icon">?렜</span>
+        <span>寃뚯엫 愿由?/span>
       </button>
 
       <button
@@ -208,13 +202,13 @@ export function AdminPage(): string {
         data-admin-tab="settings"
         aria-selected="false"
       >
-        <span class="admin-tab-icon">⚙️</span>
-        <span>설정·백업</span>
+        <span class="admin-tab-icon">?숋툘</span>
+        <span>?ㅼ젙쨌諛깆뾽</span>
       </button>
     </nav>
 
     <!-- ====================================================
-         탭 1: 현황
+         ??1: ?꾪솴
          ==================================================== -->
     <section
       class="admin-panel is-active"
@@ -223,9 +217,9 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>🏠 관리 현황</h2>
+            <h2>?룧 愿由??꾪솴</h2>
             <p class="admin-hint">
-              등록된 게임과 현재 후보 작업 상태를 한눈에 확인합니다.
+              ?깅줉??寃뚯엫怨??꾩옱 ?꾨낫 ?묒뾽 ?곹깭瑜??쒕늿???뺤씤?⑸땲??
             </p>
           </div>
 
@@ -234,14 +228,14 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            새로고침
+            ?덈줈怨좎묠
           </button>
         </div>
 
         <div class="dashboard-grid">
           <article class="dashboard-stat">
             <span class="dashboard-stat-label">
-              등록된 게임
+              ?깅줉??寃뚯엫
             </span>
             <strong
               id="dashboardGameCount"
@@ -250,14 +244,12 @@ export function AdminPage(): string {
               -
             </strong>
             <span class="dashboard-stat-sub">
-              전체 작품 수
-            </span>
+              ?꾩껜 ?묓뭹 ??            </span>
           </article>
 
           <article class="dashboard-stat">
             <span class="dashboard-stat-label">
-              등록된 에디션
-            </span>
+              ?깅줉???먮뵒??            </span>
             <strong
               id="dashboardEditionCount"
               class="dashboard-stat-value"
@@ -265,13 +257,13 @@ export function AdminPage(): string {
               -
             </strong>
             <span class="dashboard-stat-sub">
-              플랫폼별 등록 합계
+              ?뚮옯?쇰퀎 ?깅줉 ?⑷퀎
             </span>
           </article>
 
           <article class="dashboard-stat">
             <span class="dashboard-stat-label">
-              평가된 후보
+              ?됯????꾨낫
             </span>
             <strong
               id="dashboardCandidateCount"
@@ -280,14 +272,13 @@ export function AdminPage(): string {
               0
             </strong>
             <span class="dashboard-stat-sub">
-              현재 브라우저 임시 작업
+              ?꾩옱 釉뚮씪?곗? ?꾩떆 ?묒뾽
             </span>
           </article>
 
           <article class="dashboard-stat">
             <span class="dashboard-stat-label">
-              가져오기 대기
-            </span>
+              媛?몄삤湲??湲?            </span>
             <strong
               id="dashboardImportCount"
               class="dashboard-stat-value"
@@ -295,17 +286,16 @@ export function AdminPage(): string {
               0
             </strong>
             <span class="dashboard-stat-sub">
-              아직 저장하지 않은 행
-            </span>
+              ?꾩쭅 ??ν븯吏 ?딆? ??            </span>
           </article>
         </div>
       </section>
 
       <section class="admin-card">
-        <h2>🚀 빠른 작업</h2>
+        <h2>?? 鍮좊Ⅸ ?묒뾽</h2>
 
         <p class="admin-hint">
-          원하는 작업으로 바로 이동할 수 있습니다.
+          ?먰븯???묒뾽?쇰줈 諛붾줈 ?대룞?????덉뒿?덈떎.
         </p>
 
         <div class="dashboard-actions">
@@ -314,7 +304,7 @@ export function AdminPage(): string {
             class="btn btn-primary"
             data-go-admin-tab="candidates"
           >
-            📊 후보 게임 선별
+            ?뱤 ?꾨낫 寃뚯엫 ?좊퀎
           </button>
 
           <button
@@ -322,57 +312,55 @@ export function AdminPage(): string {
             class="btn"
             data-go-admin-tab="import"
           >
-            🤖 게임 가져오기
-          </button>
+            ?쨼 寃뚯엫 媛?몄삤湲?          </button>
 
           <button
             type="button"
             class="btn"
             data-go-admin-tab="games"
           >
-            🎮 등록 게임 관리
-          </button>
+            ?렜 ?깅줉 寃뚯엫 愿由?          </button>
 
           <button
             type="button"
             class="btn"
             data-go-admin-tab="settings"
           >
-            ⚙️ 설정 및 백업
+            ?숋툘 ?ㅼ젙 諛?諛깆뾽
           </button>
         </div>
       </section>
 
       <section class="admin-card">
-        <h2>💡 권장 작업 순서</h2>
+        <h2>?뮕 沅뚯옣 ?묒뾽 ?쒖꽌</h2>
 
         <ol class="admin-step-list">
           <li>
-            다나와 등에서 후보 게임명을 복사합니다.
+            ?ㅻ굹? ?깆뿉???꾨낫 寃뚯엫紐낆쓣 蹂듭궗?⑸땲??
           </li>
           <li>
-            <b>후보 선별</b> 탭에 한 줄에 하나씩 붙여넣습니다.
+            <b>?꾨낫 ?좊퀎</b> ??뿉 ??以꾩뿉 ?섎굹??遺숈뿬?ｌ뒿?덈떎.
           </li>
           <li>
-            여누딜의 자동 평가 결과와 판정 이유를 확인합니다.
+            ?щ늻?쒖쓽 ?먮룞 ?됯? 寃곌낵? ?먯젙 ?댁쑀瑜??뺤씤?⑸땲??
           </li>
           <li>
-            등록할 후보만 체크하여 <b>게임 가져오기</b>로 전달합니다.
+            ?깅줉???꾨낫留?泥댄겕?섏뿬 <b>寃뚯엫 媛?몄삤湲?/b>濡??꾨떖?⑸땲??
           </li>
           <li>
-            가져오기 미리보기를 확인한 후 실제 저장합니다.
+            媛?몄삤湲?誘몃━蹂닿린瑜??뺤씤?????ㅼ젣 ??ν빀?덈떎.
           </li>
         </ol>
 
         <div class="admin-notice">
-          후보 평가 결과만으로 게임이 자동 등록되지는 않습니다.
-          실제 저장은 반드시 게임 가져오기 탭에서 직접 실행해야 합니다.
+          ?꾨낫 ?됯? 寃곌낵留뚯쑝濡?寃뚯엫???먮룞 ?깅줉?섏????딆뒿?덈떎.
+          ?ㅼ젣 ??μ? 諛섎뱶??寃뚯엫 媛?몄삤湲???뿉??吏곸젒 ?ㅽ뻾?댁빞 ?⑸땲??
         </div>
       </section>
     </section>
 
       <!-- ====================================================
-         탭 2: 예판 WATCHER
+         ??2: ?덊뙋 WATCHER
          ==================================================== -->
     <section
       class="admin-panel"
@@ -382,10 +370,9 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>📡 예판 WATCHER</h2>
+            <h2>?뱻 ?덊뙋 WATCHER</h2>
             <p class="admin-hint">
-              공식 보도자료 발견 현황과 출처별 이미지 사용 정책을
-              확인합니다. 허가 대기 이미지는 공개되지 않습니다.
+              怨듭떇 蹂대룄?먮즺 諛쒓껄 ?꾪솴怨?異쒖쿂蹂??대?吏 ?ъ슜 ?뺤콉??              ?뺤씤?⑸땲?? ?덇? ?湲??대?吏??怨듦컻?섏? ?딆뒿?덈떎.
             </p>
           </div>
 
@@ -395,7 +382,7 @@ export function AdminPage(): string {
               class="btn btn-sm"
               type="button"
             >
-              전체 수집 실행
+              ?꾩껜 ?섏쭛 ?ㅽ뻾
             </button>
 
             <button
@@ -403,7 +390,7 @@ export function AdminPage(): string {
               class="btn btn-sm"
               type="button"
             >
-              새로고침
+              ?덈줈怨좎묠
             </button>
           </div>
 
@@ -411,69 +398,69 @@ export function AdminPage(): string {
 
         <div class="watcher-summary-grid">
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">활성 출처</span>
+            <span class="dashboard-stat-label">?쒖꽦 異쒖쿂</span>
             <strong
               id="watcherEnabledSources"
               class="dashboard-stat-value"
             >
               -
             </strong>
-            <span class="dashboard-stat-sub">현재 감시 대상</span>
+            <span class="dashboard-stat-sub">?꾩옱 媛먯떆 ???/span>
           </article>
 
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">신규 발견</span>
+            <span class="dashboard-stat-label">?좉퇋 諛쒓껄</span>
             <strong
               id="watcherDiscoveredItems"
               class="dashboard-stat-value"
             >
               -
             </strong>
-            <span class="dashboard-stat-sub">변환 전 보도자료</span>
+            <span class="dashboard-stat-sub">蹂????蹂대룄?먮즺</span>
           </article>
 
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">변환 완료</span>
+            <span class="dashboard-stat-label">蹂???꾨즺</span>
             <strong
               id="watcherTransformedItems"
               class="dashboard-stat-value"
             >
               -
             </strong>
-            <span class="dashboard-stat-sub">검수 준비 완료</span>
+            <span class="dashboard-stat-sub">寃??以鍮??꾨즺</span>
           </article>
 
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">검수 중</span>
+            <span class="dashboard-stat-label">寃??以?/span>
             <strong
               id="watcherReviewingItems"
               class="dashboard-stat-value"
             >
               -
             </strong>
-            <span class="dashboard-stat-sub">관리자 확인 필요</span>
+            <span class="dashboard-stat-sub">愿由ъ옄 ?뺤씤 ?꾩슂</span>
           </article>
 
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">출처 허가 대기</span>
+            <span class="dashboard-stat-label">異쒖쿂 ?덇? ?湲?/span>
             <strong
               id="watcherPendingPermissions"
               class="dashboard-stat-value"
             >
               -
             </strong>
-            <span class="dashboard-stat-sub">출처별 정책 회신 대기</span>
+            <span class="dashboard-stat-sub">異쒖쿂蹂??뺤콉 ?뚯떊 ?湲?/span>
           </article>
 
           <article class="dashboard-stat">
-            <span class="dashboard-stat-label">새 이벤트</span>
+            <span class="dashboard-stat-label">???대깽??/span>
             <strong
               id="watcherUnreadEvents"
               class="dashboard-stat-value"
             >
               -
             </strong>
-            <span class="dashboard-stat-sub">읽지 않은 알림</span>
+            <span class="dashboard-stat-sub">?쎌? ?딆? ?뚮┝</span>
           </article>
         </div>
 
@@ -485,16 +472,15 @@ export function AdminPage(): string {
       </section>
 
       <!-- ======================================================
-           WATCHER 이벤트
-           ====================================================== -->
+           WATCHER ?대깽??           ====================================================== -->
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>🔔 WATCHER 이벤트</h2>
+            <h2>?뵒 WATCHER ?대깽??/h2>
 
             <p class="admin-hint">
-              보도자료와 이미지 후보 발견 이력을 표시합니다.
-              읽음 처리해도 기록은 삭제되지 않습니다.
+              蹂대룄?먮즺? ?대?吏 ?꾨낫 諛쒓껄 ?대젰???쒖떆?⑸땲??
+              ?쎌쓬 泥섎━?대룄 湲곕줉? ??젣?섏? ?딆뒿?덈떎.
             </p>
           </div>
 
@@ -503,7 +489,7 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            모두 읽음
+            紐⑤몢 ?쎌쓬
           </button>
         </div>
 
@@ -512,13 +498,13 @@ export function AdminPage(): string {
           class="watcher-event-list"
         >
           <div class="admin-empty">
-            이벤트를 불러오는 중입니다.
+            ?대깽?몃? 遺덈윭?ㅻ뒗 以묒엯?덈떎.
           </div>
         </div>
       </section>
 
             <!-- ==================================================
-           WATCHER 게임 등록 초안
+           WATCHER 寃뚯엫 ?깅줉 珥덉븞
            ================================================== -->
       <section
         id="watcherTransformCard"
@@ -527,11 +513,11 @@ export function AdminPage(): string {
       >
         <div class="admin-section-head">
           <div>
-            <h2>📝 게임 등록 초안</h2>
+            <h2>?뱷 寃뚯엫 ?깅줉 珥덉븞</h2>
 
             <p class="admin-hint">
-              보도자료에서 확인한 사실 정보만 입력합니다.
-              초안 저장만으로 게임이 공개되지는 않습니다.
+              蹂대룄?먮즺?먯꽌 ?뺤씤???ъ떎 ?뺣낫留??낅젰?⑸땲??
+              珥덉븞 ??λ쭔?쇰줈 寃뚯엫??怨듦컻?섏????딆뒿?덈떎.
             </p>
           </div>
 
@@ -540,7 +526,7 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            닫기
+            ?リ린
           </button>
         </div>
 
@@ -552,7 +538,7 @@ export function AdminPage(): string {
 
         <div class="admin-notice">
           <strong id="watcherTransformSourceTitle">
-            보도자료를 선택해 주세요.
+            蹂대룄?먮즺瑜??좏깮??二쇱꽭??
           </strong>
 
           <div>
@@ -564,24 +550,23 @@ export function AdminPage(): string {
               rel="noopener noreferrer"
               hidden
             >
-              공식 보도자료 열기 ↗
-            </a>
+              怨듭떇 蹂대룄?먮즺 ?닿린 ??            </a>
           </div>
         </div>
 
         <div class="watcher-transform-grid">
           <label class="admin-field">
-            <span>게임 제목</span>
+            <span>寃뚯엫 ?쒕ぉ</span>
 
             <input
               id="watcherTransformTitle"
               type="text"
-              placeholder="게임 공식 제목"
+              placeholder="寃뚯엫 怨듭떇 ?쒕ぉ"
             />
           </label>
 
           <label class="admin-field">
-            <span>플랫폼</span>
+            <span>?뚮옯??/span>
 
             <select id="watcherTransformPlatform">
               <option value="switch">
@@ -605,33 +590,33 @@ export function AdminPage(): string {
               </option>
 
               <option value="etc">
-                기타
+                湲고?
               </option>
             </select>
           </label>
 
           <label class="admin-field">
-            <span>에디션 표시명</span>
+            <span>?먮뵒???쒖떆紐?/span>
 
             <input
               id="watcherTransformEditionName"
               type="text"
-              placeholder="예: Nintendo Switch 한국어 패키지판"
+              placeholder="?? Nintendo Switch ?쒓뎅???⑦궎吏??
             />
           </label>
 
           <label class="admin-field">
-            <span>장르</span>
+            <span>?λⅤ</span>
 
             <input
               id="watcherTransformGenre"
               type="text"
-              placeholder="예: 판타지 RPG"
+              placeholder="?? ?먰?吏 RPG"
             />
           </label>
 
           <label class="admin-field">
-            <span>패키지 발매일</span>
+            <span>?⑦궎吏 諛쒕ℓ??/span>
 
             <input
               id="watcherTransformReleaseDate"
@@ -640,7 +625,7 @@ export function AdminPage(): string {
           </label>
 
           <label class="admin-field">
-            <span>예약판매 시작일</span>
+            <span>?덉빟?먮ℓ ?쒖옉??/span>
 
             <input
               id="watcherTransformPreorderStart"
@@ -649,7 +634,7 @@ export function AdminPage(): string {
           </label>
 
           <label class="admin-field">
-            <span>예약판매 종료일</span>
+            <span>?덉빟?먮ℓ 醫낅즺??/span>
 
             <input
               id="watcherTransformPreorderEnd"
@@ -658,7 +643,7 @@ export function AdminPage(): string {
           </label>
 
           <label class="admin-field">
-            <span>가격 후보</span>
+            <span>媛寃??꾨낫</span>
 
             <input
               id="watcherTransformCandidatePrice"
@@ -666,33 +651,33 @@ export function AdminPage(): string {
               min="1"
               step="1"
               inputmode="numeric"
-              placeholder="예: 44800"
+              placeholder="?? 44800"
             />
           </label>
         </div>
 
         <label class="admin-field">
-          <span>예약 구매 특전</span>
+          <span>?덉빟 援щℓ ?뱀쟾</span>
 
           <input
             id="watcherTransformBonus"
             type="text"
-            placeholder="예: 멀티 클리너"
+            placeholder="?? 硫???대━??
           />
         </label>
 
         <label class="admin-field">
-          <span>특전 참고사항</span>
+          <span>?뱀쟾 李멸퀬?ы빆</span>
 
           <textarea
             id="watcherTransformBonusNote"
             rows="3"
-            placeholder="예: 약 200 × 200mm, 수량 한정, 조기 소진 가능"
+            placeholder="?? ??200 횞 200mm, ?섎웾 ?쒖젙, 議곌린 ?뚯쭊 媛??
           ></textarea>
         </label>
 
         <label class="admin-field">
-          <span>공식 트레일러 URL</span>
+          <span>怨듭떇 ?몃젅?쇰윭 URL</span>
 
           <input
             id="watcherTransformTrailer"
@@ -702,7 +687,7 @@ export function AdminPage(): string {
         </label>
 
   <!-- ==================================================
-       WATCHER 대표 이미지 후보
+       WATCHER ????대?吏 ?꾨낫
        ================================================== -->
   <div
     id="watcherTransformImageSection"
@@ -710,12 +695,10 @@ export function AdminPage(): string {
   >
     <div class="admin-section-head">
       <div>
-        <h3>🖼️ 공식 이미지 후보</h3>
+        <h3>?뼹截?怨듭떇 ?대?吏 ?꾨낫</h3>
 
         <p class="admin-hint">
-          공식 보도자료에서 수집된 이미지 중 대표 이미지 후보를
-          한 장 선택합니다. 후보 선택만으로 이미지를 다운로드하거나
-          공개하지 않습니다.
+          怨듭떇 蹂대룄?먮즺?먯꽌 ?섏쭛???대?吏 以?????대?吏 ?꾨낫瑜?          ?????좏깮?⑸땲?? ?꾨낫 ?좏깮留뚯쑝濡??대?吏瑜??ㅼ슫濡쒕뱶?섍굅??          怨듦컻?섏? ?딆뒿?덈떎.
         </p>
       </div>
 
@@ -723,18 +706,17 @@ export function AdminPage(): string {
         id="watcherTransformImageCount"
         class="watcher-badge"
       >
-        0개
-      </span>
+        0媛?      </span>
     </div>
 
     <div
       id="watcherTransformImagePolicy"
       class="admin-notice"
     >
-      <strong>이미지 정책 확인 중</strong>
+      <strong>?대?吏 ?뺤콉 ?뺤씤 以?/strong>
 
       <p class="admin-hint">
-        출처의 이미지 사용 정책과 게임 등록 상태를 확인합니다.
+        異쒖쿂???대?吏 ?ъ슜 ?뺤콉怨?寃뚯엫 ?깅줉 ?곹깭瑜??뺤씤?⑸땲??
       </p>
     </div>
 
@@ -743,7 +725,7 @@ export function AdminPage(): string {
       class="admin-notice"
       hidden
     >
-      <strong>선택된 대표 이미지</strong>
+      <strong>?좏깮??????대?吏</strong>
 
       <p
         id="watcherTransformSelectedImageText"
@@ -758,11 +740,10 @@ export function AdminPage(): string {
     >
       <div class="admin-section-head">
         <div>
-          <strong>🔒 비공개 R2 이미지 미리보기</strong>
+          <strong>?뵏 鍮꾧났媛?R2 ?대?吏 誘몃━蹂닿린</strong>
 
           <p class="admin-hint">
-            관리자 인증 API를 통해 비공개 R2 이미지를 임시로
-            불러옵니다. 이 미리보기는 공개 URL이 아닙니다.
+            愿由ъ옄 ?몄쬆 API瑜??듯빐 鍮꾧났媛?R2 ?대?吏瑜??꾩떆濡?            遺덈윭?듬땲?? ??誘몃━蹂닿린??怨듦컻 URL???꾨떃?덈떎.
           </p>
         </div>
 
@@ -772,7 +753,7 @@ export function AdminPage(): string {
           type="button"
           disabled
         >
-          관리자 미리보기 불러오기
+          愿由ъ옄 誘몃━蹂닿린 遺덈윭?ㅺ린
         </button>
       </div>
 
@@ -784,7 +765,7 @@ export function AdminPage(): string {
         <img
           id="watcherTransformPreviewImage"
           class="watcher-private-preview-image"
-          alt="선택된 게임 대표 이미지 비공개 미리보기"
+          alt="?좏깮??寃뚯엫 ????대?吏 鍮꾧났媛?誘몃━蹂닿린"
         />
       </div>
 
@@ -792,7 +773,7 @@ export function AdminPage(): string {
         id="watcherTransformPreviewInfo"
         class="admin-hint"
       >
-        저장된 대표 이미지를 선택해 주세요.
+        ??λ맂 ????대?吏瑜??좏깮??二쇱꽭??
       </p>
 
       <p
@@ -808,7 +789,7 @@ export function AdminPage(): string {
       class="watcher-transform-image-grid"
     >
       <div class="admin-empty">
-        보도자료를 열면 공식 이미지 후보를 불러옵니다.
+        蹂대룄?먮즺瑜??대㈃ 怨듭떇 ?대?吏 ?꾨낫瑜?遺덈윭?듬땲??
       </div>
     </div>
 
@@ -819,19 +800,17 @@ export function AdminPage(): string {
     ></p>
 
     <div class="admin-notice">
-      <strong>현재 단계의 안전 원칙</strong>
+      <strong>?꾩옱 ?④퀎???덉쟾 ?먯튃</strong>
 
       <p class="admin-hint">
-      대표 이미지 후보 선택 후 공식 원본을 비공개 R2에 저장할 수
-      있습니다. R2 저장만으로 게임은 공개되지 않으며,
-      games.image_url과 공개 상태는 변경하지 않습니다.
+      ????대?吏 ?꾨낫 ?좏깮 ??怨듭떇 ?먮낯??鍮꾧났媛?R2????ν븷 ??      ?덉뒿?덈떎. R2 ??λ쭔?쇰줈 寃뚯엫? 怨듦컻?섏? ?딆쑝硫?
+      games.image_url怨?怨듦컻 ?곹깭??蹂寃쏀븯吏 ?딆뒿?덈떎.
       </p>
     </div>
   </div>
 
         <!-- ================================================
-             WATCHER 최종 공개 화면 검수
-             실제 공개 처리 없음
+             WATCHER 理쒖쥌 怨듦컻 ?붾㈃ 寃??             ?ㅼ젣 怨듦컻 泥섎━ ?놁쓬
              ================================================ -->
         <section
           id="watcherFinalReview"
@@ -840,18 +819,16 @@ export function AdminPage(): string {
         >
           <div class="admin-section-head">
             <div>
-              <h3>👁️ 최종 공개 화면 검수</h3>
+              <h3>?몓截?理쒖쥌 怨듦컻 ?붾㈃ 寃??/h3>
 
               <p class="admin-hint">
-                현재 입력값과 비공개 R2 이미지를 실제 공개 화면과
-                비슷한 형태로 확인합니다. 이 카드는 조회 전용이며
-                게임 공개 상태를 변경하지 않습니다.
+                ?꾩옱 ?낅젰媛믨낵 鍮꾧났媛?R2 ?대?吏瑜??ㅼ젣 怨듦컻 ?붾㈃怨?                鍮꾩듂???뺥깭濡??뺤씤?⑸땲?? ??移대뱶??議고쉶 ?꾩슜?대ŉ
+                寃뚯엫 怨듦컻 ?곹깭瑜?蹂寃쏀븯吏 ?딆뒿?덈떎.
               </p>
             </div>
 
             <span class="watcher-badge watcher-final-draft-badge">
-              DRAFT · 비공개
-            </span>
+              DRAFT 쨌 鍮꾧났媛?            </span>
           </div>
 
           <article class="watcher-final-card">
@@ -859,7 +836,7 @@ export function AdminPage(): string {
               <img
                 id="watcherFinalImage"
                 class="watcher-final-image"
-                alt="게임 대표 이미지 최종 검수"
+                alt="寃뚯엫 ????대?吏 理쒖쥌 寃??
                 hidden
               />
 
@@ -867,9 +844,9 @@ export function AdminPage(): string {
                 id="watcherFinalImagePlaceholder"
                 class="watcher-final-image-placeholder"
               >
-                🔒
+                ?뵏
                 <span>
-                  관리자 R2 미리보기를 먼저 불러와 주세요.
+                  愿由ъ옄 R2 誘몃━蹂닿린瑜?癒쇱? 遺덈윭? 二쇱꽭??
                 </span>
               </div>
             </div>
@@ -880,55 +857,52 @@ export function AdminPage(): string {
                   id="watcherFinalPlatform"
                   class="watcher-badge"
                 >
-                  플랫폼 미입력
-                </span>
+                  ?뚮옯??誘몄엯??                </span>
 
                 <span
                   id="watcherFinalGameId"
                   class="watcher-badge"
                 >
-                  게임 DRAFT
+                  寃뚯엫 DRAFT
                 </span>
               </div>
 
               <h3 id="watcherFinalTitle">
-                게임 제목 미입력
-              </h3>
+                寃뚯엫 ?쒕ぉ 誘몄엯??              </h3>
 
               <p
                 id="watcherFinalEdition"
                 class="watcher-final-edition"
               >
-                에디션 표시명 미입력
-              </p>
+                ?먮뵒???쒖떆紐?誘몄엯??              </p>
 
               <dl class="watcher-final-meta">
                 <div>
-                  <dt>발매일</dt>
+                  <dt>諛쒕ℓ??/dt>
                   <dd id="watcherFinalReleaseDate">-</dd>
                 </div>
 
                 <div>
-                  <dt>예약판매 기간</dt>
+                  <dt>?덉빟?먮ℓ 湲곌컙</dt>
                   <dd id="watcherFinalPreorderPeriod">-</dd>
                 </div>
 
                 <div>
-                  <dt>가격 후보</dt>
-                  <dd id="watcherFinalPrice">미확정</dd>
+                  <dt>媛寃??꾨낫</dt>
+                  <dd id="watcherFinalPrice">誘명솗??/dd>
                 </div>
 
                 <div>
-                  <dt>장르</dt>
+                  <dt>?λⅤ</dt>
                   <dd id="watcherFinalGenre">-</dd>
                 </div>
               </dl>
 
               <section class="watcher-final-bonus">
-                <strong>🎁 예약 구매 특전</strong>
+                <strong>?럞 ?덉빟 援щℓ ?뱀쟾</strong>
 
                 <p id="watcherFinalBonus">
-                  등록된 특전 정보가 없습니다.
+                  ?깅줉???뱀쟾 ?뺣낫媛 ?놁뒿?덈떎.
                 </p>
 
                 <p
@@ -946,8 +920,7 @@ export function AdminPage(): string {
                   rel="noopener noreferrer"
                   hidden
                 >
-                  공식 보도자료 확인 ↗
-                </a>
+                  怨듭떇 蹂대룄?먮즺 ?뺤씤 ??                </a>
 
                 <a
                   id="watcherFinalTrailerLink"
@@ -957,13 +930,12 @@ export function AdminPage(): string {
                   rel="noopener noreferrer"
                   hidden
                 >
-                  공식 트레일러 확인 ↗
-                </a>
+                  怨듭떇 ?몃젅?쇰윭 ?뺤씤 ??                </a>
               </div>
 
               <footer class="watcher-final-credit">
                 <p id="watcherFinalCredit">
-                  출처 정보를 확인해 주세요.
+                  異쒖쿂 ?뺣낫瑜??뺤씤??二쇱꽭??
                 </p>
 
                 <p id="watcherFinalCopyright"></p>
@@ -972,12 +944,12 @@ export function AdminPage(): string {
           </article>
 
           <div class="admin-notice watcher-final-safety">
-            <strong>현재 검수 상태</strong>
+            <strong>?꾩옱 寃???곹깭</strong>
 
             <p class="admin-hint">
-              이 화면은 관리자 브라우저에서 생성한 Blob 이미지와
-              입력값만 조합합니다. games.image_url, 게임 공개 상태,
-              예약판매 공개 상태는 변경하지 않습니다.
+              ???붾㈃? 愿由ъ옄 釉뚮씪?곗??먯꽌 ?앹꽦??Blob ?대?吏?
+              ?낅젰媛믩쭔 議고빀?⑸땲?? games.image_url, 寃뚯엫 怨듦컻 ?곹깭,
+              ?덉빟?먮ℓ 怨듦컻 ?곹깭??蹂寃쏀븯吏 ?딆뒿?덈떎.
             </p>
           </div>
         </section>
@@ -989,15 +961,14 @@ export function AdminPage(): string {
             class="btn btn-primary"
             type="button"
           >
-            초안 저장
-          </button>
+            珥덉븞 ???          </button>
             <button
               id="registerWatcherDraft"
               class="btn"
               type="button"
               disabled
             >
-              초안 저장 후 등록
+              珥덉븞 ??????깅줉
             </button>
 
           <button
@@ -1005,7 +976,7 @@ export function AdminPage(): string {
             class="btn"
             type="button"
           >
-            취소
+            痍⑥냼
           </button>
         </div>
 
@@ -1020,10 +991,10 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>🏢 수집 출처 및 이미지 정책</h2>
+            <h2>?룫 ?섏쭛 異쒖쿂 諛??대?吏 ?뺤콉</h2>
             <p class="admin-hint">
-              PENDING은 사용 허가를 의미하지 않습니다.
-              회신 전에는 관리자 후보 확인만 가능합니다.
+              PENDING? ?ъ슜 ?덇?瑜??섎??섏? ?딆뒿?덈떎.
+              ?뚯떊 ?꾩뿉??愿由ъ옄 ?꾨낫 ?뺤씤留?媛?ν빀?덈떎.
             </p>
           </div>
         </div>
@@ -1033,7 +1004,7 @@ export function AdminPage(): string {
           class="watcher-source-list"
         >
           <div class="admin-empty">
-            출처 정보를 불러오는 중입니다.
+            異쒖쿂 ?뺣낫瑜?遺덈윭?ㅻ뒗 以묒엯?덈떎.
           </div>
         </div>
       </section>
@@ -1041,9 +1012,9 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>📰 발견된 공식 보도자료</h2>
+            <h2>?벐 諛쒓껄??怨듭떇 蹂대룄?먮즺</h2>
             <p class="admin-hint">
-              최신 발견 항목 50개를 표시합니다.
+              理쒖떊 諛쒓껄 ??ぉ 50媛쒕? ?쒖떆?⑸땲??
             </p>
           </div>
         </div>
@@ -1053,26 +1024,25 @@ export function AdminPage(): string {
           class="watcher-item-list"
         >
           <div class="admin-empty">
-            수집 항목을 불러오는 중입니다.
+            ?섏쭛 ??ぉ??遺덈윭?ㅻ뒗 以묒엯?덈떎.
           </div>
         </div>
       </section>
 
       <section class="admin-card">
-        <h2>🔒 현재 이미지 운영 원칙</h2>
+        <h2>?뵏 ?꾩옱 ?대?吏 ?댁쁺 ?먯튃</h2>
 
         <div class="admin-notice">
-          이미지 정책이 PENDING인 출처는 공식 이미지 URL만 후보로
-          기록합니다. 사이트 공개, 자체 저장, 리사이즈 및 재배포는
-          허가 범위가 확인될 때까지 차단합니다.
+          ?대?吏 ?뺤콉??PENDING??異쒖쿂??怨듭떇 ?대?吏 URL留??꾨낫濡?          湲곕줉?⑸땲?? ?ъ씠??怨듦컻, ?먯껜 ??? 由ъ궗?댁쫰 諛??щ같?щ뒗
+          ?덇? 踰붿쐞媛 ?뺤씤???뚭퉴吏 李⑤떒?⑸땲??
         </div>
       </section>
     </section>
 
 
     <!-- ====================================================
-         사전예약 V2
-         플랫폼 → 상품 에디션 → 예약판매
+         ?ъ쟾?덉빟 V2
+         ?뚮옯?????곹뭹 ?먮뵒?????덉빟?먮ℓ
          ==================================================== -->
     <section
       class="admin-panel"
@@ -1082,11 +1052,11 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>🛒 사전예약 V2</h2>
+            <h2>?썟 ?ъ쟾?덉빟 V2</h2>
             <p class="admin-hint">
-              WATCHER가 생성한 비공개 DRAFT 게임에 플랫폼별
-              통상판·한정판·디럭스 에디션을 등록합니다.
-              기존 Legacy 가격과 네이버 수집기는 변경하지 않습니다.
+              WATCHER媛 ?앹꽦??鍮꾧났媛?DRAFT 寃뚯엫???뚮옯?쇰퀎
+              ?듭긽?먃룻븳?뺥뙋쨌?붾윮???먮뵒?섏쓣 ?깅줉?⑸땲??
+              湲곗〈 Legacy 媛寃⑷낵 ?ㅼ씠踰??섏쭛湲곕뒗 蹂寃쏀븯吏 ?딆뒿?덈떎.
             </p>
           </div>
 
@@ -1095,21 +1065,19 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            새로고침
+            ?덈줈怨좎묠
           </button>
         </div>
 
         <div class="admin-notice">
-          이 화면에서 저장하는 게임·상품 에디션·예약판매 정보는
-          모두 DRAFT입니다. 저장만으로 메인이나 공개 게임 화면에
-          표시되지 않습니다.
+          ???붾㈃?먯꽌 ??ν븯??寃뚯엫쨌?곹뭹 ?먮뵒?샕룹삁?쏀뙋留??뺣낫??          紐⑤몢 DRAFT?낅땲?? ??λ쭔?쇰줈 硫붿씤?대굹 怨듦컻 寃뚯엫 ?붾㈃??          ?쒖떆?섏? ?딆뒿?덈떎.
         </div>
 
         <label class="admin-field">
-          <span>비공개 DRAFT 게임</span>
+          <span>鍮꾧났媛?DRAFT 寃뚯엫</span>
           <select id="preorderV2Game">
             <option value="">
-              게임을 선택해 주세요.
+              寃뚯엫???좏깮??二쇱꽭??
             </option>
           </select>
         </label>
@@ -1129,7 +1097,7 @@ export function AdminPage(): string {
         <div class="admin-section-head">
           <div>
             <h2 id="preorderV2GameTitle">
-              상품 에디션 등록
+              ?곹뭹 ?먮뵒???깅줉
             </h2>
 
             <p
@@ -1143,17 +1111,16 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            새 에디션
-          </button>
+            ???먮뵒??          </button>
         </div>
 
         <form id="preorderV2Form">
           <div class="preorder-v2-section">
-            <h3>1. 플랫폼</h3>
+            <h3>1. ?뚮옯??/h3>
 
             <div class="preorder-v2-grid preorder-v2-grid-2">
               <label class="admin-field">
-                <span>플랫폼</span>
+                <span>?뚮옯??/span>
                 <select
                   id="preorderV2Platform"
                   required
@@ -1177,17 +1144,17 @@ export function AdminPage(): string {
                     PC
                   </option>
                   <option value="etc">
-                    기타
+                    湲고?
                   </option>
                 </select>
               </label>
 
               <label class="admin-field">
-                <span>플랫폼판 표시명</span>
+                <span>?뚮옯?쇳뙋 ?쒖떆紐?/span>
                 <input
                   type="text"
                   id="preorderV2PlatformEditionName"
-                  placeholder="예: Nintendo Switch 한국어 패키지판"
+                  placeholder="?? Nintendo Switch ?쒓뎅???⑦궎吏??
                   maxlength="100"
                 />
               </label>
@@ -1195,38 +1162,38 @@ export function AdminPage(): string {
           </div>
 
           <div class="preorder-v2-section">
-            <h3>2. 상품 에디션</h3>
+            <h3>2. ?곹뭹 ?먮뵒??/h3>
 
             <div class="preorder-v2-grid preorder-v2-grid-2">
               <label class="admin-field">
-                <span>에디션 종류</span>
+                <span>?먮뵒??醫낅쪟</span>
                 <select
                   id="preorderV2VariantKind"
                   required
                 >
-                  <option value="STANDARD">통상판</option>
-                  <option value="DELUXE">디럭스</option>
-                  <option value="ULTIMATE">얼티밋</option>
-                  <option value="LIMITED">한정판</option>
-                  <option value="COLLECTORS">컬렉터스</option>
-                  <option value="OTHER">기타</option>
+                  <option value="STANDARD">?듭긽??/option>
+                  <option value="DELUXE">?붾윮??/option>
+                  <option value="ULTIMATE">?쇳떚諛?/option>
+                  <option value="LIMITED">?쒖젙??/option>
+                  <option value="COLLECTORS">而щ젆?곗뒪</option>
+                  <option value="OTHER">湲고?</option>
                 </select>
               </label>
 
               <label class="admin-field">
-                <span>상품 형태</span>
+                <span>?곹뭹 ?뺥깭</span>
                 <select
                   id="preorderV2PackageType"
                   required
                 >
-                  <option value="PACKAGE">패키지</option>
-                  <option value="DIGITAL">디지털</option>
-                  <option value="BOTH">패키지·디지털 공통</option>
+                  <option value="PACKAGE">?⑦궎吏</option>
+                  <option value="DIGITAL">?붿???/option>
+                  <option value="BOTH">?⑦궎吏쨌?붿???怨듯넻</option>
                 </select>
               </label>
 
               <label class="admin-field">
-                <span>에디션 코드</span>
+                <span>?먮뵒??肄붾뱶</span>
                 <input
                   type="text"
                   id="preorderV2VariantCode"
@@ -1238,12 +1205,12 @@ export function AdminPage(): string {
               </label>
 
               <label class="admin-field">
-                <span>에디션 표시명</span>
+                <span>?먮뵒???쒖떆紐?/span>
                 <input
                   type="text"
                   id="preorderV2VariantName"
-                  value="통상판"
-                  placeholder="예: 한국 한정판"
+                  value="?듭긽??
+                  placeholder="?? ?쒓뎅 ?쒖젙??
                   maxlength="100"
                   required
                 />
@@ -1258,12 +1225,11 @@ export function AdminPage(): string {
                   checked
                 />
                 <span>
-                  이 플랫폼의 기본 에디션
-                </span>
+                  ???뚮옯?쇱쓽 湲곕낯 ?먮뵒??                </span>
               </label>
 
               <label class="admin-field preorder-v2-order">
-                <span>표시 순서</span>
+                <span>?쒖떆 ?쒖꽌</span>
                 <input
                   type="number"
                   id="preorderV2DisplayOrder"
@@ -1275,23 +1241,23 @@ export function AdminPage(): string {
           </div>
 
           <div class="preorder-v2-section">
-            <h3>3. 공식 출처 및 일정</h3>
+            <h3>3. 怨듭떇 異쒖쿂 諛??쇱젙</h3>
 
             <label class="admin-field">
-              <span>공식 보도자료</span>
+              <span>怨듭떇 蹂대룄?먮즺</span>
               <select
                 id="preorderV2OfficialSource"
                 required
               >
                 <option value="">
-                  공식 출처를 선택해 주세요.
+                  怨듭떇 異쒖쿂瑜??좏깮??二쇱꽭??
                 </option>
               </select>
             </label>
 
             <div class="preorder-v2-grid preorder-v2-grid-3">
               <label class="admin-field">
-                <span>출시일</span>
+                <span>異쒖떆??/span>
                 <input
                   type="date"
                   id="preorderV2ReleaseDate"
@@ -1300,7 +1266,7 @@ export function AdminPage(): string {
               </label>
 
               <label class="admin-field">
-                <span>예약판매 시작일</span>
+                <span>?덉빟?먮ℓ ?쒖옉??/span>
                 <input
                   type="date"
                   id="preorderV2StartDate"
@@ -1308,7 +1274,7 @@ export function AdminPage(): string {
               </label>
 
               <label class="admin-field">
-                <span>예약판매 종료일</span>
+                <span>?덉빟?먮ℓ 醫낅즺??/span>
                 <input
                   type="date"
                   id="preorderV2EndDate"
@@ -1317,87 +1283,86 @@ export function AdminPage(): string {
             </div>
 
             <label class="admin-field">
-              <span>예약판매 상태</span>
+              <span>?덉빟?먮ℓ ?곹깭</span>
               <select id="preorderV2PreorderStatus">
-                <option value="UNKNOWN">확인 전</option>
-                <option value="UPCOMING">예정</option>
-                <option value="OPEN">진행 중</option>
-                <option value="CLOSED">종료</option>
-                <option value="CANCELLED">취소</option>
+                <option value="UNKNOWN">?뺤씤 ??/option>
+                <option value="UPCOMING">?덉젙</option>
+                <option value="OPEN">吏꾪뻾 以?/option>
+                <option value="CLOSED">醫낅즺</option>
+                <option value="CANCELLED">痍⑥냼</option>
               </select>
             </label>
           </div>
 
           <div class="preorder-v2-section">
-            <h3>4. 공식 가격</h3>
+            <h3>4. 怨듭떇 媛寃?/h3>
 
             <div class="preorder-v2-grid preorder-v2-grid-3">
               <label class="admin-field">
-                <span>가격 상태</span>
+                <span>媛寃??곹깭</span>
                 <select id="preorderV2PriceStatus">
                   <option value="UNCONFIRMED">
-                    미확정
-                  </option>
+                    誘명솗??                  </option>
                   <option value="CANDIDATE">
-                    가격 후보
+                    媛寃??꾨낫
                   </option>
                   <option value="CONFIRMED">
-                    공식 확정
+                    怨듭떇 ?뺤젙
                   </option>
                 </select>
               </label>
 
               <label class="admin-field">
-                <span>가격 후보</span>
+                <span>媛寃??꾨낫</span>
                 <input
                   type="number"
                   id="preorderV2CandidatePrice"
                   min="1"
                   step="1"
-                  placeholder="예: 59800"
+                  placeholder="?? 59800"
                 />
               </label>
 
               <label class="admin-field">
-                <span>확정 가격</span>
+                <span>?뺤젙 媛寃?/span>
                 <input
                   type="number"
                   id="preorderV2ConfirmedPrice"
                   min="1"
                   step="1"
-                  placeholder="공식 확정 후 입력"
+                  placeholder="怨듭떇 ?뺤젙 ???낅젰"
                 />
               </label>
             </div>
           </div>
 
           <div class="preorder-v2-section">
-            <h3>5. 구성품 및 예약 특전</h3>
+            <h3>5. 援ъ꽦??諛??덉빟 ?뱀쟾</h3>
 
             <label class="admin-field">
-              <span>에디션 구성품</span>
+              <span>?먮뵒??援ъ꽦??/span>
               <textarea
                 id="preorderV2Contents"
                 rows="5"
-                placeholder="예: 게임 본편, 아트북, 사운드트랙, 아크릴 스탠드"
+                placeholder="?? 寃뚯엫 蹂명렪, ?꾪듃遺? ?ъ슫?쒗듃?? ?꾪겕由??ㅽ깲??
               ></textarea>
             </label>
 
             <label class="admin-field">
-              <span>예약 구매 특전</span>
+              <span>?덉빟 援щℓ ?뱀쟾</span>
               <textarea
                 id="preorderV2Bonus"
                 rows="4"
-                placeholder="예약 구매자에게 제공되는 공식 특전"
+                placeholder="?덉빟 援щℓ?먯뿉寃??쒓났?섎뒗 怨듭떇 ?뱀쟾"
               ></textarea>
             </label>
 
             <label class="admin-field">
-              <span>특전 참고사항</span>
+              <span>?뱀쟾 李멸퀬?ы빆</span>
               <textarea
                 id="preorderV2BonusNote"
                 rows="3"
-                placeholder="수량 한정, 판매처별 차이 등"
+                placeholder="?섎웾 ?쒖젙, ?먮ℓ泥섎퀎 李⑥씠 ??
               ></textarea>
             </label>
           </div>
@@ -1405,10 +1370,9 @@ export function AdminPage(): string {
           <div class="preorder-v2-section">
             <div class="admin-section-head">
               <div>
-                <h3>6. 에디션 이미지</h3>
+                <h3>6. ?먮뵒???대?吏</h3>
                 <p class="admin-hint">
-                  선택한 공식 출처에서 승인되고 비공개 R2에
-                  저장된 이미지만 연결할 수 있습니다.
+                  ?좏깮??怨듭떇 異쒖쿂?먯꽌 ?뱀씤?섍퀬 鍮꾧났媛?R2??                  ??λ맂 ?대?吏留??곌껐?????덉뒿?덈떎.
                 </p>
               </div>
             </div>
@@ -1418,7 +1382,7 @@ export function AdminPage(): string {
               class="preorder-v2-images"
             >
               <div class="admin-empty">
-                공식 출처를 선택해 주세요.
+                怨듭떇 異쒖쿂瑜??좏깮??二쇱꽭??
               </div>
             </div>
           </div>
@@ -1429,8 +1393,7 @@ export function AdminPage(): string {
               class="btn btn-primary"
               type="submit"
             >
-              DRAFT 저장
-            </button>
+              DRAFT ???            </button>
           </div>
         </form>
       </section>
@@ -1442,9 +1405,9 @@ export function AdminPage(): string {
       >
         <div class="admin-section-head">
           <div>
-            <h2>등록된 상품 에디션</h2>
+            <h2>?깅줉???곹뭹 ?먮뵒??/h2>
             <p class="admin-hint">
-              플랫폼과 에디션별로 분리된 사전예약 DRAFT입니다.
+              ?뚮옯?쇨낵 ?먮뵒?섎퀎濡?遺꾨━???ъ쟾?덉빟 DRAFT?낅땲??
             </p>
           </div>
         </div>
@@ -1458,7 +1421,7 @@ export function AdminPage(): string {
 
 
     <!-- ====================================================
-         탭 3: 후보 선별
+         ??3: ?꾨낫 ?좊퀎
          ==================================================== -->
     <section
       class="admin-panel"
@@ -1468,10 +1431,10 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>📊 후보 게임 자동 선별</h2>
+            <h2>?뱤 ?꾨낫 寃뚯엫 ?먮룞 ?좊퀎</h2>
             <p class="admin-hint">
-              후보명을 한꺼번에 입력하면 기존 등록 여부와 네이버 쇼핑
-              검색 결과를 바탕으로 추천·검토·제외로 분류합니다.
+              ?꾨낫紐낆쓣 ?쒓볼踰덉뿉 ?낅젰?섎㈃ 湲곗〈 ?깅줉 ?щ?? ?ㅼ씠踰??쇳븨
+              寃??寃곌낵瑜?諛뷀깢?쇰줈 異붿쿇쨌寃?졖룹젣?몃줈 遺꾨쪟?⑸땲??
             </p>
           </div>
 
@@ -1480,13 +1443,12 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            임시 작업 초기화
-          </button>
+            ?꾩떆 ?묒뾽 珥덇린??          </button>
         </div>
 
         <div class="candidate-options">
           <label class="admin-field candidate-option">
-            <span>대상 플랫폼</span>
+            <span>????뚮옯??/span>
 
             <select id="candidatePlatform">
               <option value="switch">SWITCH</option>
@@ -1499,10 +1461,10 @@ export function AdminPage(): string {
           </label>
 
           <label class="admin-field candidate-option">
-            <span>출시연도 또는 순위연도</span>
+            <span>異쒖떆?곕룄 ?먮뒗 ?쒖쐞?곕룄</span>
 
             <select id="candidateYear">
-              <option value="">연도 미지정</option>
+              <option value="">?곕룄 誘몄???/option>
               <option value="2026">2026</option>
               <option value="2025">2025</option>
               <option value="2024">2024</option>
@@ -1518,30 +1480,27 @@ export function AdminPage(): string {
         </div>
 
         <label class="admin-field">
-          <span>후보 게임명</span>
+          <span>?꾨낫 寃뚯엫紐?/span>
 
           <textarea
             id="candidateTitles"
             class="admin-textarea candidate-textarea"
             rows="12"
-            placeholder="한 줄에 게임 하나씩 붙여넣으세요.&#10;&#10;예)&#10;피크민 4&#10;슈퍼 마리오브라더스 원더&#10;젤다의 전설 티어스 오브 더 킹덤"
+            placeholder="??以꾩뿉 寃뚯엫 ?섎굹??遺숈뿬?ｌ쑝?몄슂.&#10;&#10;??&#10;?쇳겕誘?4&#10;?덊띁 留덈━?ㅻ툕?쇰뜑???먮뜑&#10;?ㅻ떎???꾩꽕 ?곗뼱???ㅻ툕 ???밸뜡"
           ></textarea>
         </label>
 
         <div class="candidate-input-summary">
           <span>
-            입력:
-            <b id="candidateInputCount">0</b>개
-          </span>
+            ?낅젰:
+            <b id="candidateInputCount">0</b>媛?          </span>
 
           <span>
-            중복 제거 후:
-            <b id="candidateUniqueCount">0</b>개
-          </span>
+            以묐났 ?쒓굅 ??
+            <b id="candidateUniqueCount">0</b>媛?          </span>
 
           <span>
-            한 번에 최대 100개
-          </span>
+            ??踰덉뿉 理쒕? 100媛?          </span>
         </div>
 
         <div class="admin-row admin-row-wrap">
@@ -1550,7 +1509,7 @@ export function AdminPage(): string {
             class="btn btn-primary"
             type="button"
           >
-            🔍 후보 자동 평가 시작
+            ?뵇 ?꾨낫 ?먮룞 ?됯? ?쒖옉
           </button>
 
           <button
@@ -1559,7 +1518,7 @@ export function AdminPage(): string {
             type="button"
             disabled
           >
-            평가 중단
+            ?됯? 以묐떒
           </button>
 
           <button
@@ -1567,7 +1526,7 @@ export function AdminPage(): string {
             class="btn"
             type="button"
           >
-            임시 저장 복원
+            ?꾩떆 ???蹂듭썝
           </button>
         </div>
 
@@ -1584,8 +1543,7 @@ export function AdminPage(): string {
         >
           <div class="candidate-progress-head">
             <span id="candidateProgressText">
-              평가 준비 중
-            </span>
+              ?됯? 以鍮?以?            </span>
 
             <span id="candidateProgressPercent">
               0%
@@ -1619,10 +1577,10 @@ export function AdminPage(): string {
       >
         <div class="admin-section-head">
           <div>
-            <h2>📋 평가 결과</h2>
+            <h2>?뱥 ?됯? 寃곌낵</h2>
 
             <p class="admin-hint">
-              점수와 판정 이유를 확인한 뒤 등록할 게임만 선택하세요.
+              ?먯닔? ?먯젙 ?댁쑀瑜??뺤씤?????깅줉??寃뚯엫留??좏깮?섏꽭??
             </p>
           </div>
 
@@ -1632,8 +1590,7 @@ export function AdminPage(): string {
             type="button"
             hidden
           >
-            실패 항목 재시도
-          </button>
+            ?ㅽ뙣 ??ぉ ?ъ떆??          </button>
         </div>
 
         <div class="candidate-summary-grid">
@@ -1642,7 +1599,7 @@ export function AdminPage(): string {
             class="candidate-summary is-active"
             data-candidate-filter="all"
           >
-            <span>전체</span>
+            <span>?꾩껜</span>
             <strong id="candidateCountAll">0</strong>
           </button>
 
@@ -1651,7 +1608,7 @@ export function AdminPage(): string {
             class="candidate-summary candidate-summary-recommend"
             data-candidate-filter="recommend"
           >
-            <span>추천</span>
+            <span>異붿쿇</span>
             <strong id="candidateCountRecommend">0</strong>
           </button>
 
@@ -1660,7 +1617,7 @@ export function AdminPage(): string {
             class="candidate-summary candidate-summary-review"
             data-candidate-filter="review"
           >
-            <span>검토</span>
+            <span>寃??/span>
             <strong id="candidateCountReview">0</strong>
           </button>
 
@@ -1669,7 +1626,7 @@ export function AdminPage(): string {
             class="candidate-summary candidate-summary-exclude"
             data-candidate-filter="exclude"
           >
-            <span>제외</span>
+            <span>?쒖쇅</span>
             <strong id="candidateCountExclude">0</strong>
           </button>
 
@@ -1678,7 +1635,7 @@ export function AdminPage(): string {
             class="candidate-summary candidate-summary-existing"
             data-candidate-filter="existing"
           >
-            <span>기등록</span>
+            <span>湲곕벑濡?/span>
             <strong id="candidateCountExisting">0</strong>
           </button>
 
@@ -1687,7 +1644,7 @@ export function AdminPage(): string {
             class="candidate-summary candidate-summary-error"
             data-candidate-filter="error"
           >
-            <span>오류</span>
+            <span>?ㅻ쪟</span>
             <strong id="candidateCountError">0</strong>
           </button>
         </div>
@@ -1699,7 +1656,7 @@ export function AdminPage(): string {
                 type="checkbox"
                 id="selectAllCandidates"
               />
-              현재 목록 전체 선택
+              ?꾩옱 紐⑸줉 ?꾩껜 ?좏깮
             </label>
 
             <button
@@ -1707,7 +1664,7 @@ export function AdminPage(): string {
               class="btn btn-sm"
               type="button"
             >
-              추천만 선택
+              異붿쿇留??좏깮
             </button>
 
             <button
@@ -1715,29 +1672,25 @@ export function AdminPage(): string {
               class="btn btn-sm"
               type="button"
             >
-              선택 해제
+              ?좏깮 ?댁젣
             </button>
           </div>
 
           <div class="candidate-toolbar-right">
             <label class="candidate-sort-label">
-              정렬
+              ?뺣젹
 
               <select id="candidateSort">
                 <option value="score-desc">
-                  점수 높은 순
-                </option>
+                  ?먯닔 ?믪? ??                </option>
                 <option value="stores-desc">
-                  판매처 많은 순
-                </option>
+                  ?먮ℓ泥?留롮? ??                </option>
                 <option value="price-spread-desc">
-                  가격 차이 큰 순
-                </option>
+                  媛寃?李⑥씠 ????                </option>
                 <option value="name-asc">
-                  이름 순
-                </option>
+                  ?대쫫 ??                </option>
                 <option value="input-order">
-                  입력 순서
+                  ?낅젰 ?쒖꽌
                 </option>
               </select>
             </label>
@@ -1751,8 +1704,7 @@ export function AdminPage(): string {
 
         <div class="candidate-bottom-bar">
           <div class="candidate-selected-info">
-            <b id="candidateSelectedCount">0</b>개 선택됨
-          </div>
+            <b id="candidateSelectedCount">0</b>媛??좏깮??          </div>
 
           <button
             id="sendCandidatesToImport"
@@ -1760,15 +1712,13 @@ export function AdminPage(): string {
             type="button"
             disabled
           >
-            선택 후보를 게임 가져오기로 보내기
-          </button>
+            ?좏깮 ?꾨낫瑜?寃뚯엫 媛?몄삤湲곕줈 蹂대궡湲?          </button>
         </div>
       </section>
     </section>
 
     <!-- ====================================================
-         탭 4: 게임 가져오기
-         ==================================================== -->
+         ??4: 寃뚯엫 媛?몄삤湲?         ==================================================== -->
     <section
       class="admin-panel"
       data-admin-panel="import"
@@ -1777,11 +1727,10 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>🤖 게임 자동 가져오기</h2>
+            <h2>?쨼 寃뚯엫 ?먮룞 媛?몄삤湲?/h2>
 
             <p class="admin-hint">
-              한 행이 하나의 게임입니다. 먼저 미리보기로 검색 결과를
-              확인하고 문제가 없을 때만 실제 저장을 실행하세요.
+              ???됱씠 ?섎굹??寃뚯엫?낅땲?? 癒쇱? 誘몃━蹂닿린濡?寃??寃곌낵瑜?              ?뺤씤?섍퀬 臾몄젣媛 ?놁쓣 ?뚮쭔 ?ㅼ젣 ??μ쓣 ?ㅽ뻾?섏꽭??
             </p>
           </div>
 
@@ -1790,39 +1739,36 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            입력 행 초기화
-          </button>
+            ?낅젰 ??珥덇린??          </button>
         </div>
 
         <div class="admin-notice">
-          후보 선별에서 전달된 게임은 기존 입력 행을 덮어쓰지 않고
-          아래쪽에 추가됩니다. 이미 같은 이름이 입력돼 있으면 중복으로
-          추가하지 않습니다.
+          ?꾨낫 ?좊퀎?먯꽌 ?꾨떖??寃뚯엫? 湲곗〈 ?낅젰 ?됱쓣 ??뼱?곗? ?딄퀬
+          ?꾨옒履쎌뿉 異붽??⑸땲?? ?대? 媛숈? ?대쫫???낅젰???덉쑝硫?以묐났?쇰줈
+          異붽??섏? ?딆뒿?덈떎.
         </div>
 
         <details class="admin-details">
-          <summary>입력 항목 사용법 보기</summary>
+          <summary>?낅젰 ??ぉ ?ъ슜踰?蹂닿린</summary>
 
           <div class="admin-details-body">
             <ul class="admin-help-list">
               <li>
-                <b>대표 이름</b>: 사이트에 표시할 게임명입니다.
+                <b>????대쫫</b>: ?ъ씠?몄뿉 ?쒖떆??寃뚯엫紐낆엯?덈떎.
               </li>
               <li>
-                <b>키워드</b>: 시리즈물에서 특정 작품을 구분할 때
-                사용합니다. 쉼표로 여러 개 입력할 수 있습니다.
+                <b>?ㅼ썙??/b>: ?쒕━利덈Ъ?먯꽌 ?뱀젙 ?묓뭹??援щ텇????                ?ъ슜?⑸땲?? ?쇳몴濡??щ윭 媛??낅젰?????덉뒿?덈떎.
               </li>
               <li>
-                <b>제외어</b>: 파생판이나 스핀오프 등을 제외할 때
-                사용합니다.
+                <b>?쒖쇅??/b>: ?뚯깮?먯씠???ㅽ??ㅽ봽 ?깆쓣 ?쒖쇅????                ?ъ슜?⑸땲??
               </li>
               <li>
-                <b>이미지 URL</b>: 비우면 네이버 결과에서 자동
-                수집합니다.
+                <b>?대?吏 URL</b>: 鍮꾩슦硫??ㅼ씠踰?寃곌낵?먯꽌 ?먮룞
+                ?섏쭛?⑸땲??
               </li>
               <li>
-                <b>스위치 정책</b>: Switch 1·Switch 2 분류가
-                애매할 때만 지정합니다.
+                <b>?ㅼ쐞移??뺤콉</b>: Switch 1쨌Switch 2 遺꾨쪟媛
+                ?좊ℓ???뚮쭔 吏?뺥빀?덈떎.
               </li>
             </ul>
           </div>
@@ -1831,27 +1777,25 @@ export function AdminPage(): string {
         <div class="ig-table">
           <div class="ig-head">
             <span class="ig-col-name">
-              대표 이름
+              ????대쫫
             </span>
 
             <span class="ig-col-keywords">
-              키워드
-            </span>
+              ?ㅼ썙??            </span>
 
             <span class="ig-col-bottom">
-              제외어 / 이미지 URL / 스위치 정책
+              ?쒖쇅??/ ?대?吏 URL / ?ㅼ쐞移??뺤콉
             </span>
 
             <span class="ig-col-exclude">
-              제외어
-            </span>
+              ?쒖쇅??            </span>
 
             <span class="ig-col-image">
-              이미지 URL
+              ?대?吏 URL
             </span>
 
             <span class="ig-col-policy">
-              스위치 정책
+              ?ㅼ쐞移??뺤콉
             </span>
 
             <span class="ig-col-act"></span>
@@ -1866,7 +1810,7 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            ➕ 행 추가
+            ????異붽?
           </button>
 
           <button
@@ -1874,7 +1818,7 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            빈 행 정리
+            鍮????뺣━
           </button>
         </div>
 
@@ -1884,7 +1828,7 @@ export function AdminPage(): string {
             class="btn"
             type="button"
           >
-            🔍 미리보기
+            ?뵇 誘몃━蹂닿린
           </button>
 
           <button
@@ -1892,8 +1836,7 @@ export function AdminPage(): string {
             class="btn btn-primary"
             type="button"
           >
-            ⬇️ 실제 저장
-          </button>
+            燧뉛툘 ?ㅼ젣 ???          </button>
         </div>
 
         <p
@@ -1910,8 +1853,7 @@ export function AdminPage(): string {
     </section>
 
     <!-- ====================================================
-         탭 5: 게임 관리
-         ==================================================== -->
+         ??5: 寃뚯엫 愿由?         ==================================================== -->
     <section
       class="admin-panel"
       data-admin-panel="games"
@@ -1920,11 +1862,10 @@ export function AdminPage(): string {
       <section class="admin-card">
         <div class="admin-section-head">
           <div>
-            <h2>🎮 등록된 게임</h2>
+            <h2>?렜 ?깅줉??寃뚯엫</h2>
 
             <p class="admin-hint">
-              현재 등록된 게임을 확인하거나 선택한 게임을 삭제할 수
-              있습니다.
+              ?꾩옱 ?깅줉??寃뚯엫???뺤씤?섍굅???좏깮??寃뚯엫????젣????              ?덉뒿?덈떎.
             </p>
           </div>
 
@@ -1933,17 +1874,17 @@ export function AdminPage(): string {
             class="btn btn-sm"
             type="button"
           >
-            새로고침
+            ?덈줈怨좎묠
           </button>
         </div>
 
         <label class="admin-field">
-          <span>게임 검색</span>
+          <span>寃뚯엫 寃??/span>
 
           <input
             type="text"
             id="gameListSearch"
-            placeholder="게임명으로 검색"
+            placeholder="寃뚯엫紐낆쑝濡?寃??
           />
         </label>
 
@@ -1953,12 +1894,11 @@ export function AdminPage(): string {
               type="checkbox"
               id="selectAllGames"
             />
-            현재 목록 전체 선택
+            ?꾩옱 紐⑸줉 ?꾩껜 ?좏깮
           </label>
 
           <span id="selectedGameCount" class="admin-selection-count">
-            0개 선택됨
-          </span>
+            0媛??좏깮??          </span>
 
           <button
             id="bulkDeleteBtn"
@@ -1966,7 +1906,7 @@ export function AdminPage(): string {
             type="button"
             disabled
           >
-            선택 삭제
+            ?좏깮 ??젣
           </button>
         </div>
 
@@ -1983,7 +1923,7 @@ export function AdminPage(): string {
     </section>
 
     <!-- ====================================================
-         탭 6: 설정 및 백업
+         ??6: ?ㅼ젙 諛?諛깆뾽
          ==================================================== -->
     <section
       class="admin-panel"
@@ -1991,77 +1931,76 @@ export function AdminPage(): string {
       hidden
     >
       <section class="admin-card">
-        <h2>⚙️ 관리자 설정</h2>
+        <h2>?숋툘 愿由ъ옄 ?ㅼ젙</h2>
 
-        <h3>💰 쇼핑몰 레퍼럴 ID</h3>
+        <h3>?뮥 ?쇳븨紐??덊띁??ID</h3>
 
         <p class="admin-hint">
-          한 번만 입력해두면 구매 링크에 자동으로 적용됩니다.
-          서버에서 결합되므로 일반 사용자 화면에는 설정값이 직접
-          노출되지 않습니다.
+          ??踰덈쭔 ?낅젰?대몢硫?援щℓ 留곹겕???먮룞?쇰줈 ?곸슜?⑸땲??
+          ?쒕쾭?먯꽌 寃고빀?섎?濡??쇰컲 ?ъ슜???붾㈃?먮뒗 ?ㅼ젙媛믪씠 吏곸젒
+          ?몄텧?섏? ?딆뒿?덈떎.
         </p>
 
         <label class="admin-field">
-          <span>쿠팡 파트너스 ID</span>
+          <span>荑좏뙜 ?뚰듃?덉뒪 ID</span>
 
           <input
             type="text"
             id="coupang_partners_id"
-            placeholder="예: AF1234567"
+            placeholder="?? AF1234567"
           />
         </label>
 
         <label class="admin-field">
-          <span>링크프라이스 퍼블리셔 ID</span>
+          <span>留곹겕?꾨씪?댁뒪 ?쇰툝由ъ뀛 ID</span>
 
           <input
             type="text"
             id="linkprice_id"
-            placeholder="예: A100705627"
+            placeholder="?? A100705627"
           />
         </label>
 
         <hr class="admin-hr" />
 
-        <h3>🚫 전역 수집 필터</h3>
+        <h3>?슟 ?꾩뿭 ?섏쭛 ?꾪꽣</h3>
 
         <p class="admin-hint">
-          모든 게임의 네이버 가격 수집에 공통으로 적용됩니다.
-          항목은 쉼표 또는 줄바꿈으로 구분하세요.
-          정규식이 아닌 일반 문자열로 검색됩니다.
+          紐⑤뱺 寃뚯엫???ㅼ씠踰?媛寃??섏쭛??怨듯넻?쇰줈 ?곸슜?⑸땲??
+          ??ぉ? ?쇳몴 ?먮뒗 以꾨컮轅덉쑝濡?援щ텇?섏꽭??
+          ?뺢퇋?앹씠 ?꾨땶 ?쇰컲 臾몄옄?대줈 寃?됰맗?덈떎.
         </p>
 
         <label class="admin-field">
-          <span>추가 블랙리스트 키워드</span>
+          <span>異붽? 釉붾옓由ъ뒪???ㅼ썙??/span>
 
           <textarea
             id="custom_blacklist_keywords"
             class="admin-textarea"
             rows="6"
-            placeholder="예)&#10;해외판&#10;계정판매&#10;게임 공략집"
+            placeholder="??&#10;?댁쇅??#10;怨꾩젙?먮ℓ&#10;寃뚯엫 怨듬왂吏?
           ></textarea>
         </label>
 
         <p class="admin-hint">
-          상품 제목에 위 문자열이 포함되면 가격 수집 대상에서
-          제외됩니다. 특정 게임 하나에만 적용할 제외어는 게임
-          가져오기의 제외어 항목을 사용하세요.
+          ?곹뭹 ?쒕ぉ????臾몄옄?댁씠 ?ы븿?섎㈃ 媛寃??섏쭛 ??곸뿉??          ?쒖쇅?⑸땲?? ?뱀젙 寃뚯엫 ?섎굹?먮쭔 ?곸슜???쒖쇅?대뒗 寃뚯엫
+          媛?몄삤湲곗쓽 ?쒖쇅????ぉ???ъ슜?섏꽭??
         </p>
 
         <label class="admin-field">
-          <span>추가 차단 쇼핑몰</span>
+          <span>異붽? 李⑤떒 ?쇳븨紐?/span>
 
           <textarea
             id="custom_blocked_malls"
             class="admin-textarea"
             rows="5"
-            placeholder="예)&#10;문제쇼핑몰&#10;업체명"
+            placeholder="??&#10;臾몄젣?쇳븨紐?#10;?낆껜紐?
           ></textarea>
         </label>
 
         <p class="admin-hint">
-          네이버 쇼핑의 판매처 이름에 위 문자열이 포함되면 해당
-          판매처 상품을 제외합니다.
+          ?ㅼ씠踰??쇳븨???먮ℓ泥??대쫫????臾몄옄?댁씠 ?ы븿?섎㈃ ?대떦
+          ?먮ℓ泥??곹뭹???쒖쇅?⑸땲??
         </p>
 
         <button
@@ -2069,8 +2008,7 @@ export function AdminPage(): string {
           class="btn btn-primary"
           type="button"
         >
-          관리자 설정 저장
-        </button>
+          愿由ъ옄 ?ㅼ젙 ???        </button>
 
         <p
           id="settingsStatus"
@@ -2079,20 +2017,19 @@ export function AdminPage(): string {
       </section>
 
       <section class="admin-card">
-        <h2>💾 백업 / 복원</h2>
+        <h2>?뮶 諛깆뾽 / 蹂듭썝</h2>
 
         <p class="admin-hint">
-          현재 등록된 게임을 아래 형식으로 내보냅니다.
+          ?꾩옱 ?깅줉??寃뚯엫???꾨옒 ?뺤떇?쇰줈 ?대낫?낅땲??
         </p>
 
         <div class="admin-format-box">
-          대표이름 | 검색어 | 이미지URL | keywords | 제외어 | 스위치정책
-        </div>
+          ??쒖씠由?| 寃?됱뼱 | ?대?吏URL | keywords | ?쒖쇅??| ?ㅼ쐞移섏젙梨?        </div>
 
         <p class="admin-hint">
-          내보낸 텍스트를 별도로 보관하면 나중에 붙여넣기 방식으로
-          다시 등록할 수 있습니다. 가격은 복원 시 최신값으로 다시
-          수집됩니다.
+          ?대낫???띿뒪?몃? 蹂꾨룄濡?蹂닿??섎㈃ ?섏쨷??遺숈뿬?ｊ린 諛⑹떇?쇰줈
+          ?ㅼ떆 ?깅줉?????덉뒿?덈떎. 媛寃⑹? 蹂듭썝 ??理쒖떊媛믪쑝濡??ㅼ떆
+          ?섏쭛?⑸땲??
         </p>
 
         <div class="admin-row admin-row-wrap">
@@ -2101,7 +2038,7 @@ export function AdminPage(): string {
             class="btn"
             type="button"
           >
-            ⬆️ 목록 내보내기
+            燧놅툘 紐⑸줉 ?대낫?닿린
           </button>
 
           <button
@@ -2109,23 +2046,21 @@ export function AdminPage(): string {
             class="btn"
             type="button"
           >
-            📄 TXT 저장
-          </button>
+            ?뱞 TXT ???          </button>
 
           <button
             id="exportCsvBtn"
             class="btn"
             type="button"
           >
-            📊 CSV 저장
-          </button>
+            ?뱤 CSV ???          </button>
         </div>
 
         <textarea
           id="exportArea"
           class="admin-textarea"
           rows="8"
-          placeholder="내보내기 버튼을 누르면 여기에 목록이 표시됩니다."
+          placeholder="?대낫?닿린 踰꾪듉???꾨Ⅴ硫??ш린??紐⑸줉???쒖떆?⑸땲??"
         ></textarea>
 
         <p
@@ -2135,18 +2070,18 @@ export function AdminPage(): string {
 
         <hr class="admin-hr" />
 
-        <h3>♻️ 붙여넣기로 복원</h3>
+        <h3>?삼툘 遺숈뿬?ｊ린濡?蹂듭썝</h3>
 
         <p class="admin-hint">
-          백업한 내용을 한 줄에 한 게임씩 붙여넣으세요.
-          먼저 미리보기를 실행한 뒤 실제 저장하는 것을 권장합니다.
+          諛깆뾽???댁슜????以꾩뿉 ??寃뚯엫??遺숈뿬?ｌ쑝?몄슂.
+          癒쇱? 誘몃━蹂닿린瑜??ㅽ뻾?????ㅼ젣 ??ν븯??寃껋쓣 沅뚯옣?⑸땲??
         </p>
 
         <textarea
           id="importPasteArea"
           class="admin-textarea"
           rows="10"
-          placeholder="예)&#10;용과 같이 2 | 용과 같이 2 | https://.../img.jpg | 용과같이,2 | |&#10;엘든링 | 엘든링 | | | 나이트레인 |&#10;007 퍼스트라이트 | | https://.../img.jpg | | | s2"
+          placeholder="??&#10;?⑷낵 媛숈씠 2 | ?⑷낵 媛숈씠 2 | https://.../img.jpg | ?⑷낵媛숈씠,2 | |&#10;?섎뱺留?| ?섎뱺留?| | | ?섏씠?몃젅??|&#10;007 ?쇱뒪?몃씪?댄듃 | | https://.../img.jpg | | | s2"
         ></textarea>
 
         <div class="admin-row admin-row-wrap">
@@ -2155,7 +2090,7 @@ export function AdminPage(): string {
             class="btn"
             type="button"
           >
-            🔍 붙여넣기 미리보기
+            ?뵇 遺숈뿬?ｊ린 誘몃━蹂닿린
           </button>
 
           <button
@@ -2163,8 +2098,7 @@ export function AdminPage(): string {
             class="btn btn-primary"
             type="button"
           >
-            ⬇️ 붙여넣기로 실제 저장
-          </button>
+            燧뉛툘 遺숈뿬?ｊ린濡??ㅼ젣 ???          </button>
         </div>
 
         <p
@@ -2179,12 +2113,12 @@ export function AdminPage(): string {
       </section>
 
       <section class="admin-card admin-danger-zone">
-        <h2>⚠️ 위험 구역</h2>
+        <h2>?좑툘 ?꾪뿕 援ъ뿭</h2>
 
         <p class="admin-hint">
-          모든 게임·에디션·가격·이력 데이터를 삭제합니다.
-          레퍼럴 ID와 전역 수집 필터 설정은 유지됩니다.
-          이 작업은 되돌릴 수 없으므로 반드시 먼저 백업하세요.
+          紐⑤뱺 寃뚯엫쨌?먮뵒?샕룰?寃㈑룹씠???곗씠?곕? ??젣?⑸땲??
+          ?덊띁??ID? ?꾩뿭 ?섏쭛 ?꾪꽣 ?ㅼ젙? ?좎??⑸땲??
+          ???묒뾽? ?섎룎由????놁쑝誘濡?諛섎뱶??癒쇱? 諛깆뾽?섏꽭??
         </p>
 
         <button
@@ -2192,8 +2126,7 @@ export function AdminPage(): string {
           class="btn btn-danger"
           type="button"
         >
-          전체 데이터 초기화
-        </button>
+          ?꾩껜 ?곗씠??珥덇린??        </button>
 
         <p
           id="resetStatus"
@@ -2202,7 +2135,7 @@ export function AdminPage(): string {
       </section>
     </section>
 
-    <!-- 화면 알림 -->
+    <!-- ?붾㈃ ?뚮┝ -->
     <div
       id="adminToast"
       class="admin-toast"
