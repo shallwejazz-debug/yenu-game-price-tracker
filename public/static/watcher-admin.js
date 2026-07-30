@@ -1444,25 +1444,57 @@ async function readAllWatcherEvents() {
 
   function suggestCleGenre(item, draft) {
     if (draft && draft.genre) {
-      return draft.genre
+      return String(draft.genre).trim()
     }
 
     const text = cleArticleText(item)
+      .replace(/\u00a0/g, ' ')
+      .replace(/\r/g, '\n')
 
-    const match = text.match(
+    const cleanGenre = function (value) {
+      return String(value || '')
+        .replace(/\s+/g, ' ')
+        .replace(
+          /\s*(?:대응\s*기종|플랫폼|발매일|출시일|가격|플레이\s*인원수|이용등급|수록\s*언어|개발|발매|판권)\s*.*$/i,
+          ''
+        )
+        .trim()
+        .slice(0, 100)
+    }
+
+    const lineMatch = text.match(
       /(?:^|\n)\s*장르\s*[:：]?\s*([^\n]{1,100})/i
     )
 
-    if (!match || !match[1]) {
-      return ''
+    const lineGenre = cleanGenre(
+      lineMatch && lineMatch[1]
+    )
+
+    if (lineGenre) {
+      return lineGenre
     }
 
-    return match[1]
-      .replace(
-        /\s+(?:대응\s*기종|발매일|가격).*$/i,
-        ''
-      )
-      .trim()
+    const compact = text.replace(/\s+/g, ' ')
+
+    const tableMatch = compact.match(
+      /(?:^|\s)장르\s*[:：]?\s*(.{1,100}?)(?=\s*(?:대응\s*기종|플랫폼|발매일|출시일|가격|플레이\s*인원수|이용등급|수록\s*언어|개발|발매|판권)(?:\s|$))/i
+    )
+
+    const tableGenre = cleanGenre(
+      tableMatch && tableMatch[1]
+    )
+
+    if (tableGenre) {
+      return tableGenre
+    }
+
+    const looseMatch = compact.match(
+      /(?:^|\s)장르\s*[:：]?\s*([가-힣A-Za-z0-9][가-힣A-Za-z0-9 /&·+_-]{1,50})/i
+    )
+
+    return cleanGenre(
+      looseMatch && looseMatch[1]
+    )
   }
 
   function suggestCleTrailer(item, draft) {
