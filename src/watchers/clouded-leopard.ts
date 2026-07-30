@@ -447,8 +447,72 @@ export async function collectCloudedLeopard(
         )
         .run()
 
+      await db
+        .prepare(`
+          INSERT INTO watch_events (
+            watch_item_id,
+            source_id,
+            event_type,
+            title,
+            message
+          )
+          SELECT
+            ?, ?,
+            'SOURCE_CHANGED',
+            ?,
+            'Clouded Leopard Entertainment 보도자료 내용이 변경되었습니다.'
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM watch_events
+            WHERE watch_item_id = ?
+              AND source_id = ?
+              AND event_type = 'SOURCE_CHANGED'
+          )
+        `)
+        .bind(
+          existing.id,
+          source.id,
+          title,
+          existing.id,
+          source.id
+        )
+        .run()
+
       result.updated += 1
     }
+
+    // 기존에 수집됐지만 이벤트가 생성되지 않은 CLE 항목과
+    // 이번 실행에서 새로 발견한 항목을 작업 큐에 보충한다.
+    await db
+      .prepare(`
+        INSERT INTO watch_events (
+          watch_item_id,
+          source_id,
+          event_type,
+          title,
+          message
+        )
+        SELECT
+          wi.id,
+          wi.source_id,
+          'SOURCE_NEW',
+          wi.title,
+          'Clouded Leopard Entertainment에서 새로운 보도자료를 발견했습니다.'
+        FROM watch_items wi
+        WHERE wi.source_id = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM watch_events we
+            WHERE we.watch_item_id = wi.id
+              AND we.source_id = wi.source_id
+              AND we.event_type IN (
+                'SOURCE_NEW',
+                'SOURCE_CHANGED'
+              )
+          )
+      `)
+      .bind(source.id)
+      .run()
 
     await db
       .prepare(`
