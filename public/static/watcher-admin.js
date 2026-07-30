@@ -1683,11 +1683,21 @@ async function readAllWatcherEvents() {
                   'display:inline-flex;' +
                   'gap:5px;' +
                   'align-items:center;' +
-                  'margin-right:12px' +
+                  'margin-right:12px;' +
+                  'white-space:nowrap;' +
+                  'min-height:28px' +
                 '">' +
                   '<input ' +
                     'type="checkbox" ' +
                     'data-watcher-variant-platform="1" ' +
+                    'style="' +
+                      'width:18px;' +
+                      'height:18px;' +
+                      'min-width:18px;' +
+                      'max-width:18px;' +
+                      'flex:0 0 18px;' +
+                      'margin:0' +
+                    '" ' +
                     'value="' +
                       escapeHtml(platform) +
                     '"' +
