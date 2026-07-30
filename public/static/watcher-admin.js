@@ -1164,6 +1164,12 @@ async function readAllWatcherEvents() {
     }
 
     const text = clePlatformEvidence(item)
+      .replace(/[™®©]/g, '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[／]/g, '/')
+      .replace(/\s+/g, ' ')
+      .trim()
+
     const result = []
 
     if (
@@ -1238,11 +1244,33 @@ async function readAllWatcherEvents() {
         ? platforms
         : []
 
+    const rawTitle = String(
+      item && (
+        item.raw_title ||
+        item.title
+      ) || ''
+    ).trim()
+
+    const rawText = String(
+      item && item.raw_text || ''
+    )
+
+    const editionLines = rawText
+      .split(/\r?\n/)
+      .map(function (line) {
+        return line.trim()
+      })
+      .filter(function (line) {
+        return (
+          /^(?:상품\s*구성|제품\s*구성|에디션|한정판|패키지\s*구성)\s*[:：]/i
+            .test(line)
+        )
+      })
+      .slice(0, 20)
+
     const text = [
-      item && item.raw_title,
-      item && item.title,
-      item && item.raw_text
-    ].join('\n')
+      rawTitle
+    ].concat(editionLines).join('\n')
 
     const variants = [{
       variantCode: 'STANDARD',
@@ -1286,33 +1314,55 @@ async function readAllWatcherEvents() {
 
     const customNames = []
 
-    const bracketPattern =
-      /[『「《\[【](.{1,60}?(?:BOX|박스|한정판|컬렉터즈|프리미엄).{0,30}?)[』」》\]】]/gi
+    const quotedCustomPattern =
+      /[「《\[【]([^「」《》\[\]【】\r\n]{1,80}?(?:BOX|박스|한정판|컬렉터즈|프리미엄)[^「」《》\[\]【】\r\n]{0,30})[」》\]】]/gi
 
     let match
 
     while (
-      (match = bracketPattern.exec(text)) !== null
+      (
+        match =
+          quotedCustomPattern.exec(text)
+      ) !== null
     ) {
-      customNames.push(
-        String(match[1] || '').trim()
+      const name = String(
+        match[1] || ''
       )
+        .replace(
+          /^(?:한정판|패키지)\s*[:：-]?\s*/i,
+          ''
+        )
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      if (name) {
+        customNames.push(name)
+      }
     }
 
-    const simplePattern =
-      /([가-힣A-Za-z0-9][가-힣A-Za-z0-9 _-]{0,35}(?:BOX|박스))/gi
+    const normalizedCustomNames =
+      customNames.filter(
+        function (name, index, list) {
+          const normalized = name
+            .toUpperCase()
+            .replace(/\s+/g, '')
 
-    while (
-      (match = simplePattern.exec(text)) !== null
-    ) {
-      customNames.push(
-        String(match[1] || '').trim()
+          return (
+            list.findIndex(
+              function (candidate) {
+                return candidate
+                  .toUpperCase()
+                  .replace(/\s+/g, '') ===
+                  normalized
+              }
+            ) === index
+          )
+        }
       )
-    }
 
     Array.from(
       new Set(
-        customNames.filter(Boolean)
+        normalizedCustomNames
       )
     ).slice(0, 10).forEach(
       function (name, index) {
@@ -4135,6 +4185,22 @@ async function readAllWatcherEvents() {
         '게임 출시 플랫폼'
     }
   }
+
+  ;[
+    'watcherTransformCandidatePrice',
+    'watcherTransformBonus',
+    'watcherTransformBonusNote'
+  ].forEach(function (id) {
+    const element = $(id)
+
+    const field =
+      element &&
+      element.closest('.admin-field')
+
+    if (field) {
+      field.hidden = true
+    }
+  })
 
   const refreshButton = $('refreshWatcher')
   const collectArcButton = $('collectArcWatcher')
