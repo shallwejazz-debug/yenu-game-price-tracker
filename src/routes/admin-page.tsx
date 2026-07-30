@@ -395,7 +395,7 @@ export function AdminPage(): string {
               class="btn btn-sm"
               type="button"
             >
-              아크 수집 실행
+              전체 수집 실행
             </button>
 
             <button

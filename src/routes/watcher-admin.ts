@@ -14,6 +14,9 @@ import type { Bindings } from '../types'
 import {
   collectArcSystemWorksAsia,
 } from '../watchers/arc-system-works-asia'
+import {
+  collectCloudedLeopard,
+} from '../watchers/clouded-leopard'
 
 const watcherAdmin = new Hono<{
   Bindings: Bindings
@@ -3473,5 +3476,154 @@ watcherAdmin.post(
   }
 )
 
+
+
+// ------------------------------------------------------------
+// Clouded Leopard Entertainment 수동 수집
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/collect/clouded-leopard',
+  async (c) => {
+    try {
+      const result =
+        await collectCloudedLeopard(
+          c.env.DB,
+          10
+        )
+
+      return c.json({
+        ok: true,
+        result,
+      })
+    } catch (error) {
+      console.error(
+        'CLE collector failed:',
+        error
+      )
+
+      return c.json(
+        {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'CLE collector failed',
+        },
+        500
+      )
+    }
+  }
+)
+
+// ------------------------------------------------------------
+// 아크 + CLE 전체 수집
+// 한 출처 실패가 다른 출처를 중단하지 않는다.
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/collect/all',
+  async (c) => {
+    const sources: Array<{
+      ok: boolean
+      sourceKey: string
+      result?: {
+        found: number
+        relevant: number
+        created: number
+        updated: number
+        unchanged: number
+        imagesCreated: number
+      }
+      error?: string
+    }> = []
+
+    const collectors = [
+      {
+        sourceKey: 'ARC_SYSTEM_WORKS_ASIA',
+        run: () =>
+          collectArcSystemWorksAsia(
+            c.env.DB,
+            10
+          ),
+      },
+      {
+        sourceKey: 'CLOUDED_LEOPARD',
+        run: () =>
+          collectCloudedLeopard(
+            c.env.DB,
+            10
+          ),
+      },
+    ]
+
+    for (const collector of collectors) {
+      try {
+        const result = await collector.run()
+
+        sources.push({
+          ok: true,
+          sourceKey: collector.sourceKey,
+          result,
+        })
+      } catch (error) {
+        console.error(
+          collector.sourceKey +
+            ' collector failed:',
+          error
+        )
+
+        sources.push({
+          ok: false,
+          sourceKey: collector.sourceKey,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'collector failed',
+        })
+      }
+    }
+
+    const successful = sources.filter(
+      (source) =>
+        source.ok && source.result
+    )
+
+    const total = (
+      key:
+        | 'found'
+        | 'relevant'
+        | 'created'
+        | 'updated'
+        | 'unchanged'
+        | 'imagesCreated'
+    ) =>
+      successful.reduce(
+        (sum, source) =>
+          sum +
+          Number(
+            source.result?.[key] || 0
+          ),
+        0
+      )
+
+    return c.json({
+      ok: successful.length > 0,
+      partialFailure:
+        successful.length !== sources.length,
+      result: {
+        sourceKey: 'ALL_ENABLED',
+        found: total('found'),
+        relevant: total('relevant'),
+        created: total('created'),
+        updated: total('updated'),
+        unchanged: total('unchanged'),
+        imagesCreated:
+          total('imagesCreated'),
+      },
+      sources,
+    })
+  }
+)
 
 export default watcherAdmin

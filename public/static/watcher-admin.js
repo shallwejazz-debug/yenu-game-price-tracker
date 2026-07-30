@@ -164,7 +164,7 @@
 
     try {
       const data = await watcherApi(
-        '/admin/api/watcher/collect/arc-system-works',
+        '/admin/api/watcher/collect/all',
         {
           method: 'POST'
         }
@@ -176,7 +176,7 @@
       await loadWatcher(true)
 
       setStatus(
-        '아크 수집 완료 — ' +
+        '전체 수집 완료 — ' +
         '신규 ' +
         Number(result.created || 0) +
         '개, ' +
