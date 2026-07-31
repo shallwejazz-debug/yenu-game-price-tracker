@@ -2,7 +2,7 @@
 // Clouded Leopard Entertainment 공식 보도자료 수집기
 //
 // - 한국어 공식 보도자료만 수집
-// - 이미지 URL은 현재 수집하지 않음
+// - 공식 보도자료 이미지 URL 후보 수집
 // - 이미지 다운로드/R2 저장/자동 공개 없음
 // - watch_items 관리자 검수 후보로만 저장
 // ============================================================
@@ -228,6 +228,361 @@ function parseList(html: string): CleListItem[] {
   return results
 }
 
+﻿function normalizeCleImageUrl(
+  value: string,
+  articleUrl: string
+): string | null {
+  const decoded = decodeHtml(value)
+    .replace(/\\\//g, '/')
+    .trim()
+
+  if (
+    !decoded ||
+    /^(?:data|blob|javascript):/i.test(decoded)
+  ) {
+    return null
+  }
+
+  try {
+    const url = new URL(decoded, articleUrl)
+    const host = url.hostname.toLowerCase()
+
+    if (
+      host !== 'cloudedleopardent.com' &&
+      host !== 'www.cloudedleopardent.com' &&
+      !host.endsWith('.cloudedleopardent.com')
+    ) {
+      return null
+    }
+
+    url.protocol = 'https:'
+    url.hash = ''
+
+    const pathname = url.pathname.toLowerCase()
+
+    if (
+      !/\.(?:jpg|jpeg|png|webp|gif|avif)$/.test(
+        pathname
+      )
+    ) {
+      return null
+    }
+
+    if (
+      /(?:favicon|logo|icon|emoji|avatar|spacer|blank|loading|tracking|pixel)/i
+        .test(pathname)
+    ) {
+      return null
+    }
+
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function cleImageAttribute(
+  tag: string,
+  attributeName: string
+): string | null {
+  const pattern =
+    /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi
+
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(tag))) {
+    if (
+      String(match[1] || '').toLowerCase() !==
+      attributeName.toLowerCase()
+    ) {
+      continue
+    }
+
+    const value =
+      match[2] || match[3] || match[4] || ''
+
+    return decodeHtml(value).trim() || null
+  }
+
+  return null
+}
+
+function classifyCleImage(context: string): string {
+  const text = stripHtml(context)
+
+  if (
+    /예약\s*(?:구매|판매)?\s*특전|사전\s*예약\s*특전/i
+      .test(text)
+  ) {
+    return 'PREORDER_BONUS'
+  }
+
+  if (
+    /초회\s*(?:구입|구매|한정)?\s*특전/i
+      .test(text)
+  ) {
+    return 'FIRST_PRINT_BONUS'
+  }
+
+  if (
+    /우로보로스\s*BOX|한정판|세트\s*내용|구성품/i
+      .test(text)
+  ) {
+    return 'LIMITED_EDITION'
+  }
+
+  if (
+    /패키지\s*(?:이미지|버전|판|제품)?/i
+      .test(text)
+  ) {
+    return 'PACKAGE'
+  }
+
+  if (
+    /키\s*비주얼|메인\s*비주얼/i
+      .test(text)
+  ) {
+    return 'KEY_VISUAL'
+  }
+
+  if (
+    /스크린\s*샷|스크린샷|게임\s*화면/i
+      .test(text)
+  ) {
+    return 'SCREENSHOT'
+  }
+
+  if (/배너|banner/i.test(text)) {
+    return 'BANNER'
+  }
+
+  return 'UNKNOWN'
+}
+
+function extractCleImages(
+  articleHtml: string,
+  articleUrl: string
+): Array<{
+  url: string
+  altText: string | null
+  imageType: string
+}> {
+  const results: Array<{
+    url: string
+    altText: string | null
+    imageType: string
+  }> = []
+
+  const seen = new Set<string>()
+
+  const add = (
+    rawUrl: string | null,
+    altText: string | null,
+    imageType: string
+  ) => {
+    if (!rawUrl || results.length >= 60) return
+
+    const url = normalizeCleImageUrl(
+      rawUrl,
+      articleUrl
+    )
+
+    if (!url || seen.has(url)) return
+
+    seen.add(url)
+
+    results.push({
+      url,
+      altText:
+        altText && altText.trim()
+          ? altText.trim().slice(0, 1000)
+          : null,
+      imageType,
+    })
+  }
+
+  const tagPattern = /<(?:img|source)\b[^>]*>/gi
+  let match: RegExpExecArray | null
+
+  while ((match = tagPattern.exec(articleHtml))) {
+    const tag = match[0]
+
+    const altText =
+      cleImageAttribute(tag, 'alt') ||
+      cleImageAttribute(tag, 'title')
+
+    const contextStart = Math.max(
+      0,
+      match.index - 1000
+    )
+
+    const contextEnd = Math.min(
+      articleHtml.length,
+      match.index + tag.length + 1000
+    )
+
+    const imageType = classifyCleImage(
+      articleHtml.slice(
+        contextStart,
+        contextEnd
+      )
+    )
+
+    const srcset =
+      cleImageAttribute(tag, 'srcset') ||
+      cleImageAttribute(tag, 'data-srcset')
+
+    if (srcset) {
+      const srcsetCandidates = srcset
+        .split(',')
+        .map((entry) =>
+          entry.trim().split(/\s+/)[0]
+        )
+        .filter(Boolean)
+
+      for (
+        let index = srcsetCandidates.length - 1;
+        index >= 0;
+        index -= 1
+      ) {
+        const before = results.length
+
+        add(
+          srcsetCandidates[index],
+          altText,
+          imageType
+        )
+
+        if (results.length > before) break
+      }
+    }
+
+    const urlCandidates = [
+      cleImageAttribute(tag, 'data-original'),
+      cleImageAttribute(tag, 'data-lazy-src'),
+      cleImageAttribute(tag, 'data-src'),
+      cleImageAttribute(tag, 'src'),
+    ]
+
+    for (const candidate of urlCandidates) {
+      const before = results.length
+
+      add(candidate, altText, imageType)
+
+      if (results.length > before) break
+    }
+
+    if (results.length >= 60) break
+  }
+
+  add(
+    getMeta(articleHtml, 'og:image') ||
+      getMeta(articleHtml, 'twitter:image'),
+    '공식 보도자료 대표 이미지',
+    'KEY_VISUAL'
+  )
+
+  return results
+}
+
+async function storeCleImages(
+  db: D1Database,
+  sourceId: number,
+  externalId: string,
+  articleUrl: string,
+  title: string,
+  articleHtml: string
+): Promise<number> {
+  const item = await db
+    .prepare(`
+      SELECT id
+      FROM watch_items
+      WHERE source_id = ?
+        AND external_id = ?
+      LIMIT 1
+    `)
+    .bind(sourceId, externalId)
+    .first<{ id: number }>()
+
+  if (!item?.id) return 0
+
+  const images = extractCleImages(
+    articleHtml,
+    articleUrl
+  )
+
+  let created = 0
+
+  for (
+    let index = 0;
+    index < images.length;
+    index += 1
+  ) {
+    const image = images[index]
+
+    const insertResult = await db
+      .prepare(`
+        INSERT OR IGNORE INTO watch_item_images (
+          watch_item_id,
+          source_image_url,
+          image_type,
+          alt_text,
+          permission_status,
+          selected_for_publish,
+          display_order,
+          source_credit,
+          source_article_url
+        )
+        VALUES (
+          ?, ?, ?, ?,
+          'PENDING',
+          0,
+          ?,
+          '이미지 및 정보 출처: Clouded Leopard Entertainment',
+          ?
+        )
+      `)
+      .bind(
+        item.id,
+        image.url,
+        image.imageType,
+        image.altText,
+        index,
+        articleUrl
+      )
+      .run()
+
+    if (
+      Number(insertResult.meta.changes || 0) > 0
+    ) {
+      created += 1
+
+      await db
+        .prepare(`
+          INSERT INTO watch_events (
+            watch_item_id,
+            source_id,
+            event_type,
+            title,
+            message
+          )
+          VALUES (?, ?, 'IMAGE_NEW', ?, ?)
+        `)
+        .bind(
+          item.id,
+          sourceId,
+          title,
+          '공식 이미지 후보를 발견했습니다: ' +
+            image.imageType
+        )
+        .run()
+    }
+  }
+
+  return created
+}
+
+
 async function fetchHtml(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
@@ -390,7 +745,7 @@ export async function collectCloudedLeopard(
             VALUES (
               ?, ?, ?, ?, ?, ?, ?, ?, ?,
               'CloudedLeopardCollector',
-              '1.0.0',
+              '1.1.0',
               'SOURCE_NEW',
               'DISCOVERED'
             )
@@ -409,11 +764,33 @@ export async function collectCloudedLeopard(
           .run()
 
         result.created += 1
+
+        result.imagesCreated +=
+          await storeCleImages(
+            db,
+            source.id,
+            item.externalId,
+            item.sourceUrl,
+            title,
+            html
+          )
+
         continue
       }
 
       if (existing.content_hash === contentHash) {
         result.unchanged += 1
+
+        result.imagesCreated +=
+          await storeCleImages(
+            db,
+            source.id,
+            item.externalId,
+            item.sourceUrl,
+            title,
+            html
+          )
+
         continue
       }
 
@@ -430,7 +807,7 @@ export async function collectCloudedLeopard(
             raw_html = ?,
             parser_name =
               'CloudedLeopardCollector',
-            parser_version = '1.0.0',
+            parser_version = '1.1.0',
             event_type = 'SOURCE_UPDATED',
             updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
@@ -478,6 +855,16 @@ export async function collectCloudedLeopard(
         )
         .run()
 
+      result.imagesCreated +=
+        await storeCleImages(
+          db,
+          source.id,
+          item.externalId,
+          item.sourceUrl,
+          title,
+          html
+        )
+
       result.updated += 1
     }
 
@@ -522,7 +909,7 @@ export async function collectCloudedLeopard(
           last_error = NULL,
           collector_name =
             'CloudedLeopardCollector',
-          collector_version = '1.0.0',
+          collector_version = '1.1.0',
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `)
