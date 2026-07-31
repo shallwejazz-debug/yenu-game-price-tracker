@@ -1513,6 +1513,107 @@ async function readAllWatcherEvents() {
       : ''
   }
 
+  function normalizeWatcherDraftVariants(
+    values,
+    availablePlatforms
+  ) {
+    const available = Array.from(
+      new Set(
+        (Array.isArray(availablePlatforms)
+          ? availablePlatforms
+          : []
+        ).map(function (platform) {
+          return String(platform || '')
+            .trim()
+            .toLowerCase()
+        }).filter(Boolean)
+      )
+    )
+
+    return (Array.isArray(values) ? values : [])
+      .map(function (rawVariant) {
+        const variant =
+          rawVariant &&
+          typeof rawVariant === 'object'
+            ? rawVariant
+            : {}
+
+        const code = String(
+          variant.variantCode || ''
+        ).trim().toUpperCase()
+
+        const explicit = Array.from(
+          new Set(
+            (Array.isArray(variant.platforms)
+              ? variant.platforms
+              : []
+            ).map(function (platform) {
+              return String(platform || '')
+                .trim()
+                .toLowerCase()
+            }).filter(function (platform) {
+              return (
+                platform &&
+                (
+                  !available.length ||
+                  available.includes(platform)
+                )
+              )
+            })
+          )
+        )
+
+        let platforms = explicit
+
+        if (
+          code === 'STEAM_STANDARD' ||
+          code === 'STEAM_DELUXE' ||
+          code === 'STEAM_OROBOROS_BOX'
+        ) {
+          platforms = available.includes('pc')
+            ? ['pc']
+            : explicit.filter(function (platform) {
+                return platform === 'pc'
+              })
+        } else if (code === 'SWITCH2_EDITION') {
+          platforms = available.includes('switch2')
+            ? ['switch2']
+            : explicit.filter(function (platform) {
+                return platform === 'switch2'
+              })
+        } else if (code === 'STANDARD') {
+          platforms = available.filter(
+            function (platform) {
+              return (
+                platform !== 'pc' &&
+                platform !== 'switch2'
+              )
+            }
+          )
+        } else if (
+          code === 'DIGITAL_DELUXE' ||
+          code === 'OROBOROS_BOX'
+        ) {
+          platforms = available.filter(
+            function (platform) {
+              return platform !== 'pc'
+            }
+          )
+        }
+
+        if (!platforms.length) {
+          platforms = explicit.length
+            ? explicit
+            : available
+        }
+
+        return Object.assign({}, variant, {
+          platforms: Array.from(new Set(platforms))
+        })
+      })
+  }
+
+
   function suggestCleVariants(
     item,
     draft,
@@ -1523,7 +1624,10 @@ async function readAllWatcherEvents() {
       Array.isArray(draft.variants) &&
       draft.variants.length
     ) {
-      return draft.variants
+      return normalizeWatcherDraftVariants(
+        draft.variants,
+        platforms
+      )
     }
 
     const targetPlatforms =
@@ -3800,6 +3904,11 @@ async function readAllWatcherEvents() {
         'watcherTransformTrailer',
         suggestCleTrailer(item, draft)
       )
+
+      // All draft fields now exist in the DOM.
+      // Re-render after hydration so the final review card
+      // never shows its initial empty placeholders.
+      renderWatcherFinalReview()
 
       const sourceTitle =
         $('watcherTransformSourceTitle')
