@@ -15,6 +15,7 @@ import {
   collectArcSystemWorksAsia,
 } from '../watchers/arc-system-works-asia'
 import {
+  backfillCloudedLeopardItemImages,
   collectCloudedLeopard,
 } from '../watchers/clouded-leopard'
 
@@ -4134,6 +4135,94 @@ watcherAdmin.post(
 )
 
 
+
+// ------------------------------------------------------------
+// 특정 CLE 항목 공식 이미지 후보 재수집
+//
+// 수행:
+//   - 공식 source_url HTML 재조회
+//   - 중복되지 않은 후보만 PENDING으로 생성
+//
+// 수행하지 않음:
+//   - transformed_json 및 에디션 수정
+//   - 이미지 승인 또는 대표 이미지 선택
+//   - R2 저장
+//   - 게임 이미지 및 공개 상태 변경
+// ------------------------------------------------------------
+
+watcherAdmin.post(
+  '/items/:id/images/collect',
+  async (c) => {
+    const id = Number(c.req.param('id'))
+
+    if (
+      !Number.isInteger(id) ||
+      id <= 0
+    ) {
+      return c.json(
+        {
+          ok: false,
+          error: 'invalid watcher item id',
+        },
+        400
+      )
+    }
+
+    try {
+      const result =
+        await backfillCloudedLeopardItemImages(
+          c.env.DB,
+          id
+        )
+
+      return c.json({
+        ok: true,
+        result,
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'CLE image backfill failed'
+
+      console.error(
+        'CLE image backfill failed:',
+        error
+      )
+
+      if (message === 'watcher item not found') {
+        return c.json(
+          {
+            ok: false,
+            error: message,
+          },
+          404
+        )
+      }
+
+      if (
+        message ===
+        'target watcher item is not a Clouded Leopard item'
+      ) {
+        return c.json(
+          {
+            ok: false,
+            error: message,
+          },
+          400
+        )
+      }
+
+      return c.json(
+        {
+          ok: false,
+          error: message,
+        },
+        500
+      )
+    }
+  }
+)
 
 // ------------------------------------------------------------
 // Clouded Leopard Entertainment 수동 수집

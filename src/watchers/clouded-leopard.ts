@@ -618,6 +618,99 @@ async function sha256(value: string): Promise<string> {
     .join('')
 }
 
+export type CloudedLeopardImageBackfillResult = {
+  sourceKey: string
+  watchItemId: number
+  linkedGameId: number | null
+  found: number
+  created: number
+}
+
+export async function backfillCloudedLeopardItemImages(
+  db: D1Database,
+  watchItemIdValue: number
+): Promise<CloudedLeopardImageBackfillResult> {
+  const watchItemId = Number(watchItemIdValue)
+
+  if (
+    !Number.isInteger(watchItemId) ||
+    watchItemId <= 0
+  ) {
+    throw new Error('invalid watcher item id')
+  }
+
+  const item = await db
+    .prepare(`
+      SELECT
+        wi.id,
+        wi.source_id,
+        wi.external_id,
+        wi.source_url,
+        wi.title,
+        wi.linked_game_id,
+        ws.source_key
+      FROM watch_items wi
+      INNER JOIN watch_sources ws
+        ON ws.id = wi.source_id
+      WHERE wi.id = ?
+      LIMIT 1
+    `)
+    .bind(watchItemId)
+    .first<{
+      id: number
+      source_id: number
+      external_id: string
+      source_url: string
+      title: string
+      linked_game_id: number | null
+      source_key: string
+    }>()
+
+  if (!item) {
+    throw new Error('watcher item not found')
+  }
+
+  if (item.source_key !== SOURCE_KEY) {
+    throw new Error(
+      'target watcher item is not a Clouded Leopard item'
+    )
+  }
+
+  const articleUrl = String(
+    item.source_url || ''
+  ).trim()
+
+  if (!articleUrl) {
+    throw new Error(
+      'Clouded Leopard source URL is missing'
+    )
+  }
+
+  const articleHtml = await fetchHtml(articleUrl)
+
+  const found = extractCleImages(
+    articleHtml,
+    articleUrl
+  ).length
+
+  const created = await storeCleImages(
+    db,
+    item.source_id,
+    item.external_id,
+    articleUrl,
+    item.title,
+    articleHtml
+  )
+
+  return {
+    sourceKey: SOURCE_KEY,
+    watchItemId: item.id,
+    linkedGameId: item.linked_game_id,
+    found,
+    created,
+  }
+}
+
 export async function collectCloudedLeopard(
   db: D1Database,
   requestedLimit = 10
