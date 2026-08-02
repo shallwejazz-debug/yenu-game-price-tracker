@@ -3569,6 +3569,42 @@ async function readAllWatcherEvents() {
     container.innerHTML =
       needsHtml + cardsHtml
 
+    const needsPanel = container.querySelector(
+      '[data-watcher-image-needs="1"]'
+    )
+
+    if (needsPanel) {
+      const syncNeedsPanelLayout =
+        function () {
+          if (needsPanel.open) {
+            needsPanel.style.position =
+              'relative'
+            needsPanel.style.top = 'auto'
+            needsPanel.style.maxHeight =
+              'none'
+            needsPanel.style.overflow =
+              'visible'
+            needsPanel.style.zIndex = '1'
+          } else {
+            needsPanel.style.position =
+              'sticky'
+            needsPanel.style.top = '10px'
+            needsPanel.style.maxHeight =
+              '70vh'
+            needsPanel.style.overflow =
+              'auto'
+            needsPanel.style.zIndex = '5'
+          }
+        }
+
+      needsPanel.addEventListener(
+        'toggle',
+        syncNeedsPanelLayout
+      )
+
+      syncNeedsPanelLayout()
+    }
+
     const preparedCount = list.filter(
       function (image) {
         return (
