@@ -28,6 +28,7 @@
   }
 
   let watcherHasMultiEditionDraft = false
+  let watcherTransformImageCandidates = []
 
 
 
@@ -2797,6 +2798,181 @@ async function readAllWatcherEvents() {
       .join('')
   }
 
+  function watcherImageNeedLabel(variant) {
+    const kind = String(
+      variant && variant.variantKind || ''
+    ).toUpperCase()
+
+    const packageType = String(
+      variant && variant.packageType || 'AUTO'
+    ).toUpperCase()
+
+    const platforms = Array.isArray(
+      variant && variant.platforms
+    )
+      ? variant.platforms
+      : []
+
+    const hasPhysicalPlatform =
+      platforms.some(function (platform) {
+        return (
+          String(platform || '')
+            .toLowerCase() !== 'pc'
+        )
+      })
+
+    const physical =
+      packageType === 'PACKAGE' ||
+      packageType === 'BOTH' ||
+      (
+        packageType === 'AUTO' &&
+        hasPhysicalPlatform
+      )
+
+    if (kind === 'STANDARD' && physical) {
+      return '패키지 이미지'
+    }
+
+    if (
+      kind !== 'STANDARD' &&
+      kind !== ''
+    ) {
+      return physical
+        ? '에디션 패키지/구성 이미지'
+        : '에디션 상품 이미지'
+    }
+
+    return physical
+      ? '패키지 이미지'
+      : '상품 이미지 또는 키 비주얼'
+  }
+
+  function watcherImageNeedsHtml(images) {
+    const variants =
+      getWatcherTransformVariants()
+
+    const prepared = (
+      Array.isArray(images)
+        ? images
+        : []
+    ).filter(function (image) {
+      return (
+        String(
+          image.permission_status || ''
+        ).toUpperCase() === 'APPROVED' &&
+        Boolean(
+          String(
+            image.stored_image_url || ''
+          ).trim()
+        )
+      )
+    })
+
+    const preparedCounts = {}
+
+    prepared.forEach(function (image) {
+      const type = String(
+        image.image_type || 'UNKNOWN'
+      ).toUpperCase()
+
+      preparedCounts[type] =
+        Number(preparedCounts[type] || 0) + 1
+    })
+
+    const preparedSummary =
+      Object.keys(preparedCounts).length
+        ? Object.keys(preparedCounts)
+            .map(function (type) {
+              return (
+                imageTypeLabel(type) +
+                ' ' +
+                preparedCounts[type] +
+                '개'
+              )
+            })
+            .join(' · ')
+        : '아직 준비된 이미지가 없습니다.'
+
+    const needs = [
+      '<li><strong>게임 공통</strong>' +
+        ' — 키 비주얼 1개 권장</li>'
+    ]
+
+    variants.forEach(function (variant) {
+      const name = String(
+        variant.variantName ||
+        variant.variantCode ||
+        '에디션'
+      ).trim()
+
+      const platformText = (
+        Array.isArray(variant.platforms)
+          ? variant.platforms
+          : []
+      ).map(function (platform) {
+        return watcherPlatformLabel(platform)
+      }).join(', ')
+
+      needs.push(
+        '<li><strong>' +
+          escapeHtml(name) +
+        '</strong>' +
+        (
+          platformText
+            ? ' · ' + escapeHtml(platformText)
+            : ''
+        ) +
+        ' — ' +
+        escapeHtml(
+          watcherImageNeedLabel(variant)
+        ) +
+        '</li>'
+      )
+
+      if (
+        String(
+          variant.preorderBonus || ''
+        ).trim() ||
+        String(
+          variant.preorderBonusNote || ''
+        ).trim()
+      ) {
+        needs.push(
+          '<li><strong>' +
+            escapeHtml(name) +
+          ' 특전</strong>' +
+          ' — 예약/초회/판매처 특전 이미지 확인</li>'
+        )
+      }
+    })
+
+    return (
+      '<aside ' +
+        'data-watcher-image-needs="1" ' +
+        'class="admin-notice" ' +
+        'style="grid-column:1/-1">' +
+        '<strong>필요 이미지 안내</strong>' +
+        '<p class="admin-hint">' +
+          '에디션 폼을 기준으로 만든 검수용 안내입니다. ' +
+          '실제 이미지를 확인한 뒤 필요한 후보만 저장하고, ' +
+          '최종 연결은 사전예약 V2에서 진행합니다.' +
+        '</p>' +
+        '<ul style="' +
+          'margin:10px 0;' +
+          'padding-left:20px;' +
+          'display:grid;' +
+          'gap:6px' +
+        '">' +
+          needs.join('') +
+        '</ul>' +
+        '<p class="admin-hint">' +
+          '<strong>현재 준비됨:</strong> ' +
+          escapeHtml(preparedSummary) +
+        '</p>' +
+      '</aside>'
+    )
+  }
+
   function renderTransformImages(
     images,
     item,
@@ -2822,6 +2998,8 @@ async function readAllWatcherEvents() {
     const list = Array.isArray(images)
       ? images
       : []
+
+    watcherTransformImageCandidates = list
 
     if (countElement) {
       countElement.textContent =
@@ -2849,6 +3027,19 @@ async function readAllWatcherEvents() {
       policyStatus === 'APPROVED' ||
       policyStatus === 'CONDITIONAL'
 
+    const localStorageAllowed =
+      Number(
+        policy &&
+        policy.local_storage_allowed != null
+          ? policy.local_storage_allowed
+          : (
+            item &&
+            item.local_storage_allowed != null
+              ? item.local_storage_allowed
+              : 0
+          )
+      ) === 1
+
     if (policyElement) {
       if (policyAllowed) {
         policyElement.innerHTML =
@@ -2860,15 +3051,15 @@ async function readAllWatcherEvents() {
             ) +
           '</strong>' +
           '<p class="admin-hint">' +
-            '출처 정책이 확인되었습니다. ' +
-            '이미지 유형을 확인한 뒤 대표 후보를 선택할 수 있습니다.' +
+            '공식 원본과 실제 용도를 확인하고 ' +
+            '필요한 이미지만 비공개로 준비할 수 있습니다.' +
           '</p>'
       } else {
         policyElement.innerHTML =
           '<strong>🟡 이미지 사용 허가 대기</strong>' +
           '<p class="admin-hint">' +
-            '출처의 이미지 사용 정책이 승인되기 전에는 ' +
-            '대표 이미지로 선택할 수 없습니다.' +
+            '출처 정책이 승인되기 전에는 ' +
+            '이미지를 저장할 수 없습니다.' +
           '</p>'
       }
     }
@@ -2883,8 +3074,7 @@ async function readAllWatcherEvents() {
       }
     )
 
-
-      watcherFinalReviewContext = {
+    watcherFinalReviewContext = {
       item: item || null,
       selectedImage: selectedImage || null
     }
@@ -2904,32 +3094,26 @@ async function readAllWatcherEvents() {
       selectedText &&
       selectedImage
     ) {
-          selectedText.textContent =
+      selectedText.textContent =
         '이미지 #' +
         Number(selectedImage.id || 0) +
         ' · ' +
         imageTypeLabel(
           selectedImage.image_type
         ) +
-        ' · 개별 상태 ' +
-        String(
-          selectedImage.permission_status ||
-          'PENDING'
-        ) +
-        (
-          selectedImage.stored_image_url
-            ? ' · 비공개 R2 저장 완료'
-            : ' · R2 미저장'
-        )
-
-
-
+        ' · 기존 대표 이미지'
     }
+
+    const needsHtml =
+      watcherImageNeedsHtml(list)
 
     if (!list.length) {
       container.innerHTML =
-        '<div class="admin-empty">' +
-          '이 보도자료에서 수집된 이미지 후보가 없습니다.' +
+        needsHtml +
+        '<div class="admin-empty" ' +
+          'style="grid-column:1/-1">' +
+          '이 보도자료에서 수집된 이미지 후보가 없습니다. ' +
+          '나중에 대상별 이미지 수집을 다시 실행할 수 있습니다.' +
         '</div>'
 
       setTransformImageStatus(
@@ -2940,7 +3124,7 @@ async function readAllWatcherEvents() {
       return
     }
 
-    container.innerHTML = list
+    const cardsHtml = list
       .map(function (image, index) {
         const imageId = Number(
           image.id || 0
@@ -2949,11 +3133,6 @@ async function readAllWatcherEvents() {
         const sourceUrl = safeUrl(
           image.source_image_url
         )
-
-        const selected =
-          Number(
-            image.selected_for_publish || 0
-          ) === 1
 
         const stored = Boolean(
           String(
@@ -2970,32 +3149,22 @@ async function readAllWatcherEvents() {
           image.image_type || ''
         ).toUpperCase()
 
-        const selectable =
+        const prepared =
+          stored &&
+          permissionStatus === 'APPROVED'
+
+        const confirmedType =
+          prepared
+            ? currentType
+            : ''
+
+        const canPrepare =
           Number.isInteger(linkedGameId) &&
           linkedGameId > 0 &&
           policyAllowed &&
+          localStorageAllowed &&
           Number.isInteger(imageId) &&
           imageId > 0
-
-        const localStorageAllowed =
-          Number(
-            policy &&
-            policy.local_storage_allowed != null
-              ? policy.local_storage_allowed
-              : (
-                item &&
-                item.local_storage_allowed != null
-                  ? item.local_storage_allowed
-                  : 0
-              )
-          ) === 1
-
-        const storable =
-          selected &&
-          selectable &&
-          permissionStatus === 'APPROVED' &&
-          localStorageAllowed
-
 
         let hostName = '공식 이미지'
 
@@ -3014,8 +3183,7 @@ async function readAllWatcherEvents() {
               'class="watcher-item-link" ' +
               'href="' +
                 escapeHtml(sourceUrl) +
-              '" ' +
-              'target="_blank" ' +
+              '" target="_blank" ' +
               'rel="noopener noreferrer">' +
               '공식 이미지 원본 확인 ↗' +
             '</a>'
@@ -3027,43 +3195,36 @@ async function readAllWatcherEvents() {
           )
 
         return (
-          '<article class="watcher-transform-image-card' +
-            (selected ? ' is-selected' : '') +
+          '<article class="' +
+            'watcher-transform-image-card' +
+            (prepared ? ' is-selected' : '') +
           '">' +
 
-            '<div class="watcher-transform-image-head">' +
-              '<strong>' +
-                '후보 ' +
+            '<div class="' +
+              'watcher-transform-image-head">' +
+              '<strong>후보 ' +
                 escapeHtml(index + 1) +
               '</strong>' +
-
               (
-                selected
+                prepared
                   ? (
                     '<span class="watcher-badge ' +
                       'watcher-permission-approved">' +
-                      '대표 이미지 선택됨' +
+                      '이미지 준비 완료' +
                     '</span>'
                   )
                   : ''
               ) +
             '</div>' +
 
-            '<div class="watcher-transform-image-meta">' +
+            '<div class="' +
+              'watcher-transform-image-meta">' +
               '<span>이미지 ID: ' +
                 escapeHtml(imageId) +
               '</span>' +
-
-              '<span>수집 유형: ' +
-                escapeHtml(
-                  imageTypeLabel(currentType)
-                ) +
-              '</span>' +
-
-                            '<span>개별 상태: ' +
+              '<span>개별 상태: ' +
                 escapeHtml(permissionStatus) +
               '</span>' +
-
               '<span>비공개 저장: ' +
                 escapeHtml(
                   stored
@@ -3071,7 +3232,17 @@ async function readAllWatcherEvents() {
                     : '미저장'
                 ) +
               '</span>' +
-
+              (
+                prepared
+                  ? (
+                    '<span>확정 유형: ' +
+                      escapeHtml(
+                        imageTypeLabel(currentType)
+                      ) +
+                    '</span>'
+                  )
+                  : ''
+              ) +
               '<span>출처: ' +
                 escapeHtml(hostName) +
               '</span>' +
@@ -3080,7 +3251,8 @@ async function readAllWatcherEvents() {
             (
               image.alt_text
                 ? (
-                  '<p class="watcher-transform-image-alt">' +
+                  '<p class="' +
+                    'watcher-transform-image-alt">' +
                     escapeHtml(image.alt_text) +
                   '</p>'
                 )
@@ -3091,16 +3263,18 @@ async function readAllWatcherEvents() {
 
             '<label class="admin-field">' +
               '<span>사용할 이미지 유형</span>' +
-
               '<select ' +
                 'data-watcher-image-type="' +
                   escapeHtml(imageId) +
                 '"' +
-                (selectable ? '' : ' disabled') +
+                (canPrepare ? '' : ' disabled') +
               '>' +
-                imageTypeOptions(currentType) +
+                imageTypeOptions(
+                  confirmedType
+                ) +
               '</select>' +
             '</label>' +
+
             '<button ' +
               'type="button" ' +
               'class="btn btn-sm ' +
@@ -3108,47 +3282,40 @@ async function readAllWatcherEvents() {
               'data-watcher-image-select="' +
                 escapeHtml(imageId) +
               '"' +
-              (selectable ? '' : ' disabled') +
+              (canPrepare ? '' : ' disabled') +
             '>' +
               (
-                selected
-                  ? '대표 이미지 다시 선택'
-                  : (
-                    linkedGameId > 0
-                      ? '대표 이미지 선택'
-                      : '비공개 게임 등록 후 선택'
-                  )
+                prepared
+                  ? '이미지 다시 저장'
+                  : '이미지 저장'
               ) +
             '</button>' +
-
-            (
-              selected
-                ? (
-                  '<button ' +
-                    'type="button" ' +
-                    'class="btn btn-sm" ' +
-                    'data-watcher-image-store="' +
-                      escapeHtml(imageId) +
-                    '"' +
-                    (storable ? '' : ' disabled') +
-                  '>' +
-                    (
-                      stored
-                        ? '비공개 R2에 다시 저장'
-                        : '비공개 R2 저장'
-                    ) +
-                  '</button>'
-                )
-                : ''
-            ) +
           '</article>'
         )
       })
       .join('')
 
+    container.innerHTML =
+      needsHtml + cardsHtml
+
+    const preparedCount = list.filter(
+      function (image) {
+        return (
+          String(
+            image.permission_status || ''
+          ).toUpperCase() === 'APPROVED' &&
+          Boolean(
+            String(
+              image.stored_image_url || ''
+            ).trim()
+          )
+        )
+      }
+    ).length
+
     if (linkedGameId <= 0) {
       setTransformImageStatus(
-        '비공개 게임 DRAFT를 등록한 뒤 대표 이미지를 선택할 수 있습니다.',
+        '비공개 게임 DRAFT를 등록한 뒤 이미지를 저장할 수 있습니다.',
         'info'
       )
     } else if (!policyAllowed) {
@@ -3156,25 +3323,19 @@ async function readAllWatcherEvents() {
         '출처의 이미지 사용 정책이 승인되지 않았습니다.',
         'err'
       )
-        } else if (selectedImage) {
-      const selectedStored = Boolean(
-        String(
-          selectedImage.stored_image_url ||
-          ''
-        ).trim()
-      )
-
+    } else if (!localStorageAllowed) {
       setTransformImageStatus(
-        selectedStored
-          ? '대표 이미지가 비공개 R2에 저장되어 있습니다. 게임은 아직 공개되지 않았습니다.'
-          : '대표 이미지 후보가 선택되어 있습니다. 비공개 R2 저장을 진행할 수 있습니다.',
-        'ok'
+        '출처 정책에서 비공개 이미지 저장을 허용하지 않습니다.',
+        'err'
       )
-
     } else {
       setTransformImageStatus(
-        '공식 원본을 확인하고 이미지 유형을 선택해 주세요.',
-        'info'
+        '준비 완료 ' +
+          preparedCount +
+          '개 · 필요한 후보의 유형을 선택하고 이미지 저장을 눌러 주세요.',
+        preparedCount > 0
+          ? 'ok'
+          : 'info'
       )
     }
   }
@@ -3429,7 +3590,12 @@ async function readAllWatcherEvents() {
   async function selectWatcherImage(
     imageIdValue
   ) {
-    if (imageActionRunning) return
+    if (
+      imageActionRunning ||
+      imageStoreRunning
+    ) {
+      return
+    }
 
     const imageId = Number(
       imageIdValue
@@ -3452,7 +3618,6 @@ async function readAllWatcherEvents() {
         '보도자료 항목 정보가 올바르지 않습니다.',
         'err'
       )
-
       return
     }
 
@@ -3464,7 +3629,6 @@ async function readAllWatcherEvents() {
         '이미지 후보 정보가 올바르지 않습니다.',
         'err'
       )
-
       return
     }
 
@@ -3481,16 +3645,24 @@ async function readAllWatcherEvents() {
       )
 
     const imageType = typeSelect
-      ? String(
-          typeSelect.value || ''
-        )
+      ? String(typeSelect.value || '')
           .trim()
           .toUpperCase()
       : ''
 
+    const allowedTypes = [
+      'PACKAGE',
+      'LIMITED_EDITION',
+      'PREORDER_BONUS',
+      'FIRST_PRINT_BONUS',
+      'STORE_BONUS',
+      'KEY_VISUAL',
+      'SCREENSHOT'
+    ]
+
     if (!imageType) {
       setTransformImageStatus(
-        '대표 이미지로 사용할 이미지 유형을 선택해 주세요.',
+        '저장할 이미지의 실제 사용 유형을 선택해 주세요.',
         'err'
       )
 
@@ -3504,33 +3676,23 @@ async function readAllWatcherEvents() {
       return
     }
 
-    const allowedTypes = [
-      'PACKAGE',
-      'LIMITED_EDITION',
-      'PREORDER_BONUS',
-      'FIRST_PRINT_BONUS',
-      'STORE_BONUS',
-      'KEY_VISUAL',
-      'SCREENSHOT'
-    ]
-
     if (!allowedTypes.includes(imageType)) {
       setTransformImageStatus(
         '선택할 수 없는 이미지 유형입니다.',
         'err'
       )
-
       return
     }
 
     const confirmed = window.confirm(
       '이미지 #' +
         imageId +
-        '을(를) 대표 이미지 후보로 선택할까요?\n\n' +
-        '이미지 유형: ' +
+        '을(를) 준비할까요?\n\n' +
+        '사용 유형: ' +
         imageTypeLabel(imageType) +
         '\n\n' +
-        '이 단계에서는 이미지를 다운로드하거나 공개하지 않습니다.'
+        '후보를 승인한 뒤 공식 원본을 비공개 R2에 저장합니다.\n' +
+        '대표 이미지 지정, 에디션 연결, 공개는 하지 않습니다.'
     )
 
     if (!confirmed) return
@@ -3543,19 +3705,20 @@ async function readAllWatcherEvents() {
       )
 
     imageActionRunning = true
+    imageStoreRunning = true
 
     if (button) {
       button.disabled = true
-      button.textContent = '선택 중...'
+      button.textContent = '이미지 저장 중...'
     }
 
     setTransformImageStatus(
-      '대표 이미지 후보를 저장하고 있습니다.',
+      '이미지 유형을 승인하고 비공개 R2에 저장하고 있습니다.',
       'info'
     )
 
     try {
-      const data = await watcherApi(
+      const prepareData = await watcherApi(
         '/admin/api/watcher/items/' +
           itemId +
           '/images/' +
@@ -3564,7 +3727,28 @@ async function readAllWatcherEvents() {
         {
           method: 'POST',
           body: JSON.stringify({
-            imageType
+            imageType: imageType,
+            prepareOnly: true
+          })
+        }
+      )
+
+      if (prepareData.prepareOnly !== true) {
+        throw new Error(
+          '새 이미지 준비 API가 아직 배포되지 않았습니다.'
+        )
+      }
+
+      const storeData = await watcherApi(
+        '/admin/api/watcher/items/' +
+          itemId +
+          '/images/' +
+          imageId +
+          '/store',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            prepareOnly: true
           })
         }
       )
@@ -3572,30 +3756,37 @@ async function readAllWatcherEvents() {
       await openWatcherTransform(itemId)
 
       setTransformImageStatus(
-        '대표 이미지 후보 #' +
-          Number(
-            data.selectedImageId ||
-            imageId
+        '이미지 #' +
+          imageId +
+          ' 준비 완료 · ' +
+          imageTypeLabel(imageType) +
+          ' · 비공개 R2 저장 완료 · ' +
+          (
+            storeData.alreadyStored
+              ? '기존 파일 확인됨'
+              : '새 파일 저장됨'
           ) +
-          '을 선택했습니다. ' +
-          '아직 다운로드하거나 공개하지 않았습니다.',
+          ' · 에디션 연결 및 공개는 아직 하지 않았습니다.',
         'ok'
       )
     } catch (error) {
       setTransformImageStatus(
-        error && error.message
-          ? error.message
-          : '대표 이미지 후보 선택에 실패했습니다.',
+        (
+          error && error.message
+            ? error.message
+            : '이미지 준비에 실패했습니다.'
+        ) +
+        ' 승인만 완료되었을 수도 있으므로 버튼을 반복해서 누르지 말고 상태를 확인해 주세요.',
         'err'
       )
 
       if (button) {
         button.disabled = false
-        button.textContent =
-          '대표 이미지 선택'
+        button.textContent = '이미지 저장'
       }
     } finally {
       imageActionRunning = false
+      imageStoreRunning = false
     }
   }
 
