@@ -771,9 +771,71 @@ watcherAdmin.get('/items/:id', async (c) => {
       .bind(id)
       .all()
 
+  const linkedGameId = Number(
+    (item as Record<string, unknown>)
+      .linked_game_id || 0
+  )
+
+  const { results: imageLinks } =
+    await c.env.DB.prepare(`
+      SELECT
+        vpi.image_id,
+        vpi.preorder_id,
+        vpi.display_role,
+        vpi.display_order,
+
+        pv.id AS variant_id,
+        pv.variant_code,
+        pv.variant_name,
+        pv.variant_kind,
+        pv.package_type,
+
+        e.platform,
+        e.edition_name,
+
+        wii.image_type,
+        wii.permission_status,
+        wii.stored_image_url
+
+      FROM variant_preorder_images vpi
+
+      INNER JOIN variant_preorders vp
+        ON vp.id = vpi.preorder_id
+
+      INNER JOIN product_variants pv
+        ON pv.id = vp.variant_id
+
+      INNER JOIN editions e
+        ON e.id = pv.edition_id
+
+      INNER JOIN game_official_sources gos
+        ON gos.id = vp.official_source_id
+
+      INNER JOIN watch_item_images wii
+        ON wii.id = vpi.image_id
+
+      WHERE
+        gos.watch_item_id = ?
+        AND e.game_id = ?
+
+      ORDER BY
+        e.platform ASC,
+        pv.display_order ASC,
+        vpi.display_order ASC,
+        vpi.id ASC
+    `)
+      .bind(
+        id,
+        linkedGameId
+      )
+      .all()
+
   return c.json({
     ok: true,
-    item,
+    item: {
+      ...(item as Record<string, unknown>),
+      image_links: imageLinks ?? [],
+    },
     images: images ?? [],
   })
 })

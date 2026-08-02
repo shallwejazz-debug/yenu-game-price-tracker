@@ -2847,129 +2847,395 @@ async function readAllWatcherEvents() {
       : '상품 이미지 또는 키 비주얼'
   }
 
-  function watcherImageNeedsHtml(images) {
+  function watcherImageNeedsHtml(
+    images,
+    item
+  ) {
     const variants =
       getWatcherTransformVariants()
 
-    const prepared = (
-      Array.isArray(images)
-        ? images
+    const list = Array.isArray(images)
+      ? images
+      : []
+
+    const links =
+      item &&
+      Array.isArray(item.image_links)
+        ? item.image_links
         : []
-    ).filter(function (image) {
-      return (
-        String(
-          image.permission_status || ''
-        ).toUpperCase() === 'APPROVED' &&
-        Boolean(
+
+    const prepared = list.filter(
+      function (image) {
+        return (
           String(
-            image.stored_image_url || ''
-          ).trim()
+            image.permission_status || ''
+          ).toUpperCase() === 'APPROVED' &&
+          Boolean(
+            String(
+              image.stored_image_url || ''
+            ).trim()
+          )
         )
+      }
+    )
+
+    const preparedByTypes = function (types) {
+      return prepared.filter(function (image) {
+        return types.includes(
+          String(
+            image.image_type || ''
+          ).toUpperCase()
+        )
+      })
+    }
+
+    const statusIcon = function (status) {
+      if (status === 'linked') return '✓'
+      if (status === 'prepared') return '◐'
+      return '○'
+    }
+
+    const statusLabel = function (status) {
+      if (status === 'linked') {
+        return 'V2 연결 완료'
+      }
+
+      if (status === 'prepared') {
+        return 'R2 준비 완료'
+      }
+
+      return '미준비'
+    }
+
+    const linkedImageLink = function (
+      matchingLinks
+    ) {
+      const first = matchingLinks.find(
+        function (link) {
+          return Number(link.image_id) > 0
+        }
       )
+
+      if (!first) return ''
+
+      return (
+        ' · <a href="#watcher-image-card-' +
+          escapeHtml(first.image_id) +
+        '" class="watcher-item-link">' +
+          '이미지 #' +
+          escapeHtml(first.image_id) +
+        '</a>'
+      )
+    }
+
+    const rows = []
+
+    const keyVisuals =
+      preparedByTypes(['KEY_VISUAL'])
+
+    const linkedKeyVisuals = links.filter(
+      function (link) {
+        return (
+          String(
+            link.image_type || ''
+          ).toUpperCase() === 'KEY_VISUAL'
+        )
+      }
+    )
+
+    const commonStatus =
+      linkedKeyVisuals.length > 0
+        ? 'linked'
+        : keyVisuals.length > 0
+          ? 'prepared'
+          : 'missing'
+
+    rows.push({
+      status: commonStatus,
+      html:
+        '<strong>게임 공통 키 비주얼</strong>' +
+        ' — ' +
+        statusLabel(commonStatus) +
+        linkedImageLink(
+          linkedKeyVisuals.length
+            ? linkedKeyVisuals
+            : keyVisuals.map(function (image) {
+                return {
+                  image_id: image.id
+                }
+              })
+        )
     })
-
-    const preparedCounts = {}
-
-    prepared.forEach(function (image) {
-      const type = String(
-        image.image_type || 'UNKNOWN'
-      ).toUpperCase()
-
-      preparedCounts[type] =
-        Number(preparedCounts[type] || 0) + 1
-    })
-
-    const preparedSummary =
-      Object.keys(preparedCounts).length
-        ? Object.keys(preparedCounts)
-            .map(function (type) {
-              return (
-                imageTypeLabel(type) +
-                ' ' +
-                preparedCounts[type] +
-                '개'
-              )
-            })
-            .join(' · ')
-        : '아직 준비된 이미지가 없습니다.'
-
-    const needs = [
-      '<li><strong>게임 공통</strong>' +
-        ' — 키 비주얼 1개 권장</li>'
-    ]
 
     variants.forEach(function (variant) {
+      const code = String(
+        variant.variantCode || ''
+      ).toUpperCase()
+
       const name = String(
         variant.variantName ||
         variant.variantCode ||
         '에디션'
       ).trim()
 
-      const platformText = (
+      const platforms = (
         Array.isArray(variant.platforms)
           ? variant.platforms
           : []
       ).map(function (platform) {
-        return watcherPlatformLabel(platform)
-      }).join(', ')
+        return String(platform || '')
+          .toLowerCase()
+      })
 
-      needs.push(
-        '<li><strong>' +
-          escapeHtml(name) +
-        '</strong>' +
+      const packageType = String(
+        variant.packageType || 'AUTO'
+      ).toUpperCase()
+
+      const kind = String(
+        variant.variantKind || ''
+      ).toUpperCase()
+
+      const physical =
+        packageType === 'PACKAGE' ||
+        packageType === 'BOTH' ||
         (
-          platformText
-            ? ' · ' + escapeHtml(platformText)
-            : ''
-        ) +
-        ' — ' +
-        escapeHtml(
-          watcherImageNeedLabel(variant)
-        ) +
-        '</li>'
+          packageType === 'AUTO' &&
+          platforms.some(function (platform) {
+            return platform !== 'pc'
+          })
+        )
+
+      const expectedTypes =
+        kind === 'STANDARD'
+          ? (
+            physical
+              ? ['PACKAGE']
+              : ['KEY_VISUAL']
+          )
+          : (
+            physical
+              ? [
+                  'LIMITED_EDITION',
+                  'PACKAGE'
+                ]
+              : [
+                  'LIMITED_EDITION',
+                  'KEY_VISUAL'
+                ]
+          )
+
+      const variantLinks = links.filter(
+        function (link) {
+          const linkCode = String(
+            link.variant_code || ''
+          ).toUpperCase()
+
+          const linkName = String(
+            link.variant_name || ''
+          ).trim()
+
+          return (
+            (
+              code &&
+              linkCode === code
+            ) ||
+            (
+              !code &&
+              linkName === name
+            )
+          )
+        }
       )
 
-      if (
-        String(
-          variant.preorderBonus || ''
-        ).trim() ||
-        String(
-          variant.preorderBonusNote || ''
-        ).trim()
-      ) {
-        needs.push(
-          '<li><strong>' +
+      const allPlatformsLinked =
+        platforms.length > 0 &&
+        platforms.every(function (platform) {
+          return variantLinks.some(
+            function (link) {
+              return (
+                String(
+                  link.platform || ''
+                ).toLowerCase() === platform &&
+                String(
+                  link.display_role || ''
+                ).toUpperCase() ===
+                  'REPRESENTATIVE'
+              )
+            }
+          )
+        })
+
+      const preparedMatches =
+        preparedByTypes(expectedTypes)
+
+      const variantStatus =
+        allPlatformsLinked
+          ? 'linked'
+          : (
+            variantLinks.length > 0 ||
+            preparedMatches.length > 0
+              ? 'prepared'
+              : 'missing'
+          )
+
+      const platformText = platforms
+        .map(function (platform) {
+          return watcherPlatformLabel(platform)
+        })
+        .join(', ')
+
+      rows.push({
+        status: variantStatus,
+        html:
+          '<strong>' +
             escapeHtml(name) +
-          ' 특전</strong>' +
-          ' — 예약/초회/판매처 특전 이미지 확인</li>'
+          '</strong>' +
+          (
+            platformText
+              ? ' · ' +
+                escapeHtml(platformText)
+              : ''
+          ) +
+          ' — ' +
+          statusLabel(variantStatus) +
+          linkedImageLink(
+            variantLinks.length
+              ? variantLinks
+              : preparedMatches.map(
+                  function (image) {
+                    return {
+                      image_id: image.id
+                    }
+                  }
+                )
+          )
+      })
+
+      const hasBonus =
+        Boolean(
+          String(
+            variant.preorderBonus || ''
+          ).trim()
+        ) ||
+        Boolean(
+          String(
+            variant.preorderBonusNote || ''
+          ).trim()
         )
+
+      if (hasBonus) {
+        const bonusLinks =
+          variantLinks.filter(function (link) {
+            return (
+              String(
+                link.display_role || ''
+              ).toUpperCase() === 'BONUS'
+            )
+          })
+
+        const preparedBonus =
+          preparedByTypes([
+            'PREORDER_BONUS',
+            'FIRST_PRINT_BONUS',
+            'STORE_BONUS'
+          ])
+
+        const bonusStatus =
+          bonusLinks.length > 0
+            ? 'linked'
+            : preparedBonus.length > 0
+              ? 'prepared'
+              : 'missing'
+
+        rows.push({
+          status: bonusStatus,
+          html:
+            '<strong>' +
+              escapeHtml(name) +
+            ' 특전</strong>' +
+            ' — ' +
+            statusLabel(bonusStatus) +
+            linkedImageLink(
+              bonusLinks.length
+                ? bonusLinks
+                : preparedBonus.map(
+                    function (image) {
+                      return {
+                        image_id: image.id
+                      }
+                    }
+                  )
+            )
+        })
       }
     })
 
+    const linkedCount = rows.filter(
+      function (row) {
+        return row.status === 'linked'
+      }
+    ).length
+
+    const preparedCount = rows.filter(
+      function (row) {
+        return row.status === 'prepared'
+      }
+    ).length
+
+    const missingCount = rows.filter(
+      function (row) {
+        return row.status === 'missing'
+      }
+    ).length
+
     return (
-      '<aside ' +
+      '<details ' +
         'data-watcher-image-needs="1" ' +
         'class="admin-notice" ' +
-        'style="grid-column:1/-1">' +
-        '<strong>필요 이미지 안내</strong>' +
+        'style="' +
+          'grid-column:1/-1;' +
+          'position:sticky;' +
+          'top:10px;' +
+          'z-index:5;' +
+          'max-height:70vh;' +
+          'overflow:auto' +
+        '">' +
+
+        '<summary style="' +
+          'cursor:pointer;' +
+          'font-weight:700;' +
+          'padding:4px 0' +
+        '">' +
+          '이미지 작업 현황 · ' +
+          '✓ 연결 ' + linkedCount +
+          ' · ◐ 준비 ' + preparedCount +
+          ' · ○ 남음 ' + missingCount +
+        '</summary>' +
+
         '<p class="admin-hint">' +
-          '에디션 폼을 기준으로 만든 검수용 안내입니다. ' +
-          '실제 이미지를 확인한 뒤 필요한 후보만 저장하고, ' +
-          '최종 연결은 사전예약 V2에서 진행합니다.' +
+          '실제 R2 저장과 사전예약 V2 연결 상태를 기준으로 표시합니다.' +
         '</p>' +
+
         '<ul style="' +
-          'margin:10px 0;' +
+          'margin:10px 0 0;' +
           'padding-left:20px;' +
           'display:grid;' +
-          'gap:6px' +
+          'gap:7px' +
         '">' +
-          needs.join('') +
+          rows.map(function (row) {
+            return (
+              '<li data-image-need-status="' +
+                escapeHtml(row.status) +
+              '">' +
+                '<span aria-hidden="true">' +
+                  statusIcon(row.status) +
+                '</span> ' +
+                row.html +
+              '</li>'
+            )
+          }).join('') +
         '</ul>' +
-        '<p class="admin-hint">' +
-          '<strong>현재 준비됨:</strong> ' +
-          escapeHtml(preparedSummary) +
-        '</p>' +
-      '</aside>'
+      '</details>'
     )
   }
 
@@ -3105,7 +3371,10 @@ async function readAllWatcherEvents() {
     }
 
     const needsHtml =
-      watcherImageNeedsHtml(list)
+      watcherImageNeedsHtml(
+        list,
+        item
+      )
 
     if (!list.length) {
       container.innerHTML =
@@ -3195,7 +3464,9 @@ async function readAllWatcherEvents() {
           )
 
         return (
-          '<article class="' +
+          '<article id="watcher-image-card-' +
+            escapeHtml(imageId) +
+            '" class="' +
             'watcher-transform-image-card' +
             (prepared ? ' is-selected' : '') +
           '">' +
