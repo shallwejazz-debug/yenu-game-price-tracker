@@ -2406,6 +2406,9 @@ watcherAdmin.post(
       .trim()
       .toUpperCase()
 
+    const prepareOnly =
+      body.prepareOnly === true
+
     const allowedImageTypes = new Set([
       'PACKAGE',
       'LIMITED_EDITION',
@@ -2673,17 +2676,6 @@ watcherAdmin.post(
       )
     }
 
-    if (preorderRows.length > 1) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            '멀티 에디션 이미지는 사전예약 V2 화면에서 에디션별로 연결해 주세요.',
-        },
-        409
-      )
-    }
-
     if (
       preorderRows.some(
         (preorder) =>
@@ -2695,7 +2687,75 @@ watcherAdmin.post(
         {
           ok: false,
           error:
-            '모든 예약판매가 DRAFT 상태여야 이미지를 선택할 수 있습니다.',
+            '모든 예약판매가 DRAFT 상태여야 이미지를 준비할 수 있습니다.',
+        },
+        409
+      )
+    }
+
+    if (prepareOnly) {
+      const prepareResult =
+        await c.env.DB.prepare(`
+          UPDATE watch_item_images
+
+          SET
+            image_type = ?,
+            permission_status = 'APPROVED',
+            selected_for_publish = 0,
+            reviewed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+
+          WHERE
+            id = ?
+            AND watch_item_id = ?
+        `)
+          .bind(
+            imageType,
+            imageId,
+            itemId
+          )
+          .run()
+
+      if (
+        Number(
+          prepareResult.meta.changes || 0
+        ) !== 1
+      ) {
+        return c.json(
+          {
+            ok: false,
+            error:
+              '이미지 후보 준비 상태를 저장하지 못했습니다.',
+          },
+          409
+        )
+      }
+
+      return c.json({
+        ok: true,
+        prepareOnly: true,
+        itemId,
+        gameId,
+        imageId,
+        imageType,
+        imagePermissionStatus:
+          'APPROVED',
+        selectedForPublish: false,
+        variantImagesChanged: false,
+        imageDownloaded: false,
+        imagePublished: false,
+        gameImageUrlChanged: false,
+        message:
+          '에디션 연결 전 이미지 후보 검수를 승인했습니다.',
+      })
+    }
+
+    if (preorderRows.length > 1) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            '멀티 에디션 이미지는 사전예약 V2 화면에서 에디션별로 연결해 주세요.',
         },
         409
       )
@@ -2878,6 +2938,13 @@ watcherAdmin.post(
       )
     }
 
+    const storeBody = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => null)
+
+    const prepareOnly =
+      storeBody?.prepareOnly === true
+
     const record = await c.env.DB.prepare(`
       SELECT
         wi.id AS watch_item_id,
@@ -2928,22 +2995,22 @@ watcherAdmin.post(
           gos.game_id = g.id
           AND gos.watch_item_id = wi.id
 
-      INNER JOIN variant_preorder_images vpi
+      LEFT JOIN variant_preorder_images vpi
         ON
           vpi.image_id = image.id
           AND vpi.display_role =
             'REPRESENTATIVE'
 
-      INNER JOIN variant_preorders vp
+      LEFT JOIN variant_preorders vp
         ON
           vp.id = vpi.preorder_id
           AND vp.official_source_id =
             gos.id
 
-      INNER JOIN product_variants pv
+      LEFT JOIN product_variants pv
         ON pv.id = vp.variant_id
 
-      INNER JOIN editions edition
+      LEFT JOIN editions edition
         ON
           edition.id = pv.edition_id
           AND edition.game_id = g.id
@@ -2980,9 +3047,9 @@ watcherAdmin.post(
         source_permission_status: string | null
         local_storage_allowed: number | null
 
-        preorder_id: number
+        preorder_id: number | null
         selected_image_id: number | null
-        preorder_publish_status: string
+        preorder_publish_status: string | null
       }>()
 
     if (!record) {
@@ -3027,7 +3094,70 @@ watcherAdmin.post(
       )
     }
 
+    if (prepareOnly) {
+      const { results: draftPreorders } =
+        await c.env.DB.prepare(`
+          SELECT vp.publish_status
+
+          FROM variant_preorders vp
+
+          INNER JOIN product_variants pv
+            ON pv.id = vp.variant_id
+
+          INNER JOIN editions e
+            ON e.id = pv.edition_id
+
+          INNER JOIN game_official_sources gos
+            ON gos.id = vp.official_source_id
+
+          WHERE
+            e.game_id = ?
+            AND gos.game_id = ?
+            AND gos.watch_item_id = ?
+        `)
+          .bind(
+            gameId,
+            gameId,
+            itemId
+          )
+          .all<{
+            publish_status: string
+          }>()
+
+      if (
+        !draftPreorders ||
+        draftPreorders.length < 1
+      ) {
+        return c.json(
+          {
+            ok: false,
+            error:
+              '연결 가능한 V2 예약판매 DRAFT가 없습니다.',
+          },
+          404
+        )
+      }
+
+      if (
+        draftPreorders.some(
+          (preorder) =>
+            preorder.publish_status !==
+            'DRAFT'
+        )
+      ) {
+        return c.json(
+          {
+            ok: false,
+            error:
+              '모든 예약판매가 DRAFT 상태여야 이미지를 저장할 수 있습니다.',
+          },
+          409
+        )
+      }
+    }
+
     if (
+      !prepareOnly &&
       record.preorder_publish_status !== 'DRAFT'
     ) {
       return c.json(
@@ -3041,8 +3171,15 @@ watcherAdmin.post(
     }
 
     if (
-      Number(record.selected_for_publish) !== 1 ||
-      Number(record.selected_image_id) !== imageId
+      !prepareOnly &&
+      (
+        Number(
+          record.selected_for_publish
+        ) !== 1 ||
+        Number(
+          record.selected_image_id
+        ) !== imageId
+      )
     ) {
       return c.json(
         {
@@ -3579,6 +3716,11 @@ watcherAdmin.post(
         )
       }
 
+      const selectionCondition =
+        prepareOnly
+          ? ''
+          : 'AND selected_for_publish = 1'
+
       const updateResult =
         await c.env.DB.prepare(`
           UPDATE watch_item_images
@@ -3591,7 +3733,7 @@ watcherAdmin.post(
           WHERE
             id = ?
             AND watch_item_id = ?
-            AND selected_for_publish = 1
+            ${selectionCondition}
             AND permission_status = 'APPROVED'
         `)
           .bind(
