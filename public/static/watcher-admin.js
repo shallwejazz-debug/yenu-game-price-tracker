@@ -4273,12 +4273,6 @@ async function readAllWatcherEvents() {
         item.linked_game_id
       )
 
-      renderTransformImages(
-        images,
-        item,
-        imagePolicy
-      )
-
 
       setTransformValue(
         'watcherTransformItemId',
@@ -4323,6 +4317,13 @@ async function readAllWatcherEvents() {
           preorderBonusNote:
             draft.preorderBonusNote
         }
+      )
+
+      // 에디션 폼 생성이 끝난 뒤 실제 이미지 작업 현황을 계산한다.
+      renderTransformImages(
+        images,
+        item,
+        imagePolicy
       )
 
       setTransformValue(

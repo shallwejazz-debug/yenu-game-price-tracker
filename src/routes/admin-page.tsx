@@ -2226,7 +2226,7 @@ export function AdminPage(): string {
   </main>
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
-	<script src="/static/watcher-admin.js?v=20260803-real-image-status-1"></script>
+	<script src="/static/watcher-admin.js?v=20260803-image-render-order-1"></script>
 	<script src="/static/preorder-admin.js?v=20260724-naver-preorder-v1"></script>
 </body>
 </html>`
