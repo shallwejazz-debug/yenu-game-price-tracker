@@ -3530,7 +3530,87 @@ async function readAllWatcherEvents() {
                 : ''
             ) +
 
-            sourceLink +
+            '<div style="' +
+              'display:flex;' +
+              'flex-wrap:wrap;' +
+              'gap:8px;' +
+              'align-items:center' +
+            '">' +
+              '<button ' +
+                'type="button" ' +
+                'class="btn btn-sm" ' +
+                'data-watcher-image-preview="' +
+                  escapeHtml(imageId) +
+                '"' +
+                (
+                  sourceUrl
+                    ? ''
+                    : ' disabled'
+                ) +
+              '>' +
+                '이미지 미리보기 펼치기' +
+              '</button>' +
+              sourceLink +
+            '</div>' +
+
+            '<div ' +
+              'data-watcher-image-preview-panel="' +
+                escapeHtml(imageId) +
+              '" ' +
+              'hidden ' +
+              'style="' +
+                'border:1px solid #30384a;' +
+                'border-radius:10px;' +
+                'padding:10px;' +
+                'background:#0d111b;' +
+                'text-align:center' +
+              '"' +
+            '>' +
+              (
+                sourceUrl
+                  ? (
+                    '<a href="' +
+                      escapeHtml(sourceUrl) +
+                    '" target="_blank" ' +
+                    'rel="noopener noreferrer" ' +
+                    'title="공식 이미지 원본 새 창으로 열기">' +
+                      '<img ' +
+                        'data-watcher-image-preview-img="' +
+                          escapeHtml(imageId) +
+                        '" ' +
+                        'data-source-url="' +
+                          escapeHtml(sourceUrl) +
+                        '" ' +
+                        'alt="공식 이미지 후보 #' +
+                          escapeHtml(imageId) +
+                        ' 미리보기" ' +
+                        'loading="lazy" ' +
+                        'decoding="async" ' +
+                        'style="' +
+                          'display:block;' +
+                          'width:100%;' +
+                          'max-width:100%;' +
+                          'max-height:560px;' +
+                          'margin:0 auto;' +
+                          'object-fit:contain;' +
+                          'border-radius:8px' +
+                        '" ' +
+                      '/>' +
+                    '</a>' +
+                    '<p class="admin-hint" ' +
+                      'data-watcher-image-preview-status="' +
+                        escapeHtml(imageId) +
+                      '" style="margin:8px 0 0">' +
+                      '이미지를 클릭하면 공식 원본을 새 창으로 엽니다.' +
+                    '</p>'
+                  )
+                  : (
+                    '<p class="admin-hint">' +
+                      '미리볼 이미지 URL이 없습니다.' +
+                    '</p>'
+                  )
+              ) +
+            '</div>' +
 
             '<label class="admin-field">' +
               '<span>사용할 이미지 유형</span>' +
@@ -3890,6 +3970,145 @@ async function readAllWatcherEvents() {
         button.textContent =
           '미리보기 다시 불러오기'
       }
+    }
+  }
+
+
+  function toggleWatcherImagePreview(
+    imageIdValue
+  ) {
+    const imageId = Number(imageIdValue)
+
+    if (
+      !Number.isInteger(imageId) ||
+      imageId <= 0
+    ) {
+      return
+    }
+
+    const imageList =
+      $('watcherTransformImageList')
+
+    if (!imageList) return
+
+    const targetPanel =
+      imageList.querySelector(
+        '[data-watcher-image-preview-panel="' +
+          imageId +
+        '"]'
+      )
+
+    const targetButton =
+      imageList.querySelector(
+        '[data-watcher-image-preview="' +
+          imageId +
+        '"]'
+      )
+
+    if (!targetPanel || !targetButton) {
+      return
+    }
+
+    const willOpen = targetPanel.hidden
+
+    imageList.querySelectorAll(
+      '[data-watcher-image-preview-panel]'
+    ).forEach(function (panel) {
+      panel.hidden = true
+    })
+
+    imageList.querySelectorAll(
+      '[data-watcher-image-preview]'
+    ).forEach(function (button) {
+      button.textContent =
+        '이미지 미리보기 펼치기'
+      button.setAttribute(
+        'aria-expanded',
+        'false'
+      )
+    })
+
+    if (!willOpen) {
+      return
+    }
+
+    const image = targetPanel.querySelector(
+      '[data-watcher-image-preview-img="' +
+        imageId +
+      '"]'
+    )
+
+    const status = targetPanel.querySelector(
+      '[data-watcher-image-preview-status="' +
+        imageId +
+      '"]'
+    )
+
+    if (
+      image &&
+      !image.getAttribute('src')
+    ) {
+      const sourceUrl = String(
+        image.getAttribute(
+          'data-source-url'
+        ) || ''
+      ).trim()
+
+      if (sourceUrl) {
+        if (status) {
+          status.textContent =
+            '공식 이미지를 불러오는 중입니다.'
+        }
+
+        image.addEventListener(
+          'load',
+          function () {
+            if (status) {
+              status.textContent =
+                '이미지를 클릭하면 공식 원본을 새 창으로 엽니다.'
+            }
+          },
+          {
+            once: true
+          }
+        )
+
+        image.addEventListener(
+          'error',
+          function () {
+            if (status) {
+              status.textContent =
+                '미리보기를 불러오지 못했습니다. 공식 원본 링크를 이용해 주세요.'
+            }
+          },
+          {
+            once: true
+          }
+        )
+
+        image.src = sourceUrl
+      }
+    }
+
+    targetPanel.hidden = false
+
+    targetButton.textContent =
+      '이미지 미리보기 접기'
+
+    targetButton.setAttribute(
+      'aria-expanded',
+      'true'
+    )
+
+    const card = targetButton.closest(
+      '.watcher-transform-image-card'
+    )
+
+    if (card) {
+      card.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      })
     }
   }
 
@@ -5494,6 +5713,24 @@ async function readAllWatcherEvents() {
         const target = event.target
 
         if (!(target instanceof Element)) {
+          return
+        }
+
+        const previewButton =
+          target.closest(
+            '[data-watcher-image-preview]'
+          )
+
+        if (
+          previewButton &&
+          imageList.contains(previewButton)
+        ) {
+          toggleWatcherImagePreview(
+            previewButton.getAttribute(
+              'data-watcher-image-preview'
+            )
+          )
+
           return
         }
 
