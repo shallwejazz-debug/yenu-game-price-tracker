@@ -17,6 +17,7 @@
   let saving = false
   let approving = false
   let publishing = false
+  let bulkImageSaving = false
 
   let games = []
   let detail = null
@@ -387,6 +388,91 @@
     }
   }
 
+  function variantImageSummaryHtml(variant) {
+    const linkedImages =
+      detail &&
+      Array.isArray(detail.images)
+        ? detail.images.filter(
+            function (image) {
+              return String(
+                image.preorder_id
+              ) === String(
+                variant.preorder_id
+              )
+            }
+          )
+        : []
+
+    if (!linkedImages.length) {
+      return (
+        '<div ' +
+          'style="' +
+            'margin-top:12px;' +
+            'padding:10px 12px;' +
+            'border-radius:10px;' +
+            'background:rgba(245,158,11,.10);' +
+            'color:#fbbf24;' +
+            'font-size:13px' +
+          '">' +
+          '⚠ 이미지 미연결' +
+        '</div>'
+      )
+    }
+
+    const roleLabels = {
+      REPRESENTATIVE: '대표',
+      PACKAGE: '패키지',
+      BONUS: '예약 특전',
+      CONTENTS: '구성품',
+      GALLERY: '갤러리'
+    }
+
+    const badges = linkedImages.map(
+      function (image) {
+        return (
+          '<span ' +
+            'title="' +
+              escapeHtml(
+                image.image_type || ''
+              ) +
+            '" ' +
+            'style="' +
+              'display:inline-flex;' +
+              'align-items:center;' +
+              'gap:4px;' +
+              'padding:5px 8px;' +
+              'border-radius:999px;' +
+              'background:rgba(34,197,94,.12);' +
+              'color:#86efac;' +
+              'font-size:12px' +
+            '">' +
+            '✓ ' +
+            escapeHtml(
+              roleLabels[
+                image.display_role
+              ] ||
+              image.display_role
+            ) +
+            ' #' +
+            escapeHtml(image.image_id) +
+          '</span>'
+        )
+      }
+    ).join('')
+
+    return (
+      '<div ' +
+        'style="' +
+          'display:flex;' +
+          'flex-wrap:wrap;' +
+          'gap:6px;' +
+          'margin-top:12px' +
+        '">' +
+        badges +
+      '</div>'
+    )
+  }
+
   function renderExisting() {
     const container =
       $('preorderV2Existing')
@@ -580,6 +666,9 @@
               '</dd>' +
             '</div>' +
           '</dl>' +
+          variantImageSummaryHtml(
+            variant
+          ) +
         '</article>'
     })
 
@@ -660,6 +749,7 @@
 
       resetForm()
       renderExisting()
+      renderBulkImageManager()
 
       setStatus(
         '게임 정보를 불러왔습니다.',
@@ -895,6 +985,8 @@
       renderImageCandidates(
         selectedImages
       )
+
+      renderBulkImageManager()
     } catch (error) {
       imageCandidates = []
 
@@ -908,6 +1000,585 @@
             ) +
           '</div>'
       }
+    }
+  }
+
+  function usableBulkImages() {
+    return imageCandidates.filter(
+      function (image) {
+        return (
+          String(
+            image.permission_status || ''
+          ).toUpperCase() ===
+            'APPROVED' &&
+          String(
+            image.stored_image_url ||
+            image.stored_url ||
+            image.r2_object_key ||
+            ''
+          ).trim()
+        )
+      }
+    )
+  }
+
+  function bulkImageOptionHtml(
+    images,
+    selectedId,
+    emptyLabel
+  ) {
+    let html =
+      '<option value="">' +
+        escapeHtml(emptyLabel) +
+      '</option>'
+
+    images.forEach(function (image) {
+      const selected =
+        Number(image.id) ===
+        Number(selectedId)
+
+      html +=
+        '<option value="' +
+          escapeHtml(image.id) +
+        '"' +
+          (
+            selected
+              ? ' selected'
+              : ''
+          ) +
+        '>' +
+          '#' +
+          escapeHtml(image.id) +
+          ' · ' +
+          escapeHtml(
+            image.image_type ||
+            '이미지'
+          ) +
+        '</option>'
+    })
+
+    return html
+  }
+
+  function updateBulkImagePreview() {
+    const panel =
+      $('preorderV2BulkImages')
+
+    const status =
+      $('preorderV2BulkImageStatus')
+
+    const button =
+      $('savePreorderV2BulkImages')
+
+    if (!panel || !status || !button) {
+      return
+    }
+
+    const representativeId = Number(
+      fieldValue(
+        'preorderV2BulkRepresentative'
+      )
+    )
+
+    const contentsId = Number(
+      fieldValue(
+        'preorderV2BulkContents'
+      )
+    )
+
+    const representativeTargets =
+      panel.querySelectorAll(
+        '[data-bulk-representative-target]:checked'
+      ).length
+
+    const contentsTargets =
+      contentsId
+        ? panel.querySelectorAll(
+            '[data-bulk-contents-target]:checked'
+          ).length
+        : 0
+
+    button.disabled =
+      !representativeId ||
+      representativeTargets < 1 ||
+      bulkImageSaving
+
+    if (!representativeId) {
+      status.textContent =
+        '공통 대표 이미지를 선택해 주세요.'
+      status.className =
+        'admin-status info'
+      return
+    }
+
+    status.textContent =
+      '적용 예정 · 대표 이미지 #' +
+      representativeId +
+      ' → ' +
+      representativeTargets +
+      '개 에디션' +
+      (
+        contentsId
+          ? (
+              ' · 구성품 이미지 #' +
+              contentsId +
+              ' → ' +
+              contentsTargets +
+              '개 에디션'
+            )
+          : ''
+      )
+
+    status.className =
+      'admin-status info'
+  }
+
+  function renderBulkImageManager() {
+    const panel =
+      $('preorderV2BulkImages')
+
+    if (!panel) return
+
+    const variants =
+      detail &&
+      Array.isArray(detail.variants)
+        ? detail.variants.filter(
+            function (variant) {
+              return (
+                String(
+                  variant
+                    .preorder_publish_status ||
+                  'DRAFT'
+                ).toUpperCase() ===
+                  'DRAFT' &&
+                Number(
+                  variant.preorder_id
+                ) > 0
+              )
+            }
+          )
+        : []
+
+    const images = usableBulkImages()
+
+    if (!variants.length) {
+      panel.innerHTML =
+        '<div class="admin-empty">' +
+          '일괄 적용할 DRAFT 에디션이 없습니다.' +
+        '</div>'
+      return
+    }
+
+    if (!images.length) {
+      panel.innerHTML =
+        '<div class="admin-empty">' +
+          '승인되고 R2에 저장된 이미지 후보를 불러오는 중입니다.' +
+        '</div>'
+      return
+    }
+
+    const linkedImages =
+      detail &&
+      Array.isArray(detail.images)
+        ? detail.images
+        : []
+
+    const existingRepresentative =
+      linkedImages.find(
+        function (image) {
+          return (
+            image.display_role ===
+            'REPRESENTATIVE'
+          )
+        }
+      )
+
+    const existingContents =
+      linkedImages.find(
+        function (image) {
+          return (
+            image.display_role ===
+            'CONTENTS'
+          )
+        }
+      )
+
+    const recommendedRepresentative =
+      existingRepresentative ||
+      images.find(
+        function (image) {
+          return (
+            String(
+              image.image_type || ''
+            ).toUpperCase() ===
+            'KEY_VISUAL'
+          )
+        }
+      ) ||
+      images[0]
+
+    const recommendedContents =
+      existingContents ||
+      images.find(
+        function (image) {
+          return (
+            String(
+              image.image_type || ''
+            ).toUpperCase() ===
+            'LIMITED_EDITION'
+          )
+        }
+      )
+
+    let targetRows = ''
+
+    variants.forEach(function (variant) {
+      const currentImages =
+        linkedImages.filter(
+          function (image) {
+            return String(
+              image.preorder_id
+            ) === String(
+              variant.preorder_id
+            )
+          }
+        )
+
+      const hasRepresentative =
+        currentImages.some(
+          function (image) {
+            return (
+              image.display_role ===
+              'REPRESENTATIVE'
+            )
+          }
+        )
+
+      const hasContents =
+        currentImages.some(
+          function (image) {
+            return (
+              image.display_role ===
+              'CONTENTS'
+            )
+          }
+        )
+
+      const isBox =
+        /우로보로스|BOX/i.test(
+          String(
+            variant.variant_name || ''
+          )
+        ) ||
+        (
+          variant.variant_kind ===
+          'LIMITED'
+        ) ||
+        (
+          variant.variant_kind ===
+          'COLLECTORS'
+        )
+
+      targetRows +=
+        '<div ' +
+          'style="' +
+            'display:grid;' +
+            'grid-template-columns:minmax(180px,1fr) 120px 140px;' +
+            'gap:12px;' +
+            'align-items:center;' +
+            'padding:10px 0;' +
+            'border-top:1px solid rgba(148,163,184,.15)' +
+          '">' +
+
+          '<div>' +
+            '<b>' +
+              escapeHtml(
+                platformLabel(
+                  variant.platform
+                )
+              ) +
+            '</b>' +
+            '<div style="font-size:13px;color:#cbd5e1;margin-top:3px">' +
+              escapeHtml(
+                variant.variant_name
+              ) +
+            '</div>' +
+            '<div style="font-size:11px;color:#94a3b8;margin-top:3px">' +
+              (
+                hasRepresentative
+                  ? '현재 대표 이미지 연결됨'
+                  : '현재 대표 이미지 없음'
+              ) +
+              (
+                hasContents
+                  ? ' · 구성품 연결됨'
+                  : ''
+              ) +
+            '</div>' +
+          '</div>' +
+
+          '<label style="display:flex;gap:7px;align-items:center">' +
+            '<input ' +
+              'type="checkbox" ' +
+              'data-bulk-representative-target ' +
+              'value="' +
+                escapeHtml(variant.id) +
+              '" checked' +
+            ' />' +
+            '<span>대표 적용</span>' +
+          '</label>' +
+
+          '<label style="display:flex;gap:7px;align-items:center">' +
+            '<input ' +
+              'type="checkbox" ' +
+              'data-bulk-contents-target ' +
+              'value="' +
+                escapeHtml(variant.id) +
+              '"' +
+              (
+                isBox
+                  ? ' checked'
+                  : ''
+              ) +
+            ' />' +
+            '<span>BOX 구성 적용</span>' +
+          '</label>' +
+        '</div>'
+    })
+
+    panel.innerHTML =
+      '<div ' +
+        'style="' +
+          'display:grid;' +
+          'grid-template-columns:repeat(2,minmax(0,1fr));' +
+          'gap:14px' +
+        '">' +
+
+        '<label class="admin-field">' +
+          '<span>' +
+            '전체 에디션 공통 대표 이미지 ' +
+            '<span ' +
+              'title="상품 목록과 상세 화면에서 가장 먼저 표시되는 이미지입니다."' +
+            '>ⓘ</span>' +
+          '</span>' +
+          '<select id="preorderV2BulkRepresentative">' +
+            bulkImageOptionHtml(
+              images,
+              recommendedRepresentative
+                ? recommendedRepresentative.id
+                : '',
+              '대표 이미지 선택'
+            ) +
+          '</select>' +
+        '</label>' +
+
+        '<label class="admin-field">' +
+          '<span>' +
+            'BOX 구성품 이미지 ' +
+            '<span ' +
+              'title="한정판 구성 전체를 보여주는 이미지입니다. 선택하지 않아도 됩니다."' +
+            '>ⓘ</span>' +
+          '</span>' +
+          '<select id="preorderV2BulkContents">' +
+            bulkImageOptionHtml(
+              images,
+              recommendedContents
+                ? recommendedContents.id
+                : '',
+              '사용하지 않음'
+            ) +
+          '</select>' +
+        '</label>' +
+      '</div>' +
+
+      '<div ' +
+        'style="' +
+          'margin-top:14px;' +
+          'padding:0 12px;' +
+          'border:1px solid rgba(148,163,184,.18);' +
+          'border-radius:12px' +
+        '">' +
+        targetRows +
+      '</div>' +
+
+      '<p ' +
+        'id="preorderV2BulkImageStatus" ' +
+        'class="admin-status info" ' +
+        'aria-live="polite"' +
+      '></p>' +
+
+      '<div class="preorder-v2-actions">' +
+        '<button ' +
+          'id="savePreorderV2BulkImages" ' +
+          'class="btn btn-primary" ' +
+          'type="button"' +
+        '>' +
+          '선택한 이미지 전체 DRAFT 저장' +
+        '</button>' +
+      '</div>'
+
+    panel.onchange =
+      updateBulkImagePreview
+
+    const button =
+      $('savePreorderV2BulkImages')
+
+    if (button) {
+      button.onclick =
+        saveBulkImages
+    }
+
+    updateBulkImagePreview()
+  }
+
+  async function saveBulkImages() {
+    if (
+      bulkImageSaving ||
+      !detail ||
+      !detail.game
+    ) {
+      return
+    }
+
+    const panel =
+      $('preorderV2BulkImages')
+
+    const button =
+      $('savePreorderV2BulkImages')
+
+    if (!panel || !button) return
+
+    const representativeImageId =
+      Number(
+        fieldValue(
+          'preorderV2BulkRepresentative'
+        )
+      )
+
+    const contentsImageId =
+      Number(
+        fieldValue(
+          'preorderV2BulkContents'
+        )
+      ) || null
+
+    const representativeVariantIds =
+      Array.from(
+        panel.querySelectorAll(
+          '[data-bulk-representative-target]:checked'
+        )
+      ).map(
+        function (checkbox) {
+          return Number(checkbox.value)
+        }
+      ).filter(Number.isInteger)
+
+    const contentsVariantIds =
+      contentsImageId
+        ? Array.from(
+            panel.querySelectorAll(
+              '[data-bulk-contents-target]:checked'
+            )
+          ).map(
+            function (checkbox) {
+              return Number(checkbox.value)
+            }
+          ).filter(Number.isInteger)
+        : []
+
+    if (
+      !Number.isInteger(
+        representativeImageId
+      ) ||
+      representativeImageId <= 0 ||
+      representativeVariantIds.length < 1
+    ) {
+      setStatus(
+        '대표 이미지와 적용 대상 에디션을 확인해 주세요.',
+        'err'
+      )
+      return
+    }
+
+    const confirmed = window.confirm(
+      '이미지 일괄 연결을 저장할까요?\n\n' +
+      '대표 이미지 #' +
+      representativeImageId +
+      ' → ' +
+      representativeVariantIds.length +
+      '개 에디션\n' +
+      (
+        contentsImageId
+          ? (
+              '구성품 이미지 #' +
+              contentsImageId +
+              ' → ' +
+              contentsVariantIds.length +
+              '개 에디션\n'
+            )
+          : '구성품 이미지 → 적용하지 않음\n'
+      ) +
+      '\nDRAFT 이미지 연결만 변경되며 공개되지 않습니다.'
+    )
+
+    if (!confirmed) return
+
+    bulkImageSaving = true
+    button.disabled = true
+    button.textContent = '전체 저장 중...'
+
+    setStatus(
+      '선택한 에디션의 이미지 연결을 한 번에 저장하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const result = await api(
+        '/admin/api/preorders/games/' +
+          encodeURIComponent(
+            detail.game.id
+          ) +
+          '/images/bulk',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            representativeImageId:
+              representativeImageId,
+            contentsImageId:
+              contentsImageId,
+            representativeVariantIds:
+              representativeVariantIds,
+            contentsVariantIds:
+              contentsVariantIds
+          })
+        }
+      )
+
+      const gameId = detail.game.id
+
+      await loadGameDetail(gameId)
+
+      setStatus(
+        '✓ 이미지 일괄 저장 완료 · 대표 ' +
+          result.representativeSaved +
+          '개 · 구성품 ' +
+          result.contentsSaved +
+          '개 · 아직 공개되지 않았습니다.',
+        'ok'
+      )
+    } catch (error) {
+      setStatus(
+        error && error.message
+          ? error.message
+          : '이미지 일괄 저장에 실패했습니다.',
+        'err'
+      )
+
+      button.disabled = false
+      button.textContent =
+        '선택한 이미지 전체 DRAFT 저장'
+    } finally {
+      bulkImageSaving = false
     }
   }
 

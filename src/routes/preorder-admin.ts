@@ -1438,6 +1438,471 @@ preorderAdmin.post(
   }
 )
 
+
+// ------------------------------------------------------------
+// DRAFT 에디션 이미지 일괄 연결
+//
+// 대표 이미지는 선택한 모든 DRAFT 에디션에 적용한다.
+// 구성품 이미지는 선택한 DRAFT 에디션에만 적용한다.
+// 다른 역할의 기존 이미지는 유지한다.
+// 검토 승인·게시 상태는 변경하지 않는다.
+// ------------------------------------------------------------
+
+preorderAdmin.post(
+  '/games/:gameId/images/bulk',
+  async (c) => {
+    const gameId = Number(
+      c.req.param('gameId')
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return jsonError(
+        c,
+        '게임 정보가 올바르지 않습니다.',
+        400
+      )
+    }
+
+    const body = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => null)
+
+    if (!body) {
+      return jsonError(
+        c,
+        'invalid JSON body',
+        400
+      )
+    }
+
+    const representativeImageId =
+      positiveInteger(
+        body.representativeImageId
+      )
+
+    const contentsImageId =
+      positiveInteger(
+        body.contentsImageId
+      )
+
+    const normalizeIds = (
+      value: unknown
+    ): number[] => {
+      if (!Array.isArray(value)) {
+        return []
+      }
+
+      return Array.from(
+        new Set(
+          value
+            .map(Number)
+            .filter(
+              (id) =>
+                Number.isInteger(id) &&
+                id > 0
+            )
+        )
+      )
+    }
+
+    const representativeVariantIds =
+      normalizeIds(
+        body.representativeVariantIds
+      )
+
+    const contentsVariantIds =
+      normalizeIds(
+        body.contentsVariantIds
+      )
+
+    if (
+      !representativeImageId ||
+      representativeVariantIds.length < 1
+    ) {
+      return jsonError(
+        c,
+        '대표 이미지와 적용 대상 에디션을 선택해 주세요.',
+        400
+      )
+    }
+
+    if (
+      contentsVariantIds.length > 0 &&
+      !contentsImageId
+    ) {
+      return jsonError(
+        c,
+        '구성품 이미지를 선택해 주세요.',
+        400
+      )
+    }
+
+    if (
+      contentsImageId &&
+      contentsImageId ===
+        representativeImageId
+    ) {
+      return jsonError(
+        c,
+        '대표 이미지와 구성품 이미지는 서로 달라야 합니다.',
+        400
+      )
+    }
+
+    const game = await c.env.DB.prepare(`
+      SELECT
+        id,
+        title,
+        publish_status
+
+      FROM games
+
+      WHERE id = ?
+
+      LIMIT 1
+    `)
+      .bind(gameId)
+      .first<{
+        id: number
+        title: string
+        publish_status: string
+      }>()
+
+    if (!game) {
+      return jsonError(
+        c,
+        '게임을 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    if (game.publish_status !== 'DRAFT') {
+      return jsonError(
+        c,
+        '비공개 DRAFT 게임에서만 이미지 일괄 저장을 사용할 수 있습니다.',
+        409
+      )
+    }
+
+    const { results: rows } =
+      await c.env.DB.prepare(`
+        SELECT
+          pv.id AS variant_id,
+          pv.variant_name,
+          pv.publish_status
+            AS variant_publish_status,
+
+          vp.id AS preorder_id,
+          vp.publish_status
+            AS preorder_publish_status,
+
+          gos.watch_item_id
+
+        FROM product_variants pv
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        INNER JOIN variant_preorders vp
+          ON vp.variant_id = pv.id
+
+        INNER JOIN game_official_sources gos
+          ON gos.id = vp.official_source_id
+
+        WHERE e.game_id = ?
+
+        ORDER BY
+          pv.display_order ASC,
+          pv.id ASC
+      `)
+        .bind(gameId)
+        .all<{
+          variant_id: number
+          variant_name: string
+          variant_publish_status: string
+          preorder_id: number
+          preorder_publish_status: string
+          watch_item_id: number
+        }>()
+
+    const variantMap = new Map(
+      (rows ?? []).map(
+        (row) => [
+          Number(row.variant_id),
+          row,
+        ]
+      )
+    )
+
+    const allRequestedIds =
+      Array.from(
+        new Set([
+          ...representativeVariantIds,
+          ...contentsVariantIds,
+        ])
+      )
+
+    for (const variantId of allRequestedIds) {
+      const target = variantMap.get(
+        variantId
+      )
+
+      if (!target) {
+        return jsonError(
+          c,
+          '선택한 에디션이 이 게임에 속하지 않습니다.',
+          409
+        )
+      }
+
+      if (
+        target.variant_publish_status !==
+          'DRAFT' ||
+        target.preorder_publish_status !==
+          'DRAFT'
+      ) {
+        return jsonError(
+          c,
+          'DRAFT 상태의 에디션만 일괄 수정할 수 있습니다.',
+          409
+        )
+      }
+    }
+
+    const imageIds = [
+      representativeImageId,
+      contentsImageId,
+    ].filter(
+      (imageId): imageId is number =>
+        Number.isInteger(imageId) &&
+        imageId > 0
+    )
+
+    const imageMap = new Map<
+      number,
+      {
+        id: number
+        watch_item_id: number
+      }
+    >()
+
+    for (const imageId of imageIds) {
+      const image =
+        await c.env.DB.prepare(`
+          SELECT
+            id,
+            watch_item_id
+
+          FROM watch_item_images
+
+          WHERE
+            id = ?
+            AND permission_status =
+              'APPROVED'
+            AND stored_image_url
+              IS NOT NULL
+            AND TRIM(stored_image_url)
+              <> ''
+
+          LIMIT 1
+        `)
+          .bind(imageId)
+          .first<{
+            id: number
+            watch_item_id: number
+          }>()
+
+      if (!image) {
+        return jsonError(
+          c,
+          '승인되지 않았거나 R2에 저장되지 않은 이미지가 포함되어 있습니다.',
+          409
+        )
+      }
+
+      imageMap.set(imageId, image)
+    }
+
+    for (
+      const variantId of
+      representativeVariantIds
+    ) {
+      const target =
+        variantMap.get(variantId)!
+
+      const image =
+        imageMap.get(
+          representativeImageId
+        )!
+
+      if (
+        Number(image.watch_item_id) !==
+        Number(target.watch_item_id)
+      ) {
+        return jsonError(
+          c,
+          '대표 이미지와 에디션의 공식 출처가 일치하지 않습니다.',
+          409
+        )
+      }
+    }
+
+    if (contentsImageId) {
+      for (
+        const variantId of
+        contentsVariantIds
+      ) {
+        const target =
+          variantMap.get(variantId)!
+
+        const image =
+          imageMap.get(
+            contentsImageId
+          )!
+
+        if (
+          Number(image.watch_item_id) !==
+          Number(target.watch_item_id)
+        ) {
+          return jsonError(
+            c,
+            '구성품 이미지와 에디션의 공식 출처가 일치하지 않습니다.',
+            409
+          )
+        }
+      }
+    }
+
+    const statements = []
+
+    for (
+      const variantId of
+      representativeVariantIds
+    ) {
+      const target =
+        variantMap.get(variantId)!
+
+      statements.push(
+        c.env.DB.prepare(`
+          DELETE FROM variant_preorder_images
+
+          WHERE
+            preorder_id = ?
+            AND (
+              display_role =
+                'REPRESENTATIVE'
+              OR image_id = ?
+            )
+        `).bind(
+          target.preorder_id,
+          representativeImageId
+        )
+      )
+
+      statements.push(
+        c.env.DB.prepare(`
+          INSERT INTO variant_preorder_images (
+            preorder_id,
+            image_id,
+            display_role,
+            display_order,
+            alt_text
+          )
+
+          VALUES (
+            ?, ?, 'REPRESENTATIVE', 0, ?
+          )
+        `).bind(
+          target.preorder_id,
+          representativeImageId,
+          `${target.variant_name} 대표 이미지`
+        )
+      )
+    }
+
+    if (contentsImageId) {
+      const draftRows =
+        (rows ?? []).filter(
+          (row) =>
+            row.variant_publish_status ===
+              'DRAFT' &&
+            row.preorder_publish_status ===
+              'DRAFT'
+        )
+
+      for (const target of draftRows) {
+        statements.push(
+          c.env.DB.prepare(`
+            DELETE FROM variant_preorder_images
+
+            WHERE
+              preorder_id = ?
+              AND image_id = ?
+          `).bind(
+            target.preorder_id,
+            contentsImageId
+          )
+        )
+      }
+
+      for (
+        const variantId of
+        contentsVariantIds
+      ) {
+        const target =
+          variantMap.get(variantId)!
+
+        statements.push(
+          c.env.DB.prepare(`
+            INSERT INTO variant_preorder_images (
+              preorder_id,
+              image_id,
+              display_role,
+              display_order,
+              alt_text
+            )
+
+            VALUES (
+              ?, ?, 'CONTENTS', 1, ?
+            )
+          `).bind(
+            target.preorder_id,
+            contentsImageId,
+            `${target.variant_name} 구성품 이미지`
+          )
+        )
+      }
+    }
+
+    if (statements.length < 1) {
+      return jsonError(
+        c,
+        '저장할 이미지 연결이 없습니다.',
+        400
+      )
+    }
+
+    await c.env.DB.batch(statements)
+
+    return c.json({
+      ok: true,
+      gameId,
+      representativeImageId,
+      contentsImageId:
+        contentsImageId ?? null,
+      representativeSaved:
+        representativeVariantIds.length,
+      contentsSaved:
+        contentsImageId
+          ? contentsVariantIds.length
+          : 0,
+      publishStatusChanged: false,
+    })
+  }
+)
 // ------------------------------------------------------------
 // 상품 에디션 예약판매 검토 승인
 //

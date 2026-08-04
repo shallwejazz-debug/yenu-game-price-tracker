@@ -1160,6 +1160,51 @@ export function AdminPage(): string {
           </button>
         </div>
 
+        <section
+          class="preorder-v2-section"
+          style="margin-bottom:20px"
+        >
+          <div class="admin-section-head">
+            <div>
+              <h3>🖼️ 에디션 이미지 일괄 연결</h3>
+
+              <p class="admin-hint">
+                공통 대표 이미지는 전체 에디션에,
+                구성품 이미지는 선택한 BOX 에디션에 한 번에 적용합니다.
+              </p>
+            </div>
+          </div>
+
+          <details class="admin-details">
+            <summary>이미지 역할 간단 설명</summary>
+
+            <div class="admin-details-body">
+              <ul class="admin-help-list">
+                <li>
+                  <b>대표 이미지</b>:
+                  상품 목록과 상세 화면에서 가장 먼저 보이는 이미지
+                </li>
+                <li>
+                  <b>구성품 이미지</b>:
+                  한정판 BOX의 전체 구성품을 보여주는 이미지
+                </li>
+                <li>
+                  저장 전 적용 대상을 확인할 수 있으며,
+                  저장만으로 공개되지는 않습니다.
+                </li>
+              </ul>
+            </div>
+          </details>
+
+          <div
+            id="preorderV2BulkImages"
+            style="margin-top:14px"
+          >
+            <div class="admin-empty">
+              게임과 이미지 후보를 불러오는 중입니다.
+            </div>
+          </div>
+        </section>
         <form id="preorderV2Form">
           <div class="preorder-v2-section">
             <h3>1. 플랫폼</h3>
@@ -2227,7 +2272,7 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
-	<script src="/static/preorder-admin.js?v=20260724-naver-preorder-v1"></script>
+	<script src="/static/preorder-admin.js?v=20260804-bulk-image-workflow-1"></script>
 </body>
 </html>`
 }
