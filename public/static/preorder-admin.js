@@ -448,6 +448,9 @@
     const endException =
       exceptions.PREORDER_END_DATE
 
+    const bonusException =
+      exceptions.PREORDER_BONUS
+
     if (!variant.release_date) {
       reasons.push('출시일 미입력')
     }
@@ -467,6 +470,17 @@
     ) {
       reasons.push(
         '예약 종료일 또는 미입력 사유 필요'
+      )
+    }
+
+    if (
+      !String(
+        variant.preorder_bonus || ''
+      ).trim() &&
+      !bonusException
+    ) {
+      reasons.push(
+        '예약특전 또는 처리 사유 필요'
       )
     }
 
@@ -832,6 +846,17 @@
         }
       ).length
 
+    const benefitReady =
+      variants.filter(
+        function (variant) {
+          return Boolean(
+            window.preorderBenefitWorkflow &&
+            window.preorderBenefitWorkflow
+              .benefitReady(variant)
+          )
+        }
+      ).length
+
     const reviewReady =
       variants.filter(
         function (variant) {
@@ -875,6 +900,11 @@
     setText(
       'preorderV2ReviewStatusSummary',
       statusReady + '/' + total
+    )
+
+    setText(
+      'preorderV2ReviewBenefitSummary',
+      benefitReady + '/' + total
     )
 
     setText(
@@ -1420,7 +1450,16 @@
             '</span>' +
             '<span>' +
               escapeHtml(
-                preorderPublishStatus
+                preorderPublishStatus ===
+                  'DRAFT'
+                  ? '작성 중 · 비공개'
+                  : preorderPublishStatus ===
+                      'APPROVED'
+                    ? '검토 승인 · 비공개'
+                    : preorderPublishStatus ===
+                        'PUBLISHED'
+                      ? '공개 중'
+                      : preorderPublishStatus
               ) +
             '</span>' +
           '</div>' +
@@ -1444,21 +1483,21 @@
               '<dt>예약 기간</dt>' +
               '<dd>' +
                 escapeHtml(
-                  (
-                    variant.preorder_start_date ||
-                    '-'
-                  ) +
+                  reviewState.startLabel +
                   ' ~ ' +
-                  (
-                    variant.preorder_end_date ||
-                    '-'
-                  )
+                  reviewState.endLabel
                 ) +
               '</dd>' +
             '</div>' +
           '</dl>' +
           variantImageSummaryHtml(
             variant
+          ) +
+          (
+            window.preorderBenefitWorkflow
+              ? window.preorderBenefitWorkflow
+                  .summaryHtml(variant)
+              : ''
           ) +
           variantReviewStatusHtml(
             variant
@@ -1545,6 +1584,16 @@
       renderExisting()
       renderBulkImageManager()
       renderReviewPreparation()
+
+      if (
+        window.preorderBenefitWorkflow
+      ) {
+        window.preorderBenefitWorkflow
+          .render(
+            detail,
+            loadGameDetail
+          )
+      }
 
       setStatus(
         '게임 정보를 불러왔습니다.',
@@ -2059,12 +2108,7 @@
           }
         )
 
-      const isBox =
-        /우로보로스|BOX/i.test(
-          String(
-            variant.variant_name || ''
-          )
-        ) ||
+      const isContentsTarget =
         (
           variant.variant_kind ===
           'LIMITED'
@@ -2131,12 +2175,12 @@
                 escapeHtml(variant.id) +
               '"' +
               (
-                isBox
+                isContentsTarget
                   ? ' checked'
                   : ''
               ) +
             ' />' +
-            '<span>BOX 구성 적용</span>' +
+            '<span>구성품 적용</span>' +
           '</label>' +
         '</div>'
     })
@@ -2175,7 +2219,7 @@
 
         '<label class="admin-field">' +
           '<span>' +
-            'BOX 구성품 이미지 ' +
+            '선택 에디션 구성품 이미지 ' +
             '<span ' +
               'title="한정판 구성 전체를 보여주는 이미지입니다. 선택하지 않아도 됩니다."' +
             '>ⓘ</span>' +

@@ -179,6 +179,7 @@ const ALLOWED_REVIEW_EXCEPTION_REASONS =
     'NOT_APPLICABLE',
     'UNTIL_STOCK',
     'NO_FIXED_END',
+    'OFFICIAL_NOT_PROVIDED',
   ])
 
 function parseReviewExceptions(
@@ -2331,6 +2332,344 @@ preorderAdmin.post(
     })
   }
 )
+
+// ------------------------------------------------------------
+// 범용 예약특전 규칙 일괄 저장
+//
+// 모든 DRAFT 에디션을 정확히 한 번씩 처리한다.
+// 승인·공개·이미지·가격 상태는 변경하지 않는다.
+// ------------------------------------------------------------
+
+preorderAdmin.post(
+  '/games/:gameId/benefits/bulk',
+  async (c) => {
+    const gameId = Number(
+      c.req.param('gameId')
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return jsonError(
+        c,
+        '게임 정보가 올바르지 않습니다.',
+        400
+      )
+    }
+
+    const body = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => null)
+
+    if (
+      !body ||
+      !Array.isArray(body.assignments)
+    ) {
+      return jsonError(
+        c,
+        '예약특전 적용 규칙이 올바르지 않습니다.',
+        400
+      )
+    }
+
+    const allowedModes = new Set([
+      'PROVIDE',
+      'OFFICIAL_NOT_PROVIDED',
+      'NOT_APPLICABLE',
+      'OFFICIAL_UNANNOUNCED',
+      'SELLER_SPECIFIC',
+      'LATER_UPDATE',
+    ])
+
+    type Assignment = {
+      mode: string
+      bonus: string | null
+      note: string | null
+    }
+
+    const assignments =
+      new Map<number, Assignment>()
+
+    for (
+      const raw of
+      body.assignments
+    ) {
+      if (
+        !raw ||
+        typeof raw !== 'object' ||
+        Array.isArray(raw)
+      ) {
+        return jsonError(
+          c,
+          '예약특전 적용 항목이 올바르지 않습니다.',
+          400
+        )
+      }
+
+      const item =
+        raw as Record<string, unknown>
+
+      const variantId =
+        positiveInteger(item.variantId)
+
+      const mode = text(
+        item.mode,
+        50
+      ).toUpperCase()
+
+      const bonus = nullableText(
+        item.bonus,
+        5000
+      )
+
+      const note = nullableText(
+        item.note,
+        5000
+      )
+
+      if (!variantId) {
+        return jsonError(
+          c,
+          '예약특전 대상 에디션이 올바르지 않습니다.',
+          400
+        )
+      }
+
+      if (!allowedModes.has(mode)) {
+        return jsonError(
+          c,
+          '지원하지 않는 예약특전 처리 방식입니다.',
+          400
+        )
+      }
+
+      if (
+        mode === 'PROVIDE' &&
+        !bonus
+      ) {
+        return jsonError(
+          c,
+          '특전 제공 규칙에는 특전 내용을 입력해 주세요.',
+          400
+        )
+      }
+
+      if (assignments.has(variantId)) {
+        return jsonError(
+          c,
+          '같은 에디션이 여러 규칙에 중복 지정되었습니다.',
+          409
+        )
+      }
+
+      assignments.set(
+        variantId,
+        {
+          mode,
+          bonus:
+            mode === 'PROVIDE'
+              ? bonus
+              : null,
+          note,
+        }
+      )
+    }
+
+    const game =
+      await c.env.DB.prepare(`
+        SELECT
+          id,
+          publish_status
+
+        FROM games
+
+        WHERE id = ?
+
+        LIMIT 1
+      `)
+        .bind(gameId)
+        .first<{
+          id: number
+          publish_status: string
+        }>()
+
+    if (!game) {
+      return jsonError(
+        c,
+        '게임을 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    if (game.publish_status !== 'DRAFT') {
+      return jsonError(
+        c,
+        '작성 중인 비공개 게임에서만 사용할 수 있습니다.',
+        409
+      )
+    }
+
+    const { results: targets } =
+      await c.env.DB.prepare(`
+        SELECT
+          pv.id AS variant_id,
+          vp.id AS preorder_id,
+          vp.review_exceptions
+
+        FROM product_variants pv
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        INNER JOIN variant_preorders vp
+          ON vp.variant_id = pv.id
+
+        WHERE
+          e.game_id = ?
+          AND pv.publish_status = 'DRAFT'
+          AND vp.publish_status = 'DRAFT'
+
+        ORDER BY
+          pv.display_order,
+          pv.id
+      `)
+        .bind(gameId)
+        .all<{
+          variant_id: number
+          preorder_id: number
+          review_exceptions:
+            string | null
+        }>()
+
+    if (!targets?.length) {
+      return jsonError(
+        c,
+        '저장할 작성 중 에디션이 없습니다.',
+        404
+      )
+    }
+
+    if (
+      assignments.size !==
+      targets.length
+    ) {
+      return jsonError(
+        c,
+        '모든 작성 중 에디션의 예약특전 처리 방식을 지정해 주세요.',
+        409
+      )
+    }
+
+    const targetIds = new Set(
+      targets.map(
+        (target) =>
+          Number(target.variant_id)
+      )
+    )
+
+    for (
+      const variantId of
+      assignments.keys()
+    ) {
+      if (!targetIds.has(variantId)) {
+        return jsonError(
+          c,
+          '다른 게임 또는 수정할 수 없는 에디션이 포함되어 있습니다.',
+          409
+        )
+      }
+    }
+
+    const statements = []
+    let providedCount = 0
+    let exceptionCount = 0
+
+    for (const target of targets) {
+      const assignment =
+        assignments.get(
+          Number(target.variant_id)
+        )!
+
+      const exceptions =
+        parseReviewExceptions(
+          target.review_exceptions
+        )
+
+      if (
+        assignment.mode ===
+        'PROVIDE'
+      ) {
+        delete exceptions.PREORDER_BONUS
+        providedCount += 1
+      } else {
+        exceptions.PREORDER_BONUS = {
+          reason: assignment.mode,
+          ...(assignment.note
+            ? { note: assignment.note }
+            : {}),
+        }
+
+        exceptionCount += 1
+      }
+
+      statements.push(
+        c.env.DB.prepare(`
+          UPDATE variant_preorders
+
+          SET
+            preorder_bonus = ?,
+            preorder_bonus_note = ?,
+            review_exceptions = ?,
+            updated_at =
+              CURRENT_TIMESTAMP
+
+          WHERE
+            id = ?
+            AND publish_status = 'DRAFT'
+        `).bind(
+          assignment.bonus,
+          assignment.note,
+          JSON.stringify(exceptions),
+          target.preorder_id
+        )
+      )
+    }
+
+    const results =
+      await c.env.DB.batch(statements)
+
+    const updatedCount =
+      results.reduce(
+        (sum, result) =>
+          sum +
+          Number(
+            result.meta.changes || 0
+          ),
+        0
+      )
+
+    if (
+      updatedCount !== targets.length
+    ) {
+      return jsonError(
+        c,
+        '일부 에디션의 예약특전을 저장하지 못했습니다.',
+        500
+      )
+    }
+
+    return c.json({
+      ok: true,
+      gameId,
+      updatedCount,
+      providedCount,
+      exceptionCount,
+      publishStatusChanged: false,
+    })
+  }
+)
+
 // ------------------------------------------------------------
 // 상품 에디션 예약판매 검토 승인
 //
@@ -2376,7 +2715,10 @@ preorderAdmin.post(
         vp.release_date,
         vp.preorder_start_date,
         vp.preorder_end_date,
+        vp.review_exceptions,
         vp.preorder_status,
+        vp.preorder_bonus,
+        vp.preorder_bonus_note,
         vp.candidate_price,
         vp.confirmed_price,
         vp.price_status,
@@ -2520,6 +2862,20 @@ preorderAdmin.post(
       return jsonError(
         c,
         '예약판매 종료일 또는 종료일 없음 등의 사유를 입력해 주세요.',
+        409
+      )
+    }
+
+    if (
+      !text(target.preorder_bonus) &&
+      !hasReviewException(
+        reviewExceptions,
+        'PREORDER_BONUS'
+      )
+    ) {
+      return jsonError(
+        c,
+        '예약특전 또는 공식 미제공·해당 없음 등의 처리 사유를 입력해 주세요.',
         409
       )
     }

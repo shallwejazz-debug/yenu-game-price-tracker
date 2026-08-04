@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260722-preorder-v2-1"
+    href="/static/admin.css?v=20260805-benefit-stepper-2"
     rel="stylesheet"
   />
 </head>
@@ -597,7 +597,7 @@ export function AdminPage(): string {
             </button>
           </div>
 
-          
+
           <input
             id="watcherTransformEditionName"
             type="hidden"
@@ -1161,6 +1161,16 @@ export function AdminPage(): string {
         </div>
 
         <section
+          id="preorderV2Workflow"
+          class="preorder-workflow"
+          hidden
+        >
+          <div class="admin-empty">
+            현재 작업 단계를 계산하고 있습니다.
+          </div>
+        </section>
+
+        <section
           id="preorderV2ReviewPreparation"
           class="preorder-v2-section"
           style="margin-bottom:20px"
@@ -1221,6 +1231,16 @@ export function AdminPage(): string {
               <span class="dashboard-stat-label">종료 일정</span>
               <strong
                 id="preorderV2ReviewEndSummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">
+                예약특전
+              </span>
+              <strong
+                id="preorderV2ReviewBenefitSummary"
                 class="dashboard-stat-value"
               >-</strong>
             </article>
@@ -1347,7 +1367,7 @@ export function AdminPage(): string {
 
               <p class="admin-hint">
                 공통 대표 이미지는 전체 에디션에,
-                구성품 이미지는 선택한 BOX 에디션에 한 번에 적용합니다.
+                구성품 이미지는 선택한 에디션에 한 번에 적용합니다.
               </p>
             </div>
           </div>
@@ -1363,7 +1383,7 @@ export function AdminPage(): string {
                 </li>
                 <li>
                   <b>구성품 이미지</b>:
-                  한정판 BOX의 전체 구성품을 보여주는 이미지
+                  한정판 또는 특별판의 전체 구성품을 보여주는 이미지
                 </li>
                 <li>
                   저장 전 적용 대상을 확인할 수 있으며,
@@ -1382,6 +1402,39 @@ export function AdminPage(): string {
             </div>
           </div>
         </section>
+        <section
+          id="preorderV2BenefitSection"
+          class="preorder-v2-section"
+          style="margin-top:20px"
+          hidden
+        >
+          <div class="admin-section-head">
+            <div>
+              <h3>🎁 예약특전 규칙</h3>
+
+              <p class="admin-hint">
+                특전 내용과 적용 대상을 규칙으로 설정합니다.
+                플랫폼 빠른 선택 또는 에디션별 직접 선택을 사용할 수 있습니다.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="yenu-tip"
+              data-tip="모든 작성 중 에디션은 특전 제공 또는 미제공 사유 중 하나로 처리해야 합니다. 저장만으로 공개되지는 않습니다."
+              aria-label="예약특전 규칙 도움말"
+            >
+              ⓘ
+            </button>
+          </div>
+
+          <div id="preorderV2BenefitRules">
+            <div class="admin-empty">
+              예약특전 상태를 불러오는 중입니다.
+            </div>
+          </div>
+        </section>
+
         <details
           id="preorderV2IndividualEditor"
           class="admin-details"
@@ -2461,7 +2514,8 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
-	<script src="/static/preorder-admin.js?v=20260805-review-preparation-ui-1"></script>
+	<script src="/static/preorder-benefit-workflow.js?v=20260805-benefit-stepper-2"></script>
+<script src="/static/preorder-admin.js?v=20260805-benefit-stepper-2"></script>
 </body>
 </html>`
 }
