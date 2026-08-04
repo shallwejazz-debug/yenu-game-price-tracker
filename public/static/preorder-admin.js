@@ -18,6 +18,7 @@
   let approving = false
   let publishing = false
   let bulkImageSaving = false
+  let reviewPreparationSaving = false
 
   let games = []
   let detail = null
@@ -388,6 +389,775 @@
     }
   }
 
+  function parseClientReviewExceptions(
+    value
+  ) {
+    if (!value) return {}
+
+    if (typeof value === 'object') {
+      return value || {}
+    }
+
+    try {
+      const parsed = JSON.parse(value)
+
+      return (
+        parsed &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed)
+      )
+        ? parsed
+        : {}
+    } catch (error) {
+      return {}
+    }
+  }
+
+  function reviewReasonLabel(reason) {
+    const labels = {
+      OFFICIAL_UNANNOUNCED:
+        '공식 미발표',
+      SELLER_SPECIFIC:
+        '판매처별 상이',
+      LATER_UPDATE:
+        '추후 입력',
+      NOT_APPLICABLE:
+        '해당 없음',
+      UNTIL_STOCK:
+        '재고 소진 시 종료',
+      NO_FIXED_END:
+        '별도 종료일 없음'
+    }
+
+    return labels[reason] ||
+      reason ||
+      '사유 미입력'
+  }
+
+  function variantReviewState(variant) {
+    const reasons = []
+
+    const exceptions =
+      parseClientReviewExceptions(
+        variant.review_exceptions
+      )
+
+    const startException =
+      exceptions.PREORDER_START_DATE
+
+    const endException =
+      exceptions.PREORDER_END_DATE
+
+    if (!variant.release_date) {
+      reasons.push('출시일 미입력')
+    }
+
+    if (
+      !variant.preorder_start_date &&
+      !startException
+    ) {
+      reasons.push(
+        '예약 시작일 또는 미입력 사유 필요'
+      )
+    }
+
+    if (
+      !variant.preorder_end_date &&
+      !endException
+    ) {
+      reasons.push(
+        '예약 종료일 또는 미입력 사유 필요'
+      )
+    }
+
+    const preorderStatus = String(
+      variant.preorder_status || 'UNKNOWN'
+    ).toUpperCase()
+
+    if (
+      preorderStatus === 'UNKNOWN' ||
+      preorderStatus === 'CANCELLED'
+    ) {
+      reasons.push('예약판매 상태 확인 필요')
+    }
+
+    const sources =
+      detail &&
+      Array.isArray(
+        detail.officialSources
+      )
+        ? detail.officialSources
+        : []
+
+    const source = sources.find(
+      function (item) {
+        return String(item.id) ===
+          String(
+            variant.official_source_id
+          )
+      }
+    )
+
+    if (
+      !source ||
+      !String(
+        source.official_source_url || ''
+      ).trim()
+    ) {
+      reasons.push('공식 출처 확인 필요')
+    }
+
+    const linkedImages =
+      detail &&
+      Array.isArray(detail.images)
+        ? detail.images.filter(
+            function (image) {
+              return String(
+                image.preorder_id
+              ) === String(
+                variant.preorder_id
+              )
+            }
+          )
+        : []
+
+    const representativeImages =
+      linkedImages.filter(
+        function (image) {
+          return (
+            image.display_role ===
+            'REPRESENTATIVE'
+          )
+        }
+      )
+
+    if (
+      linkedImages.length < 1 ||
+      representativeImages.length !== 1
+    ) {
+      reasons.push('대표 이미지 확인 필요')
+    }
+
+    const invalidImage =
+      linkedImages.some(
+        function (image) {
+          return (
+            String(
+              image.permission_status || ''
+            ).toUpperCase() !==
+              'APPROVED' ||
+            !String(
+              image.stored_url ||
+              image.stored_image_url ||
+              ''
+            ).trim()
+          )
+        }
+      )
+
+    if (invalidImage) {
+      reasons.push('이미지 승인·저장 확인 필요')
+    }
+
+    if (
+      variant.price_status ===
+        'CONFIRMED' &&
+      Number(variant.confirmed_price) <= 0
+    ) {
+      reasons.push('확정 가격 확인 필요')
+    }
+
+    if (
+      variant.price_status ===
+        'CANDIDATE' &&
+      Number(variant.candidate_price) <= 0
+    ) {
+      reasons.push('가격 후보 확인 필요')
+    }
+
+    return {
+      ready: reasons.length === 0,
+      reasons: reasons,
+      startLabel:
+        variant.preorder_start_date ||
+        (
+          startException
+            ? reviewReasonLabel(
+                startException.reason
+              )
+            : '확인 필요'
+        ),
+      endLabel:
+        variant.preorder_end_date ||
+        (
+          endException
+            ? reviewReasonLabel(
+                endException.reason
+              )
+            : '확인 필요'
+        )
+    }
+  }
+
+  function variantReviewStatusHtml(
+    variant
+  ) {
+    const state =
+      variantReviewState(variant)
+
+    if (state.ready) {
+      return (
+        '<div ' +
+          'style="' +
+            'margin-top:10px;' +
+            'padding:9px 11px;' +
+            'border-radius:10px;' +
+            'background:rgba(34,197,94,.10);' +
+            'color:#86efac;' +
+            'font-size:12px' +
+          '">' +
+          '✓ 검토 준비 완료' +
+        '</div>'
+      )
+    }
+
+    return (
+      '<div ' +
+        'style="' +
+          'margin-top:10px;' +
+          'padding:9px 11px;' +
+          'border-radius:10px;' +
+          'background:rgba(245,158,11,.10);' +
+          'color:#fbbf24;' +
+          'font-size:12px' +
+        '">' +
+        '△ 확인 필요 · ' +
+        escapeHtml(
+          state.reasons.join(' · ')
+        ) +
+      '</div>'
+    )
+  }
+
+  function commonExceptionReason(
+    variants,
+    field
+  ) {
+    const reasons = variants.map(
+      function (variant) {
+        const exceptions =
+          parseClientReviewExceptions(
+            variant.review_exceptions
+          )
+
+        return exceptions[field]
+          ? exceptions[field].reason
+          : ''
+      }
+    )
+
+    if (
+      reasons.length > 0 &&
+      reasons.every(
+        function (reason) {
+          return (
+            reason &&
+            reason === reasons[0]
+          )
+        }
+      )
+    ) {
+      return reasons[0]
+    }
+
+    return ''
+  }
+
+  function commonDateValue(
+    variants,
+    field
+  ) {
+    const values = variants.map(
+      function (variant) {
+        return String(
+          variant[field] || ''
+        )
+      }
+    )
+
+    if (
+      values.length > 0 &&
+      values[0] &&
+      values.every(
+        function (value) {
+          return value === values[0]
+        }
+      )
+    ) {
+      return values[0]
+    }
+
+    return ''
+  }
+
+  function toggleReviewDateFields() {
+    const startResolution =
+      fieldValue(
+        'preorderV2ReviewStartResolution'
+      )
+
+    const endResolution =
+      fieldValue(
+        'preorderV2ReviewEndResolution'
+      )
+
+    const startDate =
+      $('preorderV2ReviewStartDate')
+
+    const endDate =
+      $('preorderV2ReviewEndDate')
+
+    if (startDate) {
+      startDate.hidden =
+        startResolution !== 'DATE'
+
+      startDate.disabled =
+        startResolution !== 'DATE'
+    }
+
+    if (endDate) {
+      endDate.hidden =
+        endResolution !== 'DATE'
+
+      endDate.disabled =
+        endResolution !== 'DATE'
+    }
+  }
+
+  function renderReviewPreparation() {
+    const panel =
+      $('preorderV2ReviewPreparation')
+
+    if (!panel) return
+
+    const variants =
+      detail &&
+      Array.isArray(detail.variants)
+        ? detail.variants.filter(
+            function (variant) {
+              return (
+                String(
+                  variant
+                    .preorder_publish_status ||
+                  'DRAFT'
+                ).toUpperCase() ===
+                  'DRAFT'
+              )
+            }
+          )
+        : []
+
+    if (!variants.length) {
+      panel.hidden = true
+      return
+    }
+
+    panel.hidden = false
+
+    const total = variants.length
+
+    const releaseReady =
+      variants.filter(
+        function (variant) {
+          return Boolean(
+            variant.release_date
+          )
+        }
+      ).length
+
+    const imageReady =
+      variants.filter(
+        function (variant) {
+          const state =
+            variantReviewState(variant)
+
+          return !state.reasons.some(
+            function (reason) {
+              return (
+                reason.includes('이미지')
+              )
+            }
+          )
+        }
+      ).length
+
+    const startReady =
+      variants.filter(
+        function (variant) {
+          const state =
+            variantReviewState(variant)
+
+          return (
+            state.startLabel !==
+            '확인 필요'
+          )
+        }
+      ).length
+
+    const endReady =
+      variants.filter(
+        function (variant) {
+          const state =
+            variantReviewState(variant)
+
+          return (
+            state.endLabel !==
+            '확인 필요'
+          )
+        }
+      ).length
+
+    const statusReady =
+      variants.filter(
+        function (variant) {
+          const status = String(
+            variant.preorder_status ||
+            'UNKNOWN'
+          ).toUpperCase()
+
+          return (
+            status !== 'UNKNOWN' &&
+            status !== 'CANCELLED'
+          )
+        }
+      ).length
+
+    const reviewReady =
+      variants.filter(
+        function (variant) {
+          return variantReviewState(
+            variant
+          ).ready
+        }
+      ).length
+
+    const setText = function (
+      id,
+      value
+    ) {
+      const element = $(id)
+
+      if (element) {
+        element.textContent = value
+      }
+    }
+
+    setText(
+      'preorderV2ReviewReleaseSummary',
+      releaseReady + '/' + total
+    )
+
+    setText(
+      'preorderV2ReviewImageSummary',
+      imageReady + '/' + total
+    )
+
+    setText(
+      'preorderV2ReviewStartSummary',
+      startReady + '/' + total
+    )
+
+    setText(
+      'preorderV2ReviewEndSummary',
+      endReady + '/' + total
+    )
+
+    setText(
+      'preorderV2ReviewStatusSummary',
+      statusReady + '/' + total
+    )
+
+    setText(
+      'preorderV2ReviewReadySummary',
+      reviewReady + '/' + total
+    )
+
+    const statuses =
+      variants.map(
+        function (variant) {
+          return String(
+            variant.preorder_status ||
+            'UNKNOWN'
+          ).toUpperCase()
+        }
+      )
+
+    const commonStatus =
+      statuses.length > 0 &&
+      statuses.every(
+        function (status) {
+          return status === statuses[0]
+        }
+      )
+        ? statuses[0]
+        : ''
+
+    setFieldValue(
+      'preorderV2ReviewStatus',
+      (
+        commonStatus &&
+        commonStatus !== 'UNKNOWN' &&
+        commonStatus !== 'CANCELLED'
+      )
+        ? commonStatus
+        : 'UPCOMING'
+    )
+
+    const commonStartDate =
+      commonDateValue(
+        variants,
+        'preorder_start_date'
+      )
+
+    const commonEndDate =
+      commonDateValue(
+        variants,
+        'preorder_end_date'
+      )
+
+    const commonStartReason =
+      commonExceptionReason(
+        variants,
+        'PREORDER_START_DATE'
+      )
+
+    const commonEndReason =
+      commonExceptionReason(
+        variants,
+        'PREORDER_END_DATE'
+      )
+
+    setFieldValue(
+      'preorderV2ReviewStartResolution',
+      commonStartDate
+        ? 'DATE'
+        : (
+            commonStartReason ||
+            'OFFICIAL_UNANNOUNCED'
+          )
+    )
+
+    setFieldValue(
+      'preorderV2ReviewEndResolution',
+      commonEndDate
+        ? 'DATE'
+        : (
+            commonEndReason ||
+            'OFFICIAL_UNANNOUNCED'
+          )
+    )
+
+    setFieldValue(
+      'preorderV2ReviewStartDate',
+      commonStartDate
+    )
+
+    setFieldValue(
+      'preorderV2ReviewEndDate',
+      commonEndDate
+    )
+
+    toggleReviewDateFields()
+
+    const notice =
+      $('preorderV2ReviewPreparationStatus')
+
+    if (notice) {
+      notice.textContent =
+        reviewReady === total
+          ? (
+              '✓ 전체 에디션이 검토 준비를 완료했습니다. ' +
+              '검토 승인 전 최종 내용을 확인해 주세요.'
+            )
+          : (
+              '확인 필요 ' +
+              (total - reviewReady) +
+              '개 · 아래 공통 설정을 저장하면 일정과 상태를 한 번에 정리할 수 있습니다.'
+            )
+
+      notice.className =
+        reviewReady === total
+          ? 'admin-status ok'
+          : 'admin-status info'
+    }
+  }
+
+  async function saveReviewPreparation() {
+    if (
+      reviewPreparationSaving ||
+      !detail ||
+      !detail.game
+    ) {
+      return
+    }
+
+    const preorderStatus =
+      fieldValue(
+        'preorderV2ReviewStatus'
+      )
+
+    const startResolution =
+      fieldValue(
+        'preorderV2ReviewStartResolution'
+      )
+
+    const endResolution =
+      fieldValue(
+        'preorderV2ReviewEndResolution'
+      )
+
+    const startDate =
+      fieldValue(
+        'preorderV2ReviewStartDate'
+      )
+
+    const endDate =
+      fieldValue(
+        'preorderV2ReviewEndDate'
+      )
+
+    if (
+      startResolution === 'DATE' &&
+      !startDate
+    ) {
+      setStatus(
+        '예약판매 시작일을 입력해 주세요.',
+        'err'
+      )
+      return
+    }
+
+    if (
+      endResolution === 'DATE' &&
+      !endDate
+    ) {
+      setStatus(
+        '예약판매 종료일을 입력해 주세요.',
+        'err'
+      )
+      return
+    }
+
+    const variants =
+      Array.isArray(detail.variants)
+        ? detail.variants.filter(
+            function (variant) {
+              return String(
+                variant
+                  .preorder_publish_status ||
+                'DRAFT'
+              ).toUpperCase() ===
+                'DRAFT'
+            }
+          )
+        : []
+
+    const confirmed = window.confirm(
+      '검토 준비 공통 설정을 저장할까요?\n\n' +
+      '대상: DRAFT 에디션 ' +
+      variants.length +
+      '개\n' +
+      '예약판매 상태: ' +
+      preorderStatus +
+      '\n시작 일정: ' +
+      (
+        startResolution === 'DATE'
+          ? startDate
+          : reviewReasonLabel(
+              startResolution
+            )
+      ) +
+      '\n종료 일정: ' +
+      (
+        endResolution === 'DATE'
+          ? endDate
+          : reviewReasonLabel(
+              endResolution
+            )
+      ) +
+      '\n\n아직 검토 승인되거나 공개되지 않습니다.'
+    )
+
+    if (!confirmed) return
+
+    reviewPreparationSaving = true
+
+    const button =
+      $('savePreorderV2ReviewPreparation')
+
+    if (button) {
+      button.disabled = true
+      button.textContent =
+        '전체 저장 중...'
+    }
+
+    setStatus(
+      '검토 준비 공통 설정을 전체 DRAFT 에디션에 저장하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const result = await api(
+        '/admin/api/preorders/games/' +
+          encodeURIComponent(
+            detail.game.id
+          ) +
+          '/review-preparation/bulk',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            preorderStatus:
+              preorderStatus,
+            startResolution:
+              startResolution,
+            startDate:
+              startDate,
+            endResolution:
+              endResolution,
+            endDate:
+              endDate
+          })
+        }
+      )
+
+      const gameId = detail.game.id
+
+      await loadGameDetail(gameId)
+
+      setStatus(
+        '✓ 검토 준비 설정 저장 완료 · ' +
+          result.updatedCount +
+          '개 에디션 · 아직 승인·공개되지 않았습니다.',
+        'ok'
+      )
+    } catch (error) {
+      setStatus(
+        error && error.message
+          ? error.message
+          : '검토 준비 설정 저장에 실패했습니다.',
+        'err'
+      )
+    } finally {
+      reviewPreparationSaving = false
+
+      if (button) {
+        button.disabled = false
+        button.textContent =
+          '전체 DRAFT에 공통 설정 저장'
+      }
+    }
+  }
+
   function variantImageSummaryHtml(variant) {
     const linkedImages =
       detail &&
@@ -515,6 +1285,9 @@
       const escapedVariantId =
         escapeHtml(variant.id)
 
+      const reviewState =
+        variantReviewState(variant)
+
       let actionButtons = ''
 
       if (
@@ -533,10 +1306,28 @@
           '<button ' +
             'type="button" ' +
             'class="btn btn-sm" ' +
-            'data-preorder-v2-approve="' +
-              escapedVariantId +
-            '">' +
-            '검토 승인' +
+            (
+              reviewState.ready
+                ? (
+                    'data-preorder-v2-approve="' +
+                      escapedVariantId +
+                    '"'
+                  )
+                : (
+                    'disabled title="' +
+                      escapeHtml(
+                        reviewState.reasons
+                          .join(', ')
+                      ) +
+                    '"'
+                  )
+            ) +
+          '>' +
+            (
+              reviewState.ready
+                ? '검토 승인'
+                : '확인 필요'
+            ) +
           '</button>'
       } else if (
         preorderPublishStatus ===
@@ -669,6 +1460,9 @@
           variantImageSummaryHtml(
             variant
           ) +
+          variantReviewStatusHtml(
+            variant
+          ) +
         '</article>'
     })
 
@@ -750,6 +1544,7 @@
       resetForm()
       renderExisting()
       renderBulkImageManager()
+      renderReviewPreparation()
 
       setStatus(
         '게임 정보를 불러왔습니다.',
@@ -2077,6 +2872,13 @@
       selectedImages
     )
 
+    const individualEditor =
+      $('preorderV2IndividualEditor')
+
+    if (individualEditor) {
+      individualEditor.open = true
+    }
+
     if ($('preorderV2Editor')) {
       $('preorderV2Editor')
         .scrollIntoView({
@@ -2392,8 +3194,48 @@
     if (resetButton) {
       resetButton.addEventListener(
         'click',
-        resetForm
+        function () {
+          const individualEditor =
+            $('preorderV2IndividualEditor')
+
+          if (individualEditor) {
+            individualEditor.open = true
+          }
+
+          resetForm()
+        }
       )
+    }
+
+    const reviewStartResolution =
+      $('preorderV2ReviewStartResolution')
+
+    const reviewEndResolution =
+      $('preorderV2ReviewEndResolution')
+
+    const saveReviewPreparationButton =
+      $('savePreorderV2ReviewPreparation')
+
+    if (reviewStartResolution) {
+      reviewStartResolution.addEventListener(
+        'change',
+        toggleReviewDateFields
+      )
+    }
+
+    if (reviewEndResolution) {
+      reviewEndResolution.addEventListener(
+        'change',
+        toggleReviewDateFields
+      )
+    }
+
+    if (saveReviewPreparationButton) {
+      saveReviewPreparationButton
+        .addEventListener(
+          'click',
+          saveReviewPreparation
+        )
     }
 
     const form =

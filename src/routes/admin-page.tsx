@@ -1161,6 +1161,183 @@ export function AdminPage(): string {
         </div>
 
         <section
+          id="preorderV2ReviewPreparation"
+          class="preorder-v2-section"
+          style="margin-bottom:20px"
+          hidden
+        >
+          <div class="admin-section-head">
+            <div>
+              <h3>✅ 검토 준비</h3>
+
+              <p class="admin-hint">
+                모든 에디션의 공통 일정과 예약 상태를 한 번에 설정합니다.
+                날짜가 발표되지 않았다면 미입력 사유를 선택할 수 있습니다.
+              </p>
+            </div>
+          </div>
+
+          <div
+            style="
+              display:grid;
+              grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+              gap:10px;
+              margin-bottom:16px;
+            "
+          >
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">출시일</span>
+              <strong
+                id="preorderV2ReviewReleaseSummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">대표 이미지</span>
+              <strong
+                id="preorderV2ReviewImageSummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">예약 상태</span>
+              <strong
+                id="preorderV2ReviewStatusSummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">시작 일정</span>
+              <strong
+                id="preorderV2ReviewStartSummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">종료 일정</span>
+              <strong
+                id="preorderV2ReviewEndSummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+
+            <article class="dashboard-stat">
+              <span class="dashboard-stat-label">검토 가능</span>
+              <strong
+                id="preorderV2ReviewReadySummary"
+                class="dashboard-stat-value"
+              >-</strong>
+            </article>
+          </div>
+
+          <p
+            id="preorderV2ReviewPreparationStatus"
+            class="admin-status info"
+            aria-live="polite"
+          ></p>
+
+          <div
+            class="preorder-v2-grid preorder-v2-grid-3"
+          >
+            <label class="admin-field">
+              <span>
+                전체 예약판매 상태
+                <span
+                  title="현재 공식 보도자료 기준 진행 상태입니다."
+                >ⓘ</span>
+              </span>
+
+              <select id="preorderV2ReviewStatus">
+                <option value="UPCOMING">예정</option>
+                <option value="OPEN">진행 중</option>
+                <option value="CLOSED">종료</option>
+              </select>
+            </label>
+
+            <label class="admin-field">
+              <span>예약판매 시작 일정</span>
+
+              <select
+                id="preorderV2ReviewStartResolution"
+              >
+                <option value="OFFICIAL_UNANNOUNCED">
+                  공식 미발표
+                </option>
+                <option value="SELLER_SPECIFIC">
+                  판매처별 상이
+                </option>
+                <option value="LATER_UPDATE">
+                  추후 입력
+                </option>
+                <option value="NOT_APPLICABLE">
+                  해당 없음
+                </option>
+                <option value="DATE">
+                  날짜 직접 입력
+                </option>
+              </select>
+
+              <input
+                id="preorderV2ReviewStartDate"
+                type="date"
+                hidden
+                disabled
+              />
+            </label>
+
+            <label class="admin-field">
+              <span>예약판매 종료 일정</span>
+
+              <select
+                id="preorderV2ReviewEndResolution"
+              >
+                <option value="OFFICIAL_UNANNOUNCED">
+                  공식 미발표
+                </option>
+                <option value="UNTIL_STOCK">
+                  재고 소진 시 종료
+                </option>
+                <option value="NO_FIXED_END">
+                  별도 종료일 없음
+                </option>
+                <option value="SELLER_SPECIFIC">
+                  판매처별 상이
+                </option>
+                <option value="LATER_UPDATE">
+                  추후 입력
+                </option>
+                <option value="NOT_APPLICABLE">
+                  해당 없음
+                </option>
+                <option value="DATE">
+                  날짜 직접 입력
+                </option>
+              </select>
+
+              <input
+                id="preorderV2ReviewEndDate"
+                type="date"
+                hidden
+                disabled
+              />
+            </label>
+          </div>
+
+          <div class="preorder-v2-actions">
+            <button
+              id="savePreorderV2ReviewPreparation"
+              class="btn btn-primary"
+              type="button"
+            >
+              전체 DRAFT에 공통 설정 저장
+            </button>
+          </div>
+        </section>
+        <section
           class="preorder-v2-section"
           style="margin-bottom:20px"
         >
@@ -1205,6 +1382,16 @@ export function AdminPage(): string {
             </div>
           </div>
         </section>
+        <details
+          id="preorderV2IndividualEditor"
+          class="admin-details"
+          style="margin-top:20px"
+        >
+          <summary>
+            개별 에디션 추가·수정
+          </summary>
+
+          <div class="admin-details-body">
         <form id="preorderV2Form">
           <div class="preorder-v2-section">
             <h3>1. 플랫폼</h3>
@@ -1491,6 +1678,8 @@ export function AdminPage(): string {
             </button>
           </div>
         </form>
+          </div>
+        </details>
       </section>
 
       <section
@@ -2272,7 +2461,7 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
-	<script src="/static/preorder-admin.js?v=20260804-bulk-image-workflow-2"></script>
+	<script src="/static/preorder-admin.js?v=20260805-review-preparation-ui-1"></script>
 </body>
 </html>`
 }
