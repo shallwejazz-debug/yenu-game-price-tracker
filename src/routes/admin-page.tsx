@@ -2272,7 +2272,7 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
-	<script src="/static/preorder-admin.js?v=20260804-bulk-image-workflow-1"></script>
+	<script src="/static/preorder-admin.js?v=20260804-bulk-image-workflow-2"></script>
 </body>
 </html>`
 }

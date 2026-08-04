@@ -1365,7 +1365,13 @@
             bulkImageOptionHtml(
               images,
               recommendedRepresentative
-                ? recommendedRepresentative.id
+                ? Number(
+                    recommendedRepresentative
+                      .image_id ||
+                    recommendedRepresentative
+                      .id ||
+                    0
+                  )
                 : '',
               '대표 이미지 선택'
             ) +
@@ -1383,7 +1389,13 @@
             bulkImageOptionHtml(
               images,
               recommendedContents
-                ? recommendedContents.id
+                ? Number(
+                    recommendedContents
+                      .image_id ||
+                    recommendedContents
+                      .id ||
+                    0
+                  )
                 : '',
               '사용하지 않음'
             ) +
