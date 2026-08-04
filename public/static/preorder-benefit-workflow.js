@@ -14,6 +14,7 @@
   let rules = []
   let nextRuleId = 1
   let saving = false
+  let bulkApproving = false
 
   function byId(id) {
     return document.getElementById(id)
@@ -1486,6 +1487,816 @@
       '</ol>'
   }
 
+
+  function reviewReasonLabel(reason) {
+    const labels = {
+      OFFICIAL_UNANNOUNCED:
+        '공식 미발표',
+      OFFICIAL_NOT_PROVIDED:
+        '공식 미제공',
+      SELLER_SPECIFIC:
+        '판매처별 상이',
+      LATER_UPDATE:
+        '추후 입력',
+      NOT_APPLICABLE:
+        '해당 없음',
+      UNTIL_STOCK:
+        '재고 소진 시 종료',
+      NO_FIXED_END:
+        '별도 종료일 없음'
+    }
+
+    return labels[reason] ||
+      reason ||
+      '확인 필요'
+  }
+
+  function scheduleLabel(
+    variant,
+    dateField,
+    exceptionField
+  ) {
+    if (variant[dateField]) {
+      return String(
+        variant[dateField]
+      )
+    }
+
+    const exception =
+      parseExceptions(
+        variant.review_exceptions
+      )[exceptionField]
+
+    return exception
+      ? reviewReasonLabel(
+          exception.reason
+        )
+      : '확인 필요'
+  }
+
+  function priceLabel(variant) {
+    const price =
+      String(
+        variant.price_status || ''
+      ).toUpperCase() ===
+        'CONFIRMED'
+        ? Number(
+            variant.confirmed_price
+          )
+        : Number(
+            variant.candidate_price
+          )
+
+    if (
+      !Number.isInteger(price) ||
+      price <= 0
+    ) {
+      return '미확정'
+    }
+
+    return (
+      '₩' +
+      price.toLocaleString('ko-KR')
+    )
+  }
+
+  function approvalReasons(variant) {
+    const reasons = []
+
+    const exceptions =
+      parseExceptions(
+        variant.review_exceptions
+      )
+
+    if (!variant.release_date) {
+      reasons.push('출시일')
+    }
+
+    if (
+      !variant.preorder_start_date &&
+      !exceptions.PREORDER_START_DATE
+    ) {
+      reasons.push('예약 시작 일정')
+    }
+
+    if (
+      !variant.preorder_end_date &&
+      !exceptions.PREORDER_END_DATE
+    ) {
+      reasons.push('예약 종료 일정')
+    }
+
+    const status = String(
+      variant.preorder_status ||
+      'UNKNOWN'
+    ).toUpperCase()
+
+    if (
+      status === 'UNKNOWN' ||
+      status === 'CANCELLED'
+    ) {
+      reasons.push('예약 상태')
+    }
+
+    if (!benefitReady(variant)) {
+      reasons.push('예약특전')
+    }
+
+    const source =
+      Array.isArray(
+        detail.officialSources
+      )
+        ? detail.officialSources.find(
+            function (item) {
+              return String(item.id) ===
+                String(
+                  variant
+                    .official_source_id
+                )
+            }
+          )
+        : null
+
+    if (
+      !source ||
+      !String(
+        source.official_source_url || ''
+      ).trim()
+    ) {
+      reasons.push('공식 출처')
+    }
+
+    const images =
+      Array.isArray(detail.images)
+        ? detail.images.filter(
+            function (image) {
+              return String(
+                image.preorder_id
+              ) === String(
+                variant.preorder_id
+              )
+            }
+          )
+        : []
+
+    const representatives =
+      images.filter(
+        function (image) {
+          return (
+            image.display_role ===
+            'REPRESENTATIVE'
+          )
+        }
+      )
+
+    if (
+      images.length < 1 ||
+      representatives.length !== 1
+    ) {
+      reasons.push('대표 이미지')
+    }
+
+    const invalidImage =
+      images.some(
+        function (image) {
+          return (
+            String(
+              image.permission_status ||
+              ''
+            ).toUpperCase() !==
+              'APPROVED' ||
+            !String(
+              image.stored_url ||
+              image.stored_image_url ||
+              ''
+            ).trim()
+          )
+        }
+      )
+
+    if (invalidImage) {
+      reasons.push(
+        '이미지 승인·저장'
+      )
+    }
+
+    const priceStatus = String(
+      variant.price_status ||
+      'UNCONFIRMED'
+    ).toUpperCase()
+
+    if (
+      priceStatus === 'CONFIRMED' &&
+      Number(
+        variant.confirmed_price
+      ) <= 0
+    ) {
+      reasons.push('확정 가격')
+    }
+
+    if (
+      priceStatus === 'CANDIDATE' &&
+      Number(
+        variant.candidate_price
+      ) <= 0
+    ) {
+      reasons.push('가격 후보')
+    }
+
+    return reasons
+  }
+
+  function reviewCardHtml(
+    variant,
+    approved
+  ) {
+    const exceptions =
+      parseExceptions(
+        variant.review_exceptions
+      )
+
+    const bonus = String(
+      variant.preorder_bonus || ''
+    ).trim()
+
+    const bonusException =
+      exceptions.PREORDER_BONUS
+
+    const images =
+      Array.isArray(detail.images)
+        ? detail.images.filter(
+            function (image) {
+              return String(
+                image.preorder_id
+              ) === String(
+                variant.preorder_id
+              )
+            }
+          )
+        : []
+
+    const reasons =
+      approvalReasons(variant)
+
+    return (
+      '<article class="' +
+        'preorder-review-card' +
+      '">' +
+
+        '<div class="' +
+          'preorder-review-card-head' +
+        '">' +
+          '<div>' +
+            '<span>' +
+              escapeHtml(
+                platformLabel(
+                  variant.platform
+                )
+              ) +
+            '</span>' +
+
+            '<strong>' +
+              escapeHtml(
+                variant.variant_name
+              ) +
+            '</strong>' +
+          '</div>' +
+
+          '<b class="' +
+            (
+              approved
+                ? 'is-approved'
+                : reasons.length === 0
+                  ? 'is-ready'
+                  : 'is-blocked'
+            ) +
+          '">' +
+            (
+              approved
+                ? '승인 완료'
+                : reasons.length === 0
+                  ? '승인 가능'
+                  : '확인 필요'
+            ) +
+          '</b>' +
+        '</div>' +
+
+        '<dl class="' +
+          'preorder-review-meta' +
+        '">' +
+          '<div>' +
+            '<dt>출시일</dt>' +
+            '<dd>' +
+              escapeHtml(
+                variant.release_date ||
+                '-'
+              ) +
+            '</dd>' +
+          '</div>' +
+
+          '<div>' +
+            '<dt>가격</dt>' +
+            '<dd>' +
+              escapeHtml(
+                priceLabel(variant)
+              ) +
+            '</dd>' +
+          '</div>' +
+
+          '<div>' +
+            '<dt>예약 시작</dt>' +
+            '<dd>' +
+              escapeHtml(
+                scheduleLabel(
+                  variant,
+                  'preorder_start_date',
+                  'PREORDER_START_DATE'
+                )
+              ) +
+            '</dd>' +
+          '</div>' +
+
+          '<div>' +
+            '<dt>예약 종료</dt>' +
+            '<dd>' +
+              escapeHtml(
+                scheduleLabel(
+                  variant,
+                  'preorder_end_date',
+                  'PREORDER_END_DATE'
+                )
+              ) +
+            '</dd>' +
+          '</div>' +
+
+          '<div>' +
+            '<dt>예약특전</dt>' +
+            '<dd>' +
+              escapeHtml(
+                bonus ||
+                (
+                  bonusException
+                    ? reviewReasonLabel(
+                        bonusException
+                          .reason
+                      )
+                    : '미처리'
+                )
+              ) +
+            '</dd>' +
+          '</div>' +
+
+          '<div>' +
+            '<dt>연결 이미지</dt>' +
+            '<dd>' +
+              images.length +
+              '장</dd>' +
+          '</div>' +
+        '</dl>' +
+
+        (
+          reasons.length > 0
+            ? (
+                '<p class="' +
+                  'preorder-review-reasons' +
+                '">' +
+                  '확인 필요: ' +
+                  escapeHtml(
+                    reasons.join(' · ')
+                  ) +
+                '</p>'
+              )
+            : ''
+        ) +
+      '</article>'
+    )
+  }
+
+  function lockIndividualActions() {
+    document
+      .querySelectorAll(
+        '[data-preorder-v2-approve]'
+      )
+      .forEach(
+        function (button) {
+          button.removeAttribute(
+            'data-preorder-v2-approve'
+          )
+
+          button.disabled = true
+          button.textContent =
+            '상단에서 일괄 승인'
+
+          button.title =
+            '부분 승인 방지를 위해 상단의 전체 검토 승인만 사용합니다.'
+        }
+      )
+
+    document
+      .querySelectorAll(
+        '[data-preorder-v2-publish]'
+      )
+      .forEach(
+        function (button) {
+          button.removeAttribute(
+            'data-preorder-v2-publish'
+          )
+
+          button.disabled = true
+          button.textContent =
+            '7단계에서 공개'
+
+          button.title =
+            '최종 미리보기 완료 후 별도의 공개 단계에서 처리합니다.'
+        }
+      )
+  }
+
+  function renderReviewWorkflow() {
+    const section =
+      byId('preorderV2BulkReviewSection')
+
+    const container =
+      byId('preorderV2BulkReview')
+
+    if (!section || !container) {
+      return
+    }
+
+    const variants =
+      detail &&
+      Array.isArray(detail.variants)
+        ? detail.variants
+        : []
+
+    if (!variants.length) {
+      section.hidden = true
+      return
+    }
+
+    const draft = variants.filter(
+      function (variant) {
+        return (
+          String(
+            variant
+              .preorder_publish_status ||
+            ''
+          ).toUpperCase() ===
+          'DRAFT'
+        )
+      }
+    )
+
+    const approved = variants.filter(
+      function (variant) {
+        return (
+          String(
+            variant
+              .preorder_publish_status ||
+            ''
+          ).toUpperCase() ===
+          'APPROVED'
+        )
+      }
+    )
+
+    const published = variants.filter(
+      function (variant) {
+        return (
+          String(
+            variant
+              .preorder_publish_status ||
+            ''
+          ).toUpperCase() ===
+          'PUBLISHED'
+        )
+      }
+    )
+
+    section.hidden = false
+
+    if (
+      approved.length === variants.length
+    ) {
+      container.innerHTML =
+        '<div class="' +
+          'preorder-review-summary ' +
+          'is-approved' +
+        '">' +
+          '<div>' +
+            '<strong>' +
+              '6단계 · 최종 미리보기' +
+            '</strong>' +
+
+            '<p>' +
+              '전체 ' +
+              approved.length +
+              '개 에디션이 검토 승인되었습니다. ' +
+              '아직 비공개이며, 아래 내용을 최종 확인합니다.' +
+            '</p>' +
+          '</div>' +
+
+          '<span>승인 완료 · 비공개</span>' +
+        '</div>' +
+
+        '<div class="' +
+          'preorder-review-grid' +
+        '">' +
+          approved.map(
+            function (variant) {
+              return reviewCardHtml(
+                variant,
+                true
+              )
+            }
+          ).join('') +
+        '</div>' +
+
+        '<div class="admin-notice">' +
+          '<b>다음 단계</b>' +
+          '<p class="admin-hint">' +
+            '최종 미리보기 확인 후 7단계에서 전체 공개합니다. ' +
+            '카드별 개별 게시 버튼은 부분 공개 방지를 위해 잠겨 있습니다.' +
+          '</p>' +
+        '</div>'
+
+      lockIndividualActions()
+      return
+    }
+
+    if (published.length > 0) {
+      container.innerHTML =
+        '<div class="admin-notice">' +
+          '이미 공개된 에디션이 포함되어 있어 일괄 승인할 수 없습니다.' +
+        '</div>'
+
+      lockIndividualActions()
+      return
+    }
+
+    const readyCount =
+      draft.filter(
+        function (variant) {
+          return (
+            approvalReasons(
+              variant
+            ).length === 0
+          )
+        }
+      ).length
+
+    const exceptionCount =
+      draft.filter(
+        function (variant) {
+          return (
+            Object.keys(
+              parseExceptions(
+                variant.review_exceptions
+              )
+            ).length > 0
+          )
+        }
+      ).length
+
+    const canApprove =
+      draft.length === variants.length &&
+      readyCount === draft.length &&
+      !bulkApproving
+
+    container.innerHTML =
+      '<div class="' +
+        'preorder-review-summary' +
+      '">' +
+        '<div>' +
+          '<strong>' +
+            '5단계 · 전체 검토 승인' +
+          '</strong>' +
+
+          '<p>' +
+            '모든 에디션을 먼저 검증한 뒤 한 번에 승인합니다. ' +
+            '한 항목이라도 문제가 있으면 아무것도 승인하지 않습니다.' +
+          '</p>' +
+        '</div>' +
+
+        '<span>' +
+          '승인 가능 ' +
+          readyCount +
+          '/' +
+          draft.length +
+        '</span>' +
+      '</div>' +
+
+      '<div class="' +
+        'preorder-review-stats' +
+      '">' +
+        '<article>' +
+          '<span>전체 대상</span>' +
+          '<strong>' +
+            draft.length +
+          '</strong>' +
+        '</article>' +
+
+        '<article>' +
+          '<span>승인 가능</span>' +
+          '<strong>' +
+            readyCount +
+          '</strong>' +
+        '</article>' +
+
+        '<article>' +
+          '<span>예외 포함</span>' +
+          '<strong>' +
+            exceptionCount +
+          '</strong>' +
+        '</article>' +
+
+        '<article>' +
+          '<span>확인 필요</span>' +
+          '<strong>' +
+            (
+              draft.length -
+              readyCount
+            ) +
+          '</strong>' +
+        '</article>' +
+      '</div>' +
+
+      '<details ' +
+        'class="admin-details" ' +
+        'open' +
+      '>' +
+        '<summary>' +
+          '전체 승인 대상 미리보기' +
+        '</summary>' +
+
+        '<div class="' +
+          'admin-details-body' +
+        '">' +
+          '<div class="' +
+            'preorder-review-grid' +
+          '">' +
+            draft.map(
+              function (variant) {
+                return reviewCardHtml(
+                  variant,
+                  false
+                )
+              }
+            ).join('') +
+          '</div>' +
+        '</div>' +
+      '</details>' +
+
+      '<div class="' +
+        'preorder-review-actions' +
+      '">' +
+        '<div>' +
+          '<b>승인 후에도 비공개</b>' +
+          '<p>' +
+            '승인하면 작성 내용이 잠기지만 사용자 사이트에는 공개되지 않습니다.' +
+          '</p>' +
+        '</div>' +
+
+        '<button ' +
+          'id="approveAllPreorderV2" ' +
+          'type="button" ' +
+          'class="btn btn-primary"' +
+          (
+            canApprove
+              ? ''
+              : ' disabled'
+          ) +
+        '>' +
+          (
+            bulkApproving
+              ? '전체 승인 중...'
+              : '전체 검토 승인'
+          ) +
+        '</button>' +
+      '</div>'
+
+    const button =
+      byId('approveAllPreorderV2')
+
+    if (button) {
+      button.onclick =
+        approveAllVariants
+    }
+
+    lockIndividualActions()
+  }
+
+  async function approveAllVariants() {
+    if (
+      bulkApproving ||
+      !detail ||
+      !detail.game
+    ) {
+      return
+    }
+
+    const variants =
+      Array.isArray(detail.variants)
+        ? detail.variants
+        : []
+
+    const draft = variants.filter(
+      function (variant) {
+        return (
+          String(
+            variant
+              .preorder_publish_status ||
+            ''
+          ).toUpperCase() ===
+          'DRAFT'
+        )
+      }
+    )
+
+    const blocked =
+      draft.filter(
+        function (variant) {
+          return (
+            approvalReasons(
+              variant
+            ).length > 0
+          )
+        }
+      )
+
+    if (blocked.length > 0) {
+      setStatus(
+        '확인 필요 에디션이 있어 전체 승인할 수 없습니다.',
+        'err'
+      )
+      return
+    }
+
+    const confirmed =
+      window.confirm(
+        '전체 ' +
+        draft.length +
+        '개 에디션을 검토 승인할까요?\n\n' +
+        '승인 후에는 작성 중 상태로 내용을 수정할 수 없습니다.\n' +
+        '아직 사용자 사이트에는 공개되지 않습니다.'
+      )
+
+    if (!confirmed) return
+
+    bulkApproving = true
+    renderReviewWorkflow()
+
+    setStatus(
+      '전체 에디션을 다시 검증하고 일괄 승인하고 있습니다.',
+      'info'
+    )
+
+    try {
+      const result = await request(
+        '/admin/api/preorders/games/' +
+          encodeURIComponent(
+            detail.game.id
+          ) +
+          '/approve/bulk',
+        {
+          method: 'POST'
+        }
+      )
+
+      const savedGameId =
+        detail.game.id
+
+      if (
+        typeof reloadDetail ===
+        'function'
+      ) {
+        await reloadDetail(
+          savedGameId
+        )
+      }
+
+      setStatus(
+        result.alreadyApproved
+          ? '전체 에디션이 이미 검토 승인되어 있습니다.'
+          : (
+              '✓ 전체 검토 승인 완료 · ' +
+              result.approvedCount +
+              '개 · 아직 비공개입니다.'
+            ),
+        'ok'
+      )
+    } catch (error) {
+      setStatus(
+        error.message ||
+        '전체 검토 승인에 실패했습니다.',
+        'err'
+      )
+    } finally {
+      bulkApproving = false
+      renderReviewWorkflow()
+    }
+  }
+
   function render(nextDetail, reload) {
     detail = nextDetail || null
     reloadDetail =
@@ -1510,6 +2321,8 @@
 
     renderStepper()
     renderRules()
+    renderReviewWorkflow()
+    lockIndividualActions()
   }
 
   window.preorderBenefitWorkflow = {

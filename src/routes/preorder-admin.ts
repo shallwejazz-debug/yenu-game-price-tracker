@@ -2671,6 +2671,564 @@ preorderAdmin.post(
 )
 
 // ------------------------------------------------------------
+// 전체 DRAFT 에디션 일괄 검토 승인
+//
+// 1. 게임에 연결된 모든 예약판매를 먼저 조회한다.
+// 2. 모든 DRAFT 항목의 필수 조건을 검증한다.
+// 3. 한 항목이라도 실패하면 아무것도 승인하지 않는다.
+// 4. 전체 검증 통과 후 D1 batch로 DRAFT → APPROVED 처리한다.
+// 5. 게임·상품 에디션·공개 상태는 변경하지 않는다.
+// ------------------------------------------------------------
+
+preorderAdmin.post(
+  '/games/:gameId/approve/bulk',
+  async (c) => {
+    const gameId = Number(
+      c.req.param('gameId')
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return jsonError(
+        c,
+        '게임 정보가 올바르지 않습니다.',
+        400
+      )
+    }
+
+    const game =
+      await c.env.DB.prepare(`
+        SELECT
+          id,
+          title,
+          publish_status
+
+        FROM games
+
+        WHERE id = ?
+
+        LIMIT 1
+      `)
+        .bind(gameId)
+        .first<{
+          id: number
+          title: string
+          publish_status: string
+        }>()
+
+    if (!game) {
+      return jsonError(
+        c,
+        '게임을 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    if (game.publish_status !== 'DRAFT') {
+      return jsonError(
+        c,
+        '작성 중인 비공개 게임만 일괄 검토 승인할 수 있습니다.',
+        409
+      )
+    }
+
+    const { results: targets } =
+      await c.env.DB.prepare(`
+        SELECT
+          e.platform,
+
+          pv.id AS variant_id,
+          pv.variant_name,
+          pv.variant_kind,
+          pv.package_type,
+          pv.publish_status
+            AS variant_publish_status,
+
+          vp.id AS preorder_id,
+          vp.release_date,
+          vp.preorder_start_date,
+          vp.preorder_end_date,
+          vp.review_exceptions,
+          vp.preorder_status,
+          vp.preorder_bonus,
+          vp.preorder_bonus_note,
+          vp.candidate_price,
+          vp.confirmed_price,
+          vp.price_status,
+          vp.publish_status
+            AS preorder_publish_status,
+
+          gos.id AS official_source_id,
+          gos.official_source_url,
+
+          (
+            SELECT COUNT(*)
+
+            FROM variant_preorder_images vpi
+
+            WHERE
+              vpi.preorder_id = vp.id
+          ) AS image_count,
+
+          (
+            SELECT COUNT(*)
+
+            FROM variant_preorder_images vpi
+
+            WHERE
+              vpi.preorder_id = vp.id
+              AND vpi.display_role =
+                'REPRESENTATIVE'
+          ) AS representative_count,
+
+          (
+            SELECT COUNT(*)
+
+            FROM variant_preorder_images vpi
+
+            INNER JOIN watch_item_images wii
+              ON wii.id = vpi.image_id
+
+            WHERE
+              vpi.preorder_id = vp.id
+              AND wii.permission_status =
+                'APPROVED'
+              AND wii.stored_image_url
+                IS NOT NULL
+              AND TRIM(
+                wii.stored_image_url
+              ) <> ''
+          ) AS valid_image_count
+
+        FROM variant_preorders vp
+
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        INNER JOIN game_official_sources gos
+          ON gos.id =
+            vp.official_source_id
+
+        WHERE e.game_id = ?
+
+        ORDER BY
+          CASE e.platform
+            WHEN 'ps5' THEN 1
+            WHEN 'switch' THEN 2
+            WHEN 'switch2' THEN 3
+            WHEN 'xbox' THEN 4
+            WHEN 'ps4' THEN 5
+            WHEN 'pc' THEN 6
+            ELSE 7
+          END,
+          pv.display_order ASC,
+          pv.id ASC
+      `)
+        .bind(gameId)
+        .all<any>()
+
+    if (!targets || targets.length < 1) {
+      return jsonError(
+        c,
+        '검토 승인할 예약판매 에디션이 없습니다.',
+        404
+      )
+    }
+
+    const invalidStatus =
+      targets.find(
+        (target) => {
+          const status = String(
+            target.preorder_publish_status ||
+            ''
+          ).toUpperCase()
+
+          return (
+            status !== 'DRAFT' &&
+            status !== 'APPROVED'
+          )
+        }
+      )
+
+    if (invalidStatus) {
+      return jsonError(
+        c,
+        '작성 중 또는 검토 승인 상태가 아닌 에디션이 포함되어 있습니다.',
+        409
+      )
+    }
+
+    const draftTargets =
+      targets.filter(
+        (target) =>
+          String(
+            target.preorder_publish_status ||
+            ''
+          ).toUpperCase() ===
+          'DRAFT'
+      )
+
+    if (draftTargets.length < 1) {
+      return c.json({
+        ok: true,
+        alreadyApproved: true,
+        gameId,
+        totalCount: targets.length,
+        approvedCount: 0,
+        alreadyApprovedCount:
+          targets.length,
+        publishStatusChanged: false,
+      })
+    }
+
+    const failures: Array<{
+      variantId: number
+      variantName: string
+      reason: string
+    }> = []
+
+    let exceptionVariantCount = 0
+
+    for (const target of draftTargets) {
+      const reasons: string[] = []
+
+      const exceptions =
+        parseReviewExceptions(
+          target.review_exceptions
+        )
+
+      const exceptionKeys =
+        Object.keys(exceptions)
+
+      if (exceptionKeys.length > 0) {
+        exceptionVariantCount += 1
+      }
+
+      if (
+        target.variant_publish_status !==
+        'DRAFT'
+      ) {
+        reasons.push(
+          '상품 에디션이 작성 중 상태가 아님'
+        )
+      }
+
+      if (
+        !isValidDate(
+          text(target.release_date, 10)
+        )
+      ) {
+        reasons.push(
+          '출시일 확인 필요'
+        )
+      }
+
+      if (
+        !target.preorder_start_date &&
+        !hasReviewException(
+          exceptions,
+          'PREORDER_START_DATE'
+        )
+      ) {
+        reasons.push(
+          '예약 시작일 또는 미입력 사유 필요'
+        )
+      }
+
+      if (
+        !target.preorder_end_date &&
+        !hasReviewException(
+          exceptions,
+          'PREORDER_END_DATE'
+        )
+      ) {
+        reasons.push(
+          '예약 종료일 또는 미입력 사유 필요'
+        )
+      }
+
+      const startDate = text(
+        target.preorder_start_date,
+        10
+      )
+
+      const endDate = text(
+        target.preorder_end_date,
+        10
+      )
+
+      if (
+        startDate &&
+        !isValidDate(startDate)
+      ) {
+        reasons.push(
+          '예약 시작일 형식 확인 필요'
+        )
+      }
+
+      if (
+        endDate &&
+        !isValidDate(endDate)
+      ) {
+        reasons.push(
+          '예약 종료일 형식 확인 필요'
+        )
+      }
+
+      if (
+        startDate &&
+        endDate &&
+        startDate > endDate
+      ) {
+        reasons.push(
+          '예약 종료일이 시작일보다 빠름'
+        )
+      }
+
+      const preorderStatus = String(
+        target.preorder_status ||
+        'UNKNOWN'
+      ).toUpperCase()
+
+      if (
+        preorderStatus === 'UNKNOWN' ||
+        preorderStatus === 'CANCELLED'
+      ) {
+        reasons.push(
+          '예약판매 상태 확인 필요'
+        )
+      }
+
+      if (
+        !text(target.preorder_bonus) &&
+        !hasReviewException(
+          exceptions,
+          'PREORDER_BONUS'
+        )
+      ) {
+        reasons.push(
+          '예약특전 또는 처리 사유 필요'
+        )
+      }
+
+      if (
+        !target.official_source_id ||
+        !text(
+          target.official_source_url
+        )
+      ) {
+        reasons.push(
+          '공식 출처 확인 필요'
+        )
+      }
+
+      const imageCount = Number(
+        target.image_count || 0
+      )
+
+      const representativeCount =
+        Number(
+          target.representative_count ||
+          0
+        )
+
+      const validImageCount =
+        Number(
+          target.valid_image_count || 0
+        )
+
+      if (imageCount < 1) {
+        reasons.push(
+          '에디션 이미지 필요'
+        )
+      }
+
+      if (
+        representativeCount !== 1
+      ) {
+        reasons.push(
+          '대표 이미지는 정확히 한 장 필요'
+        )
+      }
+
+      if (
+        validImageCount !==
+        imageCount
+      ) {
+        reasons.push(
+          '이미지 승인·R2 저장 확인 필요'
+        )
+      }
+
+      const priceStatus = String(
+        target.price_status ||
+        'UNCONFIRMED'
+      ).toUpperCase()
+
+      if (
+        !ALLOWED_PRICE_STATUSES.has(
+          priceStatus
+        )
+      ) {
+        reasons.push(
+          '가격 상태 확인 필요'
+        )
+      }
+
+      if (
+        priceStatus === 'CONFIRMED' &&
+        (
+          !Number.isInteger(
+            Number(
+              target.confirmed_price
+            )
+          ) ||
+          Number(
+            target.confirmed_price
+          ) <= 0
+        )
+      ) {
+        reasons.push(
+          '확정 가격 확인 필요'
+        )
+      }
+
+      if (
+        priceStatus === 'CANDIDATE' &&
+        (
+          !Number.isInteger(
+            Number(
+              target.candidate_price
+            )
+          ) ||
+          Number(
+            target.candidate_price
+          ) <= 0
+        )
+      ) {
+        reasons.push(
+          '가격 후보 확인 필요'
+        )
+      }
+
+      if (reasons.length > 0) {
+        failures.push({
+          variantId:
+            Number(target.variant_id),
+
+          variantName:
+            text(
+              target.variant_name,
+              100
+            ) || '이름 없는 에디션',
+
+          reason:
+            reasons.join(' · '),
+        })
+      }
+    }
+
+    if (failures.length > 0) {
+      const preview =
+        failures
+          .slice(0, 5)
+          .map(
+            (failure) =>
+              `${failure.variantName}: ${failure.reason}`
+          )
+          .join('\n')
+
+      return c.json(
+        {
+          ok: false,
+          error:
+            '전체 검토 승인 조건을 충족하지 못했습니다.\n' +
+            preview +
+            (
+              failures.length > 5
+                ? `\n외 ${failures.length - 5}개`
+                : ''
+            ),
+          failures,
+          approvedCount: 0,
+          publishStatusChanged: false,
+        },
+        409
+      )
+    }
+
+    const statements =
+      draftTargets.map(
+        (target) =>
+          c.env.DB.prepare(`
+            UPDATE variant_preorders
+
+            SET
+              publish_status =
+                'APPROVED',
+              approved_at =
+                CURRENT_TIMESTAMP,
+              updated_at =
+                CURRENT_TIMESTAMP
+
+            WHERE
+              id = ?
+              AND publish_status =
+                'DRAFT'
+          `).bind(
+            target.preorder_id
+          )
+      )
+
+    const results =
+      await c.env.DB.batch(
+        statements
+      )
+
+    const approvedCount =
+      results.reduce(
+        (sum, result) =>
+          sum +
+          Number(
+            result.meta.changes || 0
+          ),
+        0
+      )
+
+    if (
+      approvedCount !==
+      draftTargets.length
+    ) {
+      return jsonError(
+        c,
+        '전체 검토 승인 결과를 확인할 수 없습니다.',
+        500
+      )
+    }
+
+    return c.json({
+      ok: true,
+      alreadyApproved: false,
+      gameId,
+      totalCount: targets.length,
+      approvedCount,
+      alreadyApprovedCount:
+        targets.length -
+        draftTargets.length,
+      exceptionVariantCount,
+      publishStatusChanged: false,
+      gamePublishStatus:
+        game.publish_status,
+    })
+  }
+)
+
+// ------------------------------------------------------------
 // 상품 에디션 예약판매 검토 승인
 //
 // DRAFT → APPROVED

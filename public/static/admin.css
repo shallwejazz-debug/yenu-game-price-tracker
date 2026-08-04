@@ -3361,3 +3361,228 @@
     width: 100%;
   }
 }
+
+
+/* ============================================================
+   사전예약 V2 일괄 검토 승인·최종 미리보기
+   ============================================================ */
+
+.preorder-review-summary {
+  display: flex;
+  padding: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  background: rgba(89, 108, 224, 0.1);
+  border: 1px solid rgba(113, 130, 239, 0.3);
+  border-radius: 10px;
+}
+
+.preorder-review-summary.is-approved {
+  background: rgba(34, 197, 94, 0.09);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.preorder-review-summary strong {
+  color: #eef1f6;
+  font-size: 0.92rem;
+}
+
+.preorder-review-summary p {
+  margin: 6px 0 0;
+  color: #9fa8b7;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.preorder-review-summary > span {
+  display: inline-flex;
+  padding: 5px 8px;
+  flex: 0 0 auto;
+  color: #bac6ff;
+  background: rgba(89, 108, 224, 0.16);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.preorder-review-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin: 13px 0;
+}
+
+.preorder-review-stats article {
+  padding: 12px;
+  background: #11151d;
+  border: 1px solid #303747;
+  border-radius: 9px;
+}
+
+.preorder-review-stats span,
+.preorder-review-stats strong {
+  display: block;
+}
+
+.preorder-review-stats span {
+  color: #858f9f;
+  font-size: 0.7rem;
+}
+
+.preorder-review-stats strong {
+  margin-top: 6px;
+  color: #f0f2f6;
+  font-size: 1.15rem;
+}
+
+.preorder-review-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preorder-review-card {
+  min-width: 0;
+  padding: 13px;
+  background: #11151d;
+  border: 1px solid #303747;
+  border-radius: 10px;
+}
+
+.preorder-review-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preorder-review-card-head span,
+.preorder-review-card-head strong {
+  display: block;
+}
+
+.preorder-review-card-head span {
+  color: #8fa7ff;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.preorder-review-card-head strong {
+  margin-top: 4px;
+  color: #edf0f5;
+  font-size: 0.84rem;
+}
+
+.preorder-review-card-head > b {
+  padding: 4px 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  font-size: 0.65rem;
+}
+
+.preorder-review-card-head .is-ready,
+.preorder-review-card-head .is-approved {
+  color: #8ce2b5;
+  background: rgba(47, 157, 101, 0.15);
+}
+
+.preorder-review-card-head .is-blocked {
+  color: #f2ca6a;
+  background: rgba(200, 151, 40, 0.15);
+}
+
+.preorder-review-meta {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 12px 0 0;
+}
+
+.preorder-review-meta div {
+  min-width: 0;
+  padding: 8px;
+  background: #171b24;
+  border-radius: 7px;
+}
+
+.preorder-review-meta dt {
+  color: #788291;
+  font-size: 0.64rem;
+}
+
+.preorder-review-meta dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: #d2d7df;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.preorder-review-reasons {
+  margin: 10px 0 0;
+  padding: 8px 9px;
+  color: #f0c878;
+  background: rgba(200, 151, 40, 0.1);
+  border-radius: 7px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.preorder-review-actions {
+  display: flex;
+  margin-top: 14px;
+  padding: 13px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: #11151d;
+  border: 1px solid #343b4b;
+  border-radius: 10px;
+}
+
+.preorder-review-actions b {
+  color: #e9ecf1;
+  font-size: 0.8rem;
+}
+
+.preorder-review-actions p {
+  margin: 5px 0 0;
+  color: #8993a2;
+  font-size: 0.72rem;
+}
+
+.preorder-review-actions .btn {
+  min-width: 170px;
+}
+
+@media (max-width: 760px) {
+  .preorder-review-summary,
+  .preorder-review-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .preorder-review-stats {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .preorder-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preorder-review-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .preorder-review-stats,
+  .preorder-review-meta {
+    grid-template-columns: 1fr;
+  }
+}

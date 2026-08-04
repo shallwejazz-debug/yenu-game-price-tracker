@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260805-benefit-stepper-3"
+    href="/static/admin.css?v=20260805-bulk-review-1"
     rel="stylesheet"
   />
 </head>
@@ -1435,6 +1435,39 @@ export function AdminPage(): string {
           </div>
         </section>
 
+        <section
+          id="preorderV2BulkReviewSection"
+          class="preorder-v2-section"
+          style="margin-top:20px"
+          hidden
+        >
+          <div class="admin-section-head">
+            <div>
+              <h3>🔎 검토 승인·최종 미리보기</h3>
+
+              <p class="admin-hint">
+                전체 에디션의 일정·가격·이미지·예약특전을
+                다시 확인하고 부분 승인 없이 한 번에 처리합니다.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="yenu-tip"
+              data-tip="검토 승인은 작성 내용을 잠그지만 공개하지 않습니다. 승인 후 최종 미리보기를 거쳐 별도로 공개합니다."
+              aria-label="검토 승인 도움말"
+            >
+              ⓘ
+            </button>
+          </div>
+
+          <div id="preorderV2BulkReview">
+            <div class="admin-empty">
+              전체 검토 상태를 계산하고 있습니다.
+            </div>
+          </div>
+        </section>
+
         <details
           id="preorderV2IndividualEditor"
           class="admin-details"
@@ -1744,7 +1777,7 @@ export function AdminPage(): string {
           <div>
             <h2>등록된 상품 에디션</h2>
             <p class="admin-hint">
-              플랫폼과 에디션별로 분리된 사전예약 DRAFT입니다.
+              플랫폼과 에디션별로 분리된 작성 중 예약판매 정보입니다.
             </p>
           </div>
         </div>
@@ -2514,8 +2547,8 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
-	<script src="/static/preorder-benefit-workflow.js?v=20260805-benefit-stepper-3"></script>
-<script src="/static/preorder-admin.js?v=20260805-benefit-stepper-3"></script>
+	<script src="/static/preorder-benefit-workflow.js?v=20260805-bulk-review-1"></script>
+<script src="/static/preorder-admin.js?v=20260805-bulk-review-1"></script>
 </body>
 </html>`
 }
