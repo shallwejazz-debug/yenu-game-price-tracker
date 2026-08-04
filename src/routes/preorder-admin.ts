@@ -161,6 +161,109 @@ function normalizedVariantCode(
     .replace(/^_+|_+$/g, '')
 }
 
+type ReviewExceptionValue = {
+  reason: string
+  note?: string
+}
+
+type ReviewExceptions = Record<
+  string,
+  ReviewExceptionValue
+>
+
+const ALLOWED_REVIEW_EXCEPTION_REASONS =
+  new Set([
+    'OFFICIAL_UNANNOUNCED',
+    'SELLER_SPECIFIC',
+    'LATER_UPDATE',
+    'NOT_APPLICABLE',
+    'UNTIL_STOCK',
+    'NO_FIXED_END',
+  ])
+
+function parseReviewExceptions(
+  value: unknown
+): ReviewExceptions {
+  if (!value) {
+    return {}
+  }
+
+  let parsed: unknown = value
+
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      return {}
+    }
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    Array.isArray(parsed)
+  ) {
+    return {}
+  }
+
+  const result: ReviewExceptions = {}
+
+  for (
+    const [field, rawValue] of
+    Object.entries(
+      parsed as Record<string, unknown>
+    )
+  ) {
+    if (
+      !rawValue ||
+      typeof rawValue !== 'object' ||
+      Array.isArray(rawValue)
+    ) {
+      continue
+    }
+
+    const object =
+      rawValue as Record<string, unknown>
+
+    const reason = text(
+      object.reason,
+      50
+    ).toUpperCase()
+
+    if (
+      !ALLOWED_REVIEW_EXCEPTION_REASONS
+        .has(reason)
+    ) {
+      continue
+    }
+
+    const note = text(
+      object.note,
+      500
+    )
+
+    result[field] = {
+      reason,
+      ...(note ? { note } : {}),
+    }
+  }
+
+  return result
+}
+
+function hasReviewException(
+  exceptions: ReviewExceptions,
+  field: string
+): boolean {
+  const target = exceptions[field]
+
+  return Boolean(
+    target &&
+    ALLOWED_REVIEW_EXCEPTION_REASONS
+      .has(target.reason)
+  )
+}
+
 function jsonError(
   c: any,
   error: string,
@@ -428,6 +531,7 @@ preorderAdmin.get(
           vp.release_date,
           vp.preorder_start_date,
           vp.preorder_end_date,
+          vp.review_exceptions,
           vp.preorder_status,
           vp.preorder_bonus,
           vp.preorder_bonus_note,
@@ -1903,6 +2007,330 @@ preorderAdmin.post(
     })
   }
 )
+
+// ------------------------------------------------------------
+// 검토 준비 일정·상태 일괄 저장
+//
+// 모든 DRAFT 에디션에 같은 예약판매 상태와 일정 또는
+// 공식 미발표 등의 예외 사유를 적용한다.
+// 이미지, 가격, 승인, 공개 상태는 변경하지 않는다.
+// ------------------------------------------------------------
+
+preorderAdmin.post(
+  '/games/:gameId/review-preparation/bulk',
+  async (c) => {
+    const gameId = Number(
+      c.req.param('gameId')
+    )
+
+    if (
+      !Number.isInteger(gameId) ||
+      gameId <= 0
+    ) {
+      return jsonError(
+        c,
+        '게임 정보가 올바르지 않습니다.',
+        400
+      )
+    }
+
+    const body = await c.req
+      .json<Record<string, unknown>>()
+      .catch(() => null)
+
+    if (!body) {
+      return jsonError(
+        c,
+        'invalid JSON body',
+        400
+      )
+    }
+
+    const preorderStatus = text(
+      body.preorderStatus,
+      30
+    ).toUpperCase()
+
+    const startResolution = text(
+      body.startResolution,
+      50
+    ).toUpperCase()
+
+    const endResolution = text(
+      body.endResolution,
+      50
+    ).toUpperCase()
+
+    const rawStartDate = text(
+      body.startDate,
+      10
+    )
+
+    const rawEndDate = text(
+      body.endDate,
+      10
+    )
+
+    if (
+      !ALLOWED_PREORDER_STATUSES.has(
+        preorderStatus
+      ) ||
+      preorderStatus === 'UNKNOWN' ||
+      preorderStatus === 'CANCELLED'
+    ) {
+      return jsonError(
+        c,
+        '예약판매 상태를 예정·진행 중·종료 중에서 선택해 주세요.',
+        400
+      )
+    }
+
+    const startUsesDate =
+      startResolution === 'DATE'
+
+    const endUsesDate =
+      endResolution === 'DATE'
+
+    if (
+      !startUsesDate &&
+      !ALLOWED_REVIEW_EXCEPTION_REASONS
+        .has(startResolution)
+    ) {
+      return jsonError(
+        c,
+        '예약판매 시작일 또는 미입력 사유를 선택해 주세요.',
+        400
+      )
+    }
+
+    if (
+      !endUsesDate &&
+      !ALLOWED_REVIEW_EXCEPTION_REASONS
+        .has(endResolution)
+    ) {
+      return jsonError(
+        c,
+        '예약판매 종료일 또는 미입력 사유를 선택해 주세요.',
+        400
+      )
+    }
+
+    const startDate =
+      startUsesDate
+        ? nullableDate(rawStartDate)
+        : null
+
+    const endDate =
+      endUsesDate
+        ? nullableDate(rawEndDate)
+        : null
+
+    if (
+      startUsesDate &&
+      !startDate
+    ) {
+      return jsonError(
+        c,
+        '올바른 예약판매 시작일을 입력해 주세요.',
+        400
+      )
+    }
+
+    if (
+      endUsesDate &&
+      !endDate
+    ) {
+      return jsonError(
+        c,
+        '올바른 예약판매 종료일을 입력해 주세요.',
+        400
+      )
+    }
+
+    if (
+      startDate &&
+      endDate &&
+      startDate > endDate
+    ) {
+      return jsonError(
+        c,
+        '예약판매 종료일은 시작일보다 빠를 수 없습니다.',
+        400
+      )
+    }
+
+    const game = await c.env.DB.prepare(`
+      SELECT
+        id,
+        title,
+        publish_status
+
+      FROM games
+
+      WHERE id = ?
+
+      LIMIT 1
+    `)
+      .bind(gameId)
+      .first<{
+        id: number
+        title: string
+        publish_status: string
+      }>()
+
+    if (!game) {
+      return jsonError(
+        c,
+        '게임을 찾을 수 없습니다.',
+        404
+      )
+    }
+
+    if (game.publish_status !== 'DRAFT') {
+      return jsonError(
+        c,
+        '비공개 DRAFT 게임에서만 검토 준비 정보를 수정할 수 있습니다.',
+        409
+      )
+    }
+
+    const { results: targets } =
+      await c.env.DB.prepare(`
+        SELECT
+          vp.id AS preorder_id,
+          vp.review_exceptions,
+
+          pv.id AS variant_id,
+          pv.variant_name,
+          pv.publish_status
+            AS variant_publish_status,
+
+          vp.publish_status
+            AS preorder_publish_status
+
+        FROM variant_preorders vp
+
+        INNER JOIN product_variants pv
+          ON pv.id = vp.variant_id
+
+        INNER JOIN editions e
+          ON e.id = pv.edition_id
+
+        WHERE
+          e.game_id = ?
+          AND pv.publish_status = 'DRAFT'
+          AND vp.publish_status = 'DRAFT'
+
+        ORDER BY
+          pv.display_order ASC,
+          pv.id ASC
+      `)
+        .bind(gameId)
+        .all<{
+          preorder_id: number
+          review_exceptions: string | null
+          variant_id: number
+          variant_name: string
+          variant_publish_status: string
+          preorder_publish_status: string
+        }>()
+
+    if (!targets || targets.length < 1) {
+      return jsonError(
+        c,
+        '일괄 저장할 DRAFT 에디션이 없습니다.',
+        404
+      )
+    }
+
+    const statements = []
+
+    for (const target of targets) {
+      const exceptions =
+        parseReviewExceptions(
+          target.review_exceptions
+        )
+
+      if (startUsesDate) {
+        delete exceptions
+          .PREORDER_START_DATE
+      } else {
+        exceptions.PREORDER_START_DATE = {
+          reason: startResolution,
+        }
+      }
+
+      if (endUsesDate) {
+        delete exceptions
+          .PREORDER_END_DATE
+      } else {
+        exceptions.PREORDER_END_DATE = {
+          reason: endResolution,
+        }
+      }
+
+      statements.push(
+        c.env.DB.prepare(`
+          UPDATE variant_preorders
+
+          SET
+            preorder_start_date = ?,
+            preorder_end_date = ?,
+            preorder_status = ?,
+            review_exceptions = ?,
+            updated_at = CURRENT_TIMESTAMP
+
+          WHERE
+            id = ?
+            AND publish_status = 'DRAFT'
+        `).bind(
+          startDate,
+          endDate,
+          preorderStatus,
+          JSON.stringify(exceptions),
+          target.preorder_id
+        )
+      )
+    }
+
+    const results =
+      await c.env.DB.batch(
+        statements
+      )
+
+    const updatedCount =
+      results.reduce(
+        (sum, result) =>
+          sum +
+          Number(
+            result.meta.changes || 0
+          ),
+        0
+      )
+
+    if (
+      updatedCount !== targets.length
+    ) {
+      return jsonError(
+        c,
+        '일부 에디션의 검토 준비 정보를 저장하지 못했습니다.',
+        500
+      )
+    }
+
+    return c.json({
+      ok: true,
+      gameId,
+      preorderStatus,
+      startResolution,
+      startDate,
+      endResolution,
+      endDate,
+      updatedCount,
+      publishStatusChanged: false,
+    })
+  }
+)
 // ------------------------------------------------------------
 // 상품 에디션 예약판매 검토 승인
 //
@@ -2055,14 +2483,43 @@ preorderAdmin.post(
       )
     }
 
+    if (!target.release_date) {
+      return jsonError(
+        c,
+        '출시일을 입력해 주세요.',
+        409
+      )
+    }
+
+    const reviewExceptions =
+      parseReviewExceptions(
+        target.review_exceptions
+      )
+
     if (
-      !target.release_date ||
-      !target.preorder_start_date ||
-      !target.preorder_end_date
+      !target.preorder_start_date &&
+      !hasReviewException(
+        reviewExceptions,
+        'PREORDER_START_DATE'
+      )
     ) {
       return jsonError(
         c,
-        '출시일과 예약판매 시작일·종료일을 모두 입력해 주세요.',
+        '예약판매 시작일 또는 공식 미발표 등의 사유를 입력해 주세요.',
+        409
+      )
+    }
+
+    if (
+      !target.preorder_end_date &&
+      !hasReviewException(
+        reviewExceptions,
+        'PREORDER_END_DATE'
+      )
+    ) {
+      return jsonError(
+        c,
+        '예약판매 종료일 또는 종료일 없음 등의 사유를 입력해 주세요.',
         409
       )
     }
@@ -2225,6 +2682,7 @@ preorderAdmin.post(
           vp.release_date,
           vp.preorder_start_date,
           vp.preorder_end_date,
+          vp.review_exceptions,
           vp.preorder_status,
           vp.price_status,
           vp.candidate_price,
