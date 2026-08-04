@@ -1012,7 +1012,7 @@
           : (
               '확인 필요 ' +
               (total - reviewReady) +
-              '개 · 아래 공통 설정을 저장하면 일정과 상태를 한 번에 정리할 수 있습니다.'
+              '개 · 일정·상태·예약특전 중 표시된 미완료 항목을 처리해 주세요.'
             )
 
       notice.className =
@@ -1183,7 +1183,7 @@
       if (button) {
         button.disabled = false
         button.textContent =
-          '전체 DRAFT에 공통 설정 저장'
+          '전체 작성 중 에디션에 공통 설정 저장'
       }
     }
   }
@@ -1564,7 +1564,15 @@
         $('preorderV2GameMeta')
           .textContent =
           '상태 ' +
-          data.game.publish_status +
+          (
+            String(
+              data.game.publish_status ||
+              ''
+            ).toUpperCase() ===
+              'DRAFT'
+              ? '작성 중 · 비공개'
+              : data.game.publish_status
+          ) +
           ' · 플랫폼 ' +
           (
             Array.isArray(data.editions)
@@ -2109,6 +2117,7 @@
         )
 
       const isContentsTarget =
+        hasContents ||
         (
           variant.variant_kind ===
           'LIMITED'
@@ -2264,7 +2273,7 @@
           'class="btn btn-primary" ' +
           'type="button"' +
         '>' +
-          '선택한 이미지 전체 DRAFT 저장' +
+          '선택한 이미지 전체 작성 중 상태로 저장' +
         '</button>' +
       '</div>'
 
@@ -2427,7 +2436,7 @@
 
       button.disabled = false
       button.textContent =
-        '선택한 이미지 전체 DRAFT 저장'
+        '선택한 이미지 전체 작성 중 상태로 저장'
     } finally {
       bulkImageSaving = false
     }

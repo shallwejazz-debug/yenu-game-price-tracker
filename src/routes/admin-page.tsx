@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260805-benefit-stepper-2"
+    href="/static/admin.css?v=20260805-benefit-stepper-3"
     rel="stylesheet"
   />
 </head>
@@ -1353,7 +1353,7 @@ export function AdminPage(): string {
               class="btn btn-primary"
               type="button"
             >
-              전체 DRAFT에 공통 설정 저장
+              전체 작성 중 에디션에 공통 설정 저장
             </button>
           </div>
         </section>
@@ -2514,8 +2514,8 @@ export function AdminPage(): string {
 
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
-	<script src="/static/preorder-benefit-workflow.js?v=20260805-benefit-stepper-2"></script>
-<script src="/static/preorder-admin.js?v=20260805-benefit-stepper-2"></script>
+	<script src="/static/preorder-benefit-workflow.js?v=20260805-benefit-stepper-3"></script>
+<script src="/static/preorder-admin.js?v=20260805-benefit-stepper-3"></script>
 </body>
 </html>`
 }

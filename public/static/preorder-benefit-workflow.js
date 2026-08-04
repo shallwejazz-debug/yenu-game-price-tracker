@@ -282,13 +282,28 @@
       }
     )
 
+    const invalidProvide =
+      rules.filter(
+        function (rule) {
+          return (
+            rule.targetIds.size > 0 &&
+            rule.mode === 'PROVIDE' &&
+            !String(
+              rule.bonus || ''
+            ).trim()
+          )
+        }
+      ).length
+
     return {
       unresolved,
       duplicate,
+      invalidProvide,
       complete:
         counts.size > 0 &&
         unresolved.length === 0 &&
-        duplicate.length === 0
+        duplicate.length === 0 &&
+        invalidProvide === 0
     }
   }
 
@@ -650,6 +665,8 @@
                   state.unresolved.length +
                   '개 · 중복 지정 ' +
                   state.duplicate.length +
+                  '개 · 특전 내용 미입력 ' +
+                  state.invalidProvide +
                   '개'
                 )
           ) +
