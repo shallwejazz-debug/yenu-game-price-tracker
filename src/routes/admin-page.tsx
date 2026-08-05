@@ -34,7 +34,7 @@ export function AdminPage(): string {
 
   <link href="/static/style.css" rel="stylesheet" />
   <link
-    href="/static/admin.css?v=20260805-bulk-review-1"
+    href="/static/admin.css?v=20260805-publish-preview-1"
     rel="stylesheet"
   />
 </head>
@@ -2548,7 +2548,8 @@ export function AdminPage(): string {
 	<script src="/static/admin.js?v=20260724-naver-preorder-v1"></script>
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
 	<script src="/static/preorder-benefit-workflow.js?v=20260805-bulk-review-1"></script>
-<script src="/static/preorder-admin.js?v=20260805-bulk-review-1"></script>
+<script src="/static/preorder-admin.js?v=20260805-publish-preview-1"></script>
+<script src="/static/preorder-publish-workflow.js?v=20260805-publish-preview-1"></script>
 </body>
 </html>`
 }
