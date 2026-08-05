@@ -59,10 +59,71 @@
     return labels[value] || value || '이미지'
   }
 
-  function won(value) {
-    const price = Number(value)
+  function numericPrice(value) {
+    if (
+      value &&
+      typeof value === 'object'
+    ) {
+      const objectCandidates = [
+        value.value,
+        value.amount,
+        value.price,
+        value.confirmed_price,
+        value.confirmedPrice
+      ]
 
-    return Number.isInteger(price) && price > 0
+      for (
+        const candidate of
+        objectCandidates
+      ) {
+        const nested = numericPrice(
+          candidate
+        )
+
+        if (nested > 0) return nested
+      }
+
+      return 0
+    }
+
+    const normalized = String(
+      value == null ? '' : value
+    ).replace(/[^\d.-]/g, '')
+
+    const price = Number(normalized)
+
+    return (
+      Number.isFinite(price) &&
+      price > 0
+    )
+      ? Math.round(price)
+      : 0
+  }
+
+  function variantPrice(variant) {
+    const candidates = [
+      variant.confirmed_price,
+      variant.confirmedPrice,
+      variant.candidate_price,
+      variant.candidatePrice,
+      variant.price,
+      variant.original_price,
+      variant.originalPrice
+    ]
+
+    for (const candidate of candidates) {
+      const price = numericPrice(candidate)
+
+      if (price > 0) return price
+    }
+
+    return 0
+  }
+
+  function won(value) {
+    const price = numericPrice(value)
+
+    return price > 0
       ? '₩' + price.toLocaleString('ko-KR')
       : '가격 미정'
   }
@@ -81,6 +142,25 @@
     }
   }
 
+  function exceptionReason(value) {
+    if (
+      value &&
+      typeof value === 'object'
+    ) {
+      return String(
+        value.reason ||
+        value.code ||
+        value.resolution ||
+        value.type ||
+        ''
+      ).trim()
+    }
+
+    return String(
+      value == null ? '' : value
+    ).trim()
+  }
+
   function reasonLabel(value) {
     const labels = {
       OFFICIAL_UNANNOUNCED: '공식 미발표',
@@ -91,7 +171,13 @@
       NO_FIXED_END: '별도 종료일 없음'
     }
 
-    return labels[value] || value || '공식 출처 확인'
+    const reason = exceptionReason(value)
+
+    return (
+      labels[reason] ||
+      reason ||
+      '공식 출처 확인'
+    )
   }
 
   function periodLabel(variant) {
@@ -424,7 +510,7 @@
           '</div>' +
           '<strong>' +
             escapeHtml(
-              won(variant.confirmed_price)
+              won(variantPrice(variant))
             ) +
           '</strong>' +
         '</div>' +
@@ -471,13 +557,35 @@
       const element = byId(id)
 
       if (element) {
-        element.hidden = true
-        element.setAttribute(
+        const lockTarget =
+          element.closest(
+            '.preorder-v2-section'
+          ) || element
+
+        lockTarget.hidden = true
+        lockTarget.setAttribute(
           'data-approved-locked',
           'true'
         )
       }
     })
+
+    const individualEditor =
+      byId('preorderV2IndividualEditor')
+
+    if (individualEditor) {
+      const summary =
+        individualEditor.querySelector(
+          'summary'
+        )
+
+      if (summary) {
+        summary.textContent =
+          '승인 완료 · 에디션 편집 잠금'
+      }
+
+      individualEditor.hidden = true
+    }
 
     document
       .querySelectorAll(
