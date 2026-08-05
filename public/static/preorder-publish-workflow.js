@@ -167,6 +167,7 @@
       SELLER_SPECIFIC: '판매처별 상이',
       LATER_UPDATE: '추후 입력',
       NOT_APPLICABLE: '공식 미제공',
+      OFFICIAL_NOT_PROVIDED: '공식 미제공',
       UNTIL_STOCK: '재고 소진 시 종료',
       NO_FIXED_END: '별도 종료일 없음'
     }

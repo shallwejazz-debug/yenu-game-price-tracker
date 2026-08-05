@@ -2549,7 +2549,7 @@ export function AdminPage(): string {
 	<script src="/static/watcher-admin.js?v=20260803-image-accordion-preview-1"></script>
 	<script src="/static/preorder-benefit-workflow.js?v=20260805-publish-preview-2"></script>
 <script src="/static/preorder-admin.js?v=20260805-publish-preview-1"></script>
-<script src="/static/preorder-publish-workflow.js?v=20260805-publish-preview-2"></script>
+<script src="/static/preorder-publish-workflow.js?v=20260805-steam-label-1"></script>
 </body>
 </html>`
 }
