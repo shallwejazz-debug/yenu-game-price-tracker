@@ -82,3 +82,7 @@ npx wrangler d1 migrations apply webapp-production --local
 - 디지털 스토어 정가/할인 연동(Steam, ITAD)
 
 _최종 수정: 2026-06-23_
+
+## 서비스 동결/복구
+
+YEONU DEAL 동결 기준과 복구 절차는 [docs/archive/RESTORE.md](docs/archive/RESTORE.md)를 참고하세요.
